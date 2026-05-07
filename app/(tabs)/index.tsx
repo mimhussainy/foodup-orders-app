@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  AppState,
   Image,
   Linking,
   RefreshControl,
@@ -89,6 +90,7 @@ function groupOrdersByDate(orders: Order[], t: any) {
   return Object.keys(groups).map(title => ({ title, data: groups[title] }));
 }
 
+const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
 export default function OrdersScreen() {
@@ -107,7 +109,58 @@ export default function OrdersScreen() {
     AsyncStorage.getItem(STORAGE_KEY).then(stored => {
       if (stored) setOrders(JSON.parse(stored));
     });
+    fetchOrdersFromBackend();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        fetchOrdersFromBackend();
+      }
+    });
+
+    return () => appStateSubscription.remove();
   }, []);
+
+  const fetchOrdersFromBackend = async () => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      if (!code) return;
+      const response = await fetch(`${BACKEND_URL}/orders/${code}`);
+      const result = await response.json();
+      if (result.success && result.orders.length > 0) {
+        const backendOrders: Order[] = result.orders.map((o: any) => ({
+          order_id: parseInt(o.order_id),
+          customer_name: o.customer_name || '',
+          customer_email: o.customer_email || '',
+          customer_phone: o.customer_phone || '',
+          total: String(o.total || ''),
+          currency: o.currency || 'CHF',
+          status: o.status || '',
+          event_type: o.event_type || 'new_order',
+          items: o.items || [],
+          payment_method: o.payment_method || '',
+          note: o.note || '',
+          date: new Date().toLocaleString(),
+          timestamp: Date.now(),
+          shipping_method: o.shipping?.method || '',
+          shipping_address: o.shipping?.address || '',
+          restaurant_code: o.restaurant_code || '',
+        }));
+        setOrders(prev => {
+          // Merge backend orders with local orders, avoid duplicates
+          const merged = [...prev];
+          backendOrders.forEach(bo => {
+            const exists = merged.findIndex(o => o.order_id === bo.order_id);
+            if (exists === -1) merged.push(bo);
+          });
+          merged.sort((a, b) => b.order_id - a.order_id);
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          return merged;
+        });
+      }
+    } catch (e) {}
+  };
+
+  
 
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
@@ -160,9 +213,10 @@ export default function OrdersScreen() {
       return () => subscription.remove();
     }, []);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await fetchOrdersFromBackend();
+    setRefreshing(false);
   };
 
   const sections = groupOrdersByDate(orders, t);
@@ -302,6 +356,7 @@ export default function OrdersScreen() {
             sections={sections}
             keyExtractor={(item) => String(item.order_id)}
             contentContainerStyle={styles.scrollContent}
+            stickySectionHeadersEnabled={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
             }

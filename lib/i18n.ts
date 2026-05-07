@@ -2,7 +2,6 @@ export type Language = 'en' | 'de';
 
 export const translations = {
   en: {
-    // Onboarding
     welcome: 'Welcome back',
     signIn: 'Sign in to continue',
     owner: 'Owner',
@@ -25,7 +24,6 @@ export const translations = {
     enterPinError: 'Please enter your PIN',
     enterCredentialsError: 'Please enter your credentials',
 
-    // Days and months
     thisWeek: 'This Week',
     thisMonth: 'This Month',
     thisYear: 'This Year',
@@ -38,8 +36,7 @@ export const translations = {
     lastMonth: 'Last Month',
     older: 'Older',
     reorderHint: 'Use ↑↓ arrows to reorder delivery priority',
-    
-    // Orders
+
     orders: 'Orders',
     noOrders: 'No orders yet',
     noOrdersSub: 'New orders will appear here instantly!',
@@ -55,7 +52,6 @@ export const translations = {
     pending: 'Pending',
     onHold: 'On Hold',
 
-    // Delivery
     hiCourier: 'Hi',
     enterOrderId: 'Enter Order ID',
     orderIdPlaceholder: 'Order ID',
@@ -69,7 +65,6 @@ export const translations = {
     alreadyBeingDelivered: 'This order is already being delivered by',
     searchAnother: 'Search another order',
 
-    // Bag
     bagEmpty: 'Your bag is empty',
     bagEmptySub: 'Add orders from the Add Order tab',
     activeOrders: 'Active Orders',
@@ -79,7 +74,6 @@ export const translations = {
     markDelivered: 'Mark as Delivered',
     deliveredAt: 'Delivered at',
 
-    // Settings
     profile: 'Profile',
     addCourierAccount: 'Add Courier Account',
     courierAccounts: 'Courier Accounts',
@@ -118,7 +112,6 @@ export const translations = {
   },
 
   de: {
-    // Onboarding
     welcome: 'Willkommen zurück',
     signIn: 'Anmelden um fortzufahren',
     owner: 'Inhaber',
@@ -141,7 +134,6 @@ export const translations = {
     enterPinError: 'Bitte PIN eingeben',
     enterCredentialsError: 'Bitte Anmeldedaten eingeben',
 
-    // Tagen
     thisWeek: 'Diese Woche',
     thisMonth: 'Diesen Monat',
     thisYear: 'Dieses Jahr',
@@ -155,7 +147,6 @@ export const translations = {
     older: 'Älter',
     reorderHint: '↑↓ Pfeile zum Neuordnen der Lieferpriorität',
 
-    // Orders
     orders: 'Bestellungen',
     noOrders: 'Noch keine Bestellungen',
     noOrdersSub: 'Neue Bestellungen erscheinen sofort hier!',
@@ -171,7 +162,6 @@ export const translations = {
     pending: 'Ausstehend',
     onHold: 'Zurückgestellt',
 
-    // Delivery
     hiCourier: 'Hallo',
     enterOrderId: 'Bestellnummer eingeben',
     orderIdPlaceholder: 'Bestellnummer',
@@ -181,11 +171,10 @@ export const translations = {
     alreadyDelivered: '✓ Geliefert',
     alreadyInBag: 'Diese Bestellung ist bereits in Ihrer Tasche.',
     orderCancelled: 'Diese Bestellung wurde storniert und kann nicht geliefert werden.',
-    orderCancelled: 'Diese Bestellung wurde storniert und kann nicht geliefert werden.',
+    pickupOrder: 'Dies ist eine Abholbestellung und kann nicht geliefert werden.',
     alreadyBeingDelivered: 'Diese Bestellung wird bereits geliefert von',
     searchAnother: 'Andere Bestellung suchen',
 
-    // Bag
     bagEmpty: 'Ihre Tasche ist leer',
     bagEmptySub: 'Bestellungen im Tab "Bestellung hinzufügen" hinzufügen',
     activeOrders: 'Aktive Bestellungen',
@@ -195,7 +184,6 @@ export const translations = {
     markDelivered: 'Als geliefert markieren',
     deliveredAt: 'Geliefert um',
 
-    // Settings
     profile: 'Profil',
     addCourierAccount: 'Kurier-Konto hinzufügen',
     courierAccounts: 'Kurier-Konten',

@@ -69,27 +69,30 @@ const checkUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('user_role');
       const restaurantCode = await AsyncStorage.getItem('restaurant_code');
+      if (!role || !restaurantCode) {
+        setTimeout(() => router.replace('/onboarding'), 100);
+        return;
+      }
       if (role === 'owner') {
         registerForPushNotifications();
       } else if (role === 'delivery') {
         unregisterPushNotifications();
       }
       setTimeout(() => {
-        if (!role || !restaurantCode) {
-          router.replace('/onboarding');
-        } else {
-          router.replace('/(tabs)');
-        }
-      }, 100);
-    } catch (e) {
-      router.replace('/onboarding');
-    }
-  };
-  
+              router.replace('/(tabs)');
+            }, 100);
+          } catch (e) {
+            router.replace('/onboarding');
+          }
+        };  
   useEffect(() => {
     checkUserRole();
+    Notifications.setBadgeCountAsync(0);
+    Notifications.dismissAllNotificationsAsync();
 
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
+      Notifications.setBadgeCountAsync(0);
+      Notifications.dismissAllNotificationsAsync();
       const data = notification.request.content.data as any;
       if (data.event_type === 'new_order') {
         try {
@@ -111,7 +114,43 @@ const checkUserRole = async () => {
       }
     });
 
-    return () => subscription.remove();
+    const tapSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      Notifications.setBadgeCountAsync(0);
+      const data = response.notification.request.content.data as any;
+      if (data.order_id) {
+        const newOrder = {
+          order_id: parseInt(data.order_id),
+          customer_name: data.customer_name || '',
+          customer_email: data.customer_email || '',
+          customer_phone: data.customer_phone || '',
+          total: data.total || '',
+          currency: data.currency || 'CHF',
+          status: data.status || '',
+          event_type: data.event_type || 'new_order',
+          items: JSON.parse(data.items || '[]'),
+          payment_method: data.payment_method || '',
+          note: data.note || '',
+          date: new Date().toLocaleString(),
+          timestamp: Date.now(),
+          shipping_method: data.shipping_method || '',
+          shipping_address: data.shipping_address || '',
+          restaurant_code: data.restaurant_code || '',
+        };
+        AsyncStorage.getItem('foodup_orders').then(stored => {
+          const existing = stored ? JSON.parse(stored) : [];
+          const exists = existing.findIndex((o: any) => o.order_id === newOrder.order_id);
+          if (exists === -1) {
+            const updated = [newOrder, ...existing];
+            AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
+          }
+        });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      tapSubscription.remove();
+    };
   }, []);
 
   return (
