@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -21,6 +21,12 @@ export default function OnboardingScreen() {
   const { t } = useLanguage();
   const [step, setStep] = useState<'restaurant' | 'role' | 'pin' | 'delivery_login'>('restaurant');
   const [restaurantCode, setRestaurantCode] = useState('');
+
+  useEffect(() => {
+    AsyncStorage.getItem('restaurant_code').then(code => {
+      if (code) setStep('role');
+    });
+  }, []);
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

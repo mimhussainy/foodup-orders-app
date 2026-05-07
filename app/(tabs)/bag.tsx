@@ -171,7 +171,7 @@ export default function BagScreen() {
     setExpandedOrders(prev =>
       prev.includes(order_id)
         ? prev.filter(id => id !== order_id)
-        : [...prev, order_id]
+        : [order_id]
     );
   };
 
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardTitle: { fontSize: 17, fontWeight: '700', color: '#111' },
-  cardSubtitle: { fontSize: 14, color: '#666', marginTop: 2 },
+  cardSubtitle: { fontSize: 14, color: '#666', marginTop: 7 },
   statusBadge: {
     backgroundColor: '#F5F5F5',
     borderRadius: 6,

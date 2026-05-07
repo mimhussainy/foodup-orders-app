@@ -298,12 +298,14 @@ export default function SettingsScreen() {
     const ordersHistory = await AsyncStorage.getItem('foodup_orders');
     const deliveryBag = await AsyncStorage.getItem('delivery_bag');
     const deliveryHistory = await AsyncStorage.getItem('delivery_history');
+    const restaurantCode = await AsyncStorage.getItem('restaurant_code');
 
     await AsyncStorage.clear();
 
     if (ordersHistory) await AsyncStorage.setItem('foodup_orders', ordersHistory);
     if (deliveryBag) await AsyncStorage.setItem('delivery_bag', deliveryBag);
     if (deliveryHistory) await AsyncStorage.setItem('delivery_history', deliveryHistory);
+    if (restaurantCode) await AsyncStorage.setItem('restaurant_code', restaurantCode);
 
     router.replace('/onboarding');
   };

@@ -98,6 +98,7 @@ export default function OrdersScreen() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [claims, setClaims] = useState<{ [key: string]: string }>({});
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -114,12 +115,22 @@ export default function OrdersScreen() {
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         fetchOrdersFromBackend();
+        fetchClaims();
       }
     });
 
     return () => appStateSubscription.remove();
   }, []);
 
+  const fetchClaims = async () => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      if (!code) return;
+      const response = await fetch(`${BACKEND_URL}/claims/${code}`);
+      const result = await response.json();
+      if (result.success) setClaims(result.claims);
+    } catch (e) {}
+  };
   const fetchOrdersFromBackend = async () => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -146,11 +157,15 @@ export default function OrdersScreen() {
           restaurant_code: o.restaurant_code || '',
         }));
         setOrders(prev => {
-          // Merge backend orders with local orders, avoid duplicates
           const merged = [...prev];
           backendOrders.forEach(bo => {
             const exists = merged.findIndex(o => o.order_id === bo.order_id);
-            if (exists === -1) merged.push(bo);
+            if (exists === -1) {
+              merged.push(bo);
+            } else {
+              // Update status of existing order
+              merged[exists] = { ...merged[exists], status: bo.status };
+            }
           });
           merged.sort((a, b) => b.order_id - a.order_id);
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
@@ -216,6 +231,7 @@ export default function OrdersScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchOrdersFromBackend();
+    fetchClaims();
     setRefreshing(false);
   };
 
@@ -382,12 +398,20 @@ export default function OrdersScreen() {
                   <Ionicons name="cash-outline" size={14} color="#999" />
                   <Text style={styles.orderTotal}>{item.currency} {item.total}</Text>
                 </View>
-                {item.shipping_method ? (
-                  <View style={styles.orderMeta}>
-                    <Ionicons name={item.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
-                    <Text style={styles.orderShipping}>{item.shipping_method}</Text>
-                  </View>
-                ) : null}
+                <View style={styles.orderBottomRow}>
+                  {item.shipping_method ? (
+                    <View style={styles.orderMeta}>
+                      <Ionicons name={item.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                      <Text style={styles.orderShipping}>{item.shipping_method}</Text>
+                    </View>
+                  ) : <View />}
+                  {claims[String(item.order_id)] ? (
+                    <View style={styles.orderMeta}>
+                      <Ionicons name="bicycle-outline" size={14} color="#8B38CB" />
+                      <Text style={styles.courierName}>{claims[String(item.order_id)]}</Text>
+                    </View>
+                  ) : null}
+                </View>
               </TouchableOpacity>
             )}
           />
@@ -438,6 +462,8 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#111' },
   totalValue: { fontSize: 16, fontWeight: '700', color: '#111' },
   orderNameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  orderBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  courierName: { fontSize: 14, color: '#8B38CB', fontWeight: '500' },
   
   
 });

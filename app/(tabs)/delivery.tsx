@@ -155,7 +155,7 @@ export default function AddOrderScreen() {
 
       await AsyncStorage.setItem(
         'delivery_bag',
-        JSON.stringify([bagOrder, ...bag])
+        JSON.stringify([...bag, bagOrder])
       );
 
       setAddedToBag(true);
