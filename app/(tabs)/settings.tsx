@@ -1,0 +1,843 @@
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Alert, Image, Keyboard, Linking, SafeAreaView, ScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
+import { useLanguage } from '../../lib/useLanguage';
+
+const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
+
+const SOUND_MAP: { [key: string]: string } = {
+  cash: 'https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3',
+  bell: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+  chime: 'https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3',
+};
+
+async function previewSound(key: string) {
+  if (key === 'default') return;
+
+  try {
+    const uri = SOUND_MAP[key];
+    if (!uri) return;
+
+    const { sound } = await Audio.Sound.createAsync({ uri });
+    await sound.playAsync();
+
+    sound.setOnPlaybackStatusUpdate((status: any) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+  } catch (e) {}
+}
+
+export default function SettingsScreen() {
+  const router = useRouter();
+  const { language, t, changeLanguage } = useLanguage();
+
+  const SOUNDS = [
+    { key: 'default', label: t.default, icon: 'notifications-outline' },
+    { key: 'cash', label: t.cashRegister, icon: 'cash-outline' },
+    { key: 'bell', label: t.bell, icon: 'alarm-outline' },
+    { key: 'chime', label: t.chime, icon: 'musical-notes-outline' },
+  ];
+
+  const [role, setRole] = useState('');
+  const [restaurantCode, setRestaurantCode] = useState('');
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showSound, setShowSound] = useState(false);
+  const [showAllCouriers, setShowAllCouriers] = useState(false);
+  const [deliveryName, setDeliveryName] = useState('');
+  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [newResetPassword, setNewResetPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [notificationSound, setNotificationSound] = useState('default');
+  const [changingLanguage, setChangingLanguage] = useState(false);
+  const [showLanguage, setShowLanguage] = useState(false);
+  const [restaurantName, setRestaurantName] = useState('');
+  const [restaurantPhone, setRestaurantPhone] = useState('');
+  const [restaurantAddress, setRestaurantAddress] = useState('');
+  const [restaurantHours, setRestaurantHours] = useState('');
+  const [restaurantWebsite, setRestaurantWebsite] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [showRestaurantForm, setShowRestaurantForm] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('restaurant_code').then(c => setRestaurantCode(c || ''));
+
+    AsyncStorage.getItem('user_role').then(r => {
+      setRole(r || '');
+
+      if (r === 'owner') {
+        loadAccounts();
+        loadRestaurantProfile();
+      }
+
+      if (r === 'delivery') {
+        loadRestaurantProfile();
+      }
+    });
+
+    AsyncStorage.getItem('delivery_name').then(n => setDeliveryName(n || ''));
+    AsyncStorage.getItem('notification_sound').then(s => setNotificationSound(s || 'default'));
+  }, []);
+
+  const loadAccounts = async () => {
+    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/delivery-accounts?owner_pin=${pin}&restaurant_code=${code}`
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        setAccounts(result.accounts);
+      }
+    } catch (e) {}
+  };
+
+  const loadRestaurantProfile = async () => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+      const response = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setRestaurantName(result.profile.name || '');
+        setRestaurantPhone(result.profile.phone || '');
+        setRestaurantAddress(result.profile.address || '');
+        setRestaurantHours(result.profile.hours || '');
+        setRestaurantWebsite(result.profile.website || '');
+      }
+    } catch (e) {}
+  };
+
+  const handleAddAccount = async () => {
+    Keyboard.dismiss();
+
+    if (!newUsername.trim() || !newPassword.trim()) {
+      setError(t.enterUsernamePassword);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/add-delivery-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username:
+            newUsername.trim().charAt(0).toUpperCase() +
+            newUsername.trim().slice(1),
+          password: newPassword.trim(),
+          owner_pin: pin,
+          restaurant_code: code,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSuccess(t.accountCreated);
+        setNewUsername('');
+        setNewPassword('');
+        loadAccounts();
+      } else {
+        setError(result.message || 'Failed to create account');
+      }
+    } catch (e) {
+      setError(t.connectionError);
+    }
+
+    setLoading(false);
+  };
+
+  const handleSaveRestaurantProfile = async () => {
+    Keyboard.dismiss();
+
+    setProfileLoading(true);
+    setProfileError('');
+    setProfileSuccess('');
+
+    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/restaurant-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_pin: pin,
+          restaurant_code: code,
+          name: restaurantName.trim(),
+          phone: restaurantPhone.trim(),
+          address: restaurantAddress.trim(),
+          hours: restaurantHours.trim(),
+          website: restaurantWebsite.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setProfileSuccess(t.profileSaved);
+        setShowRestaurantForm(false);
+        setTimeout(() => setProfileSuccess(''), 2000);
+      } else {
+        setProfileError('Failed to save profile');
+      }
+    } catch (e) {
+      setProfileError(t.connectionError);
+    }
+
+    setProfileLoading(false);
+  };
+
+  const handleDeleteAccount = async (username: string) => {
+    Alert.alert(
+      t.removeCourier,
+      `${t.removeCourierConfirm} ${username.charAt(0).toUpperCase() + username.slice(1)}?`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.remove,
+          style: 'destructive',
+          onPress: async () => {
+            const pin = await AsyncStorage.getItem('owner_pin') || '';
+            const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+            try {
+              await fetch(`${BACKEND_URL}/delete-delivery-account`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username,
+                  owner_pin: pin,
+                  restaurant_code: code,
+                }),
+              });
+
+              loadAccounts();
+            } catch (e) {}
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetPassword = async (username: string) => {
+    if (!newResetPassword.trim()) {
+      setResetError('Please enter a new password');
+      return;
+    }
+
+    setResetLoading(true);
+    setResetError('');
+    setResetSuccess('');
+
+    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/reset-delivery-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          new_password: newResetPassword.trim(),
+          owner_pin: pin,
+          restaurant_code: code,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setResetSuccess(t.passwordUpdated);
+        setNewResetPassword('');
+
+        setTimeout(() => {
+          setResetTarget(null);
+          setResetSuccess('');
+        }, 1500);
+      } else {
+        setResetError(result.message || 'Failed to reset password');
+      }
+    } catch (e) {
+      setResetError(t.connectionError);
+    }
+
+    setResetLoading(false);
+  };
+
+  const handleLogout = async () => {
+    const ordersHistory = await AsyncStorage.getItem('foodup_orders');
+    const deliveryBag = await AsyncStorage.getItem('delivery_bag');
+    const deliveryHistory = await AsyncStorage.getItem('delivery_history');
+
+    await AsyncStorage.clear();
+
+    if (ordersHistory) await AsyncStorage.setItem('foodup_orders', ordersHistory);
+    if (deliveryBag) await AsyncStorage.setItem('delivery_bag', deliveryBag);
+    if (deliveryHistory) await AsyncStorage.setItem('delivery_history', deliveryHistory);
+
+    router.replace('/onboarding');
+  };
+
+  const currentSoundLabel =
+    SOUNDS.find(s => s.key === notificationSound)?.label || t.default;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Image
+          source={require('../../assets/images/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          {role === 'delivery' && (
+            <>
+              <Text style={styles.groupLabel}>{t.profile}</Text>
+
+              <View style={styles.section}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 14 }}>
+                  <Ionicons name="person-circle-outline" size={32} color="#999" style={{ marginTop: 2 }} />
+                  <View>
+                    <Text style={styles.profileName}>{deliveryName}</Text>
+                    <Text style={styles.profileRole}>{t.courier}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {(restaurantName || restaurantPhone || restaurantAddress || restaurantWebsite) && (
+                <>
+                  <Text style={styles.groupLabel}>{t.restaurant}</Text>
+
+                  <View style={styles.section}>
+                    {restaurantName ? (
+                      <View style={styles.row}>
+                        <Ionicons name="storefront-outline" size={16} color="#999" />
+                        <Text style={styles.rowValue}>{restaurantName}</Text>
+                      </View>
+                    ) : null}
+
+                    {restaurantPhone ? (
+                      <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${restaurantPhone}`)}>
+                        <Ionicons name="call-outline" size={16} color="#999" />
+                        <Text style={[styles.rowValue, { color: '#007AFF' }]}>{restaurantPhone}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {restaurantAddress ? (
+                      <TouchableOpacity
+                        style={styles.row}
+                        onPress={() => {
+                          const encoded = encodeURIComponent(restaurantAddress);
+                          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`);
+                        }}
+                      >
+                        <Ionicons name="location-outline" size={16} color="#999" />
+                        <Text style={[styles.rowValue, { color: '#007AFF' }]}>{restaurantAddress}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {restaurantWebsite ? (
+                      <TouchableOpacity
+                        style={[styles.row, { borderBottomWidth: 0 }]}
+                        onPress={() => Linking.openURL(`https://${restaurantWebsite}`)}
+                      >
+                        <Ionicons name="globe-outline" size={16} color="#999" />
+                        <Text style={[styles.rowValue, { color: '#007AFF' }]}>{restaurantWebsite}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+
+          {role === 'owner' && (
+            <>
+              <Text style={styles.groupLabel}>{t.addCourierAccount}</Text>
+
+              <View style={[styles.section, { paddingTop: 20, paddingBottom: 20 }]}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginTop: 0 }]}
+                    placeholder={t.username}
+                    placeholderTextColor="#C0C0C0"
+                    value={newUsername}
+                    onChangeText={setNewUsername}
+                    autoCapitalize="none"
+                  />
+
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginTop: 0 }]}
+                    placeholder={t.password}
+                    placeholderTextColor="#C0C0C0"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                  />
+                </View>
+
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+                {success ? <Text style={styles.successText}>{success}</Text> : null}
+
+                <TouchableOpacity style={styles.primaryBtn} onPress={handleAddAccount} disabled={loading}>
+                  <Text style={styles.primaryBtnText}>{loading ? t.adding : t.addAccount}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && accounts.length > 0 && (
+            <>
+              <Text style={styles.groupLabel}>{t.courierAccounts}</Text>
+
+              <View style={styles.section}>
+                {(showAllCouriers ? accounts : accounts.slice(0, 3)).map((account, i, arr) => (
+                  <View key={i}>
+                    <View
+                      style={[
+                        styles.row,
+                        i === arr.length - 1 &&
+                          !resetTarget &&
+                          !(!showAllCouriers && accounts.length > 3) && { borderBottomWidth: 0 },
+                      ]}
+                    >
+                      <Ionicons name="person-outline" size={16} color="#999" />
+
+                      <Text style={[styles.rowValue, { flex: 1 }]}>
+                        {account.username.charAt(0).toUpperCase() + account.username.slice(1)}
+                      </Text>
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setResetTarget(resetTarget === account.username ? null : account.username);
+                          setResetError('');
+                          setResetSuccess('');
+                          setNewResetPassword('');
+                        }}
+                      >
+                        <Text style={styles.resetText}>{t.reset}</Text>
+                      </TouchableOpacity>
+
+                      <Text style={styles.dividerText}> · </Text>
+
+                      <TouchableOpacity onPress={() => handleDeleteAccount(account.username)}>
+                        <Text style={styles.deleteText}>{t.remove}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {resetTarget === account.username && (
+                      <View style={[styles.resetBox, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                        <TextInput
+                          style={styles.resetInput}
+                          placeholder={t.newPassword}
+                          placeholderTextColor="#C0C0C0"
+                          value={newResetPassword}
+                          onChangeText={setNewResetPassword}
+                          secureTextEntry
+                          autoFocus
+                        />
+
+                        {resetError ? <Text style={styles.error}>{resetError}</Text> : null}
+                        {resetSuccess ? <Text style={styles.successText}>{resetSuccess}</Text> : null}
+
+                        <TouchableOpacity
+                          style={styles.primaryBtn}
+                          onPress={() => handleResetPassword(account.username)}
+                          disabled={resetLoading}
+                        >
+                          <Text style={styles.primaryBtnText}>
+                            {resetLoading ? t.saving : t.saveNewPassword}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))}
+
+                {accounts.length > 3 && (
+                  <TouchableOpacity
+                    style={[styles.row, { borderBottomWidth: 0, justifyContent: 'center' }]}
+                    onPress={() => setShowAllCouriers(!showAllCouriers)}
+                  >
+                    <Text style={styles.resetText}>
+                      {showAllCouriers ? 'Show Less' : `Show All (${accounts.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && (
+            <>
+              <Text style={styles.groupLabel}>{t.notificationSound}</Text>
+
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showSound ? 1 : 0 }]}
+                  onPress={() => setShowSound(!showSound)}
+                >
+                  <Ionicons name="musical-notes-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{currentSoundLabel}</Text>
+                  <Text style={styles.chevron}>{showSound ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showSound && SOUNDS.map((sound, i) => (
+                  <TouchableOpacity
+                    key={sound.key}
+                    style={[styles.row, i === SOUNDS.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={async () => {
+                      setNotificationSound(sound.key);
+                      await AsyncStorage.setItem('notification_sound', sound.key);
+                      await previewSound(sound.key);
+                    }}
+                  >
+                    <Ionicons name={sound.icon as any} size={18} color="#999" />
+
+                    <Text
+                      style={[
+                        styles.rowValue,
+                        { flex: 1 },
+                        notificationSound === sound.key && { fontWeight: '700', color: '#111' },
+                      ]}
+                    >
+                      {sound.label}
+                    </Text>
+
+                    {notificationSound === sound.key && (
+                      <Ionicons name="checkmark" size={18} color="#2ecc71" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && (
+            <>
+              <Text style={styles.groupLabel}>{t.restaurantProfile}</Text>
+
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showRestaurantForm ? 1 : 0 }]}
+                  onPress={() => setShowRestaurantForm(!showRestaurantForm)}
+                >
+                  <Ionicons name="storefront-outline" size={18} color="#999" />
+
+                  <Text style={[styles.rowValue, { flex: 1 }]}>
+                    {restaurantName || t.setUpProfile}
+                  </Text>
+
+                  {profileSuccess ? (
+                    <Text style={{ color: '#2ecc71', fontSize: 13 }}>{profileSuccess}</Text>
+                  ) : null}
+
+                  <Text style={styles.chevron}>{showRestaurantForm ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showRestaurantForm && (
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t.restaurantName}
+                      placeholderTextColor="#C0C0C0"
+                      value={restaurantName}
+                      onChangeText={setRestaurantName}
+                    />
+
+                    <TextInput
+                      style={[styles.input, { marginTop: 10 }]}
+                      placeholder={t.phone}
+                      placeholderTextColor="#C0C0C0"
+                      value={restaurantPhone}
+                      onChangeText={setRestaurantPhone}
+                      keyboardType="phone-pad"
+                    />
+
+                    <TextInput
+                      style={[styles.input, { marginTop: 10 }]}
+                      placeholder={t.address}
+                      placeholderTextColor="#C0C0C0"
+                      value={restaurantAddress}
+                      onChangeText={setRestaurantAddress}
+                    />
+
+                    <TextInput
+                      style={[styles.input, { marginTop: 10 }]}
+                      placeholder={t.website}
+                      placeholderTextColor="#C0C0C0"
+                      value={restaurantWebsite}
+                      onChangeText={setRestaurantWebsite}
+                      autoCapitalize="none"
+                    />
+
+                    {profileError ? <Text style={styles.error}>{profileError}</Text> : null}
+
+                    <TouchableOpacity
+                      style={styles.primaryBtn}
+                      onPress={handleSaveRestaurantProfile}
+                      disabled={profileLoading}
+                    >
+                      <Text style={styles.primaryBtnText}>
+                        {profileLoading ? t.saving : t.saveProfile}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </>
+          )}
+
+          <Text style={styles.groupLabel}>{t.about}</Text>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.row, { borderBottomWidth: showAbout ? 1 : 0 }]}
+              onPress={() => setShowAbout(!showAbout)}
+            >
+              <Image
+                source={require('../../assets/images/foodup-icon.png')}
+                style={styles.aboutIcon}
+                resizeMode="contain"
+              />
+              <Text style={[styles.rowValue, { flex: 1 }]}>FoodUp</Text>
+              <Text style={styles.chevron}>{showAbout ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {showAbout && (
+              <>
+                <Text style={styles.aboutTagline}>Online-Bestellsystem für Restaurants</Text>
+
+                <TouchableOpacity style={styles.row} onPress={() => Linking.openURL('https://www.foodup.ch')}>
+                  <Ionicons name="globe-outline" size={18} color="#999" />
+                  <Text style={styles.rowValue}>www.foodup.ch</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => Linking.openURL('mailto:info@foodup.ch')}>
+                  <Ionicons name="mail-outline" size={18} color="#999" />
+                  <Text style={styles.rowValue}>info@foodup.ch</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => Linking.openURL('https://wa.me/41783222292')}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#999" />
+                  <Text style={styles.rowValue}>+41 78 322 22 92</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: 0 }]}
+                  onPress={() => Linking.openURL('tel:+41432295051')}
+                >
+                  <Ionicons name="call-outline" size={18} color="#999" />
+                  <Text style={styles.rowValue}>+41 43 229 50 51</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          <Text style={styles.groupLabel}>{t.language}</Text>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.row, { borderBottomWidth: showLanguage ? 1 : 0 }]}
+              onPress={() => setShowLanguage(!showLanguage)}
+            >
+              <Text style={styles.flagText}>{language === 'de' ? '🇩🇪' : '🇬🇧'}</Text>
+              <Text style={[styles.rowValue, { flex: 1 }]}>
+                {language === 'de' ? 'Deutsch' : 'English'}
+              </Text>
+              <Text style={styles.chevron}>{showLanguage ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {showLanguage && (
+              <>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: 1 }]}
+                  onPress={async () => {
+                    setChangingLanguage(true);
+                    await changeLanguage('en');
+                    setChangingLanguage(false);
+                    setShowLanguage(false);
+                  }}
+                >
+                  <Text style={styles.flagText}>🇬🇧</Text>
+                  <Text style={[styles.rowValue, { flex: 1 }, language === 'en' && { fontWeight: '700' }]}>
+                    English
+                  </Text>
+                  {language === 'en' && !changingLanguage && (
+                    <Ionicons name="checkmark" size={18} color="#2ecc71" />
+                  )}
+                  {changingLanguage && language !== 'en' && (
+                    <Ionicons name="sync-outline" size={18} color="#999" />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: 0 }]}
+                  onPress={async () => {
+                    setChangingLanguage(true);
+                    await changeLanguage('de');
+                    setChangingLanguage(false);
+                    setShowLanguage(false);
+                  }}
+                >
+                  <Text style={styles.flagText}>🇩🇪</Text>
+                  <Text style={[styles.rowValue, { flex: 1 }, language === 'de' && { fontWeight: '700' }]}>
+                    Deutsch
+                  </Text>
+                  {language === 'de' && !changingLanguage && (
+                    <Ionicons name="checkmark" size={18} color="#2ecc71" />
+                  )}
+                  {changingLanguage && language !== 'de' && (
+                    <Ionicons name="sync-outline" size={18} color="#999" />
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          <Text style={styles.groupLabel}>{t.account}</Text>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                paddingVertical: 14,
+              }}
+            >
+              <Ionicons name="log-out-outline" size={18} color="#e74c3c" />
+              <Text style={styles.logoutText}>{t.logOut}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
+  header: {
+    backgroundColor: '#fff',
+    paddingTop: 70,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  logo: { width: 100, height: 30 },
+  scrollContent: { paddingBottom: 40, paddingTop: 8 },
+  groupLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 24,
+    marginBottom: 8,
+    marginHorizontal: 20,
+  },
+  section: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  profileName: { fontSize: 18, fontWeight: '700', color: '#111' },
+  profileRole: { fontSize: 13, color: '#999', marginTop: 2 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
+    color: '#111',
+    backgroundColor: '#FAFAFA',
+    marginTop: 8,
+  },
+  error: { color: '#e74c3c', marginTop: 8, fontSize: 13 },
+  successText: { color: '#2ecc71', marginTop: 8, fontSize: 13 },
+  primaryBtn: {
+    backgroundColor: '#111',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  primaryBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  rowValue: { fontSize: 15, color: '#111' },
+  deleteText: { fontSize: 14, color: '#e74c3c' },
+  resetText: { fontSize: 14, color: '#007AFF' },
+  dividerText: { fontSize: 14, color: '#ccc' },
+  resetBox: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  resetInput: {
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: '#111',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 8,
+  },
+  chevron: { fontSize: 12, color: '#999', lineHeight: 20 },
+  aboutTagline: { fontSize: 13, color: '#999', paddingVertical: 10 },
+  aboutIcon: { width: 20, height: 20 },
+  logoutText: { fontSize: 15, color: '#e74c3c', fontWeight: '500' },
+  flagText: { fontSize: 20 },
+});
