@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
@@ -22,6 +23,21 @@ function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
 
 const TabLayout = React.memo(function TabLayout() {
   const [role, setRole] = useState<string | null>(null);
+  const [bagCount, setBagCount] = useState(0);
+
+  useEffect(() => {
+    const loadBagCount = async () => {
+      const stored = await AsyncStorage.getItem('delivery_bag');
+      if (stored) {
+        const bag = JSON.parse(stored);
+        const active = bag.filter((o: any) => o.status === 'pending' || o.status === 'delivering');
+        setBagCount(active.length);
+      }
+    };
+    loadBagCount();
+    const interval = setInterval(loadBagCount, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const loadRole = async () => {
@@ -105,7 +121,25 @@ const TabLayout = React.memo(function TabLayout() {
         options={{
           title: 'Bag',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bag-outline" size={size} color={color} />
+            <View>
+              <Ionicons name="bag-outline" size={size} color={color} />
+              {bagCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  right: -6,
+                  top: -4,
+                  backgroundColor: '#e74c3c',
+                  borderRadius: 8,
+                  minWidth: 16,
+                  height: 16,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 3,
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{bagCount}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
