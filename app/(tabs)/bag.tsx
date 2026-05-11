@@ -1,12 +1,73 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Image, Linking, SafeAreaView, ScrollView,
+  Alert, AppState, Image, Linking, RefreshControl, SafeAreaView, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
 } from 'react-native';
+
 import { useLanguage } from '../../lib/useLanguage';
+
+function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (!accepted_at || !accepted_time) return;
+
+    const minutes = parseInt(accepted_time.replace(/[^0-9]/g, ''));
+    if (isNaN(minutes)) return;
+
+    const acceptedDate = new Date(accepted_at);
+    if (isNaN(acceptedDate.getTime())) return;
+
+    const deadlineMs = acceptedDate.getTime() + minutes * 60 * 1000;
+    const total = minutes * 60;
+    setTotalSeconds(total);
+
+    const update = () => {
+      const now = Date.now();
+      const diff = Math.floor((deadlineMs - now) / 1000);
+      setRemaining(diff);
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [accepted_at, accepted_time]);
+
+  if (remaining === null || totalSeconds === 0) return null;
+
+  const mins = Math.floor(Math.abs(remaining) / 60);
+  const secs = Math.abs(remaining) % 60;
+  const isLate = remaining < 0;
+  const progress = Math.max(0, Math.min(1, remaining / totalSeconds));
+
+  const percentage = remaining / totalSeconds;
+const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
+
+  return (
+    <View style={{ marginTop: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <Ionicons name="time-outline" size={14} color={color} />
+        <Text style={{ fontSize: 13, fontWeight: '700', color }}>
+          {isLate
+            ? `${mins}m ${secs}s overdue`
+            : `${mins}m ${secs}s remaining`}
+        </Text>
+      </View>
+      <View style={{ height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' }}>
+        <View style={{
+          height: 6,
+          width: `${progress * 100}%`,
+          backgroundColor: color,
+          borderRadius: 3,
+        }} />
+      </View>
+    </View>
+  );
+}
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -22,6 +83,9 @@ interface BagOrder {
   status: 'pending' | 'delivering' | 'delivered';
   added_at: string;
   delivered_at?: string;
+  accepted_time?: string;
+  accepted_at?: string;
+  note?: string;
 }
 
 function getDateLabel(dateStr: string, t: any) {
@@ -82,32 +146,97 @@ export default function BagScreen() {
   const [bag, setBag] = useState<BagOrder[]>([]);
   const [deliveryName, setDeliveryName] = useState('');
   const [expandedOrders, setExpandedOrders] = useState<number[]>([]);
+const [refreshing, setRefreshing] = useState(false);
   const { t } = useLanguage();
 
   useFocusEffect(
     useCallback(() => {
-      loadBag();
-      AsyncStorage.getItem('delivery_name').then(n => setDeliveryName(n || ''));
+      AsyncStorage.getItem('delivery_name').then(n => {
+        setDeliveryName(n || '');
+        loadBag(n || '');
+      });
+
+      // Poll every 10 seconds to sync with backend
+      const interval = setInterval(() => {
+        loadBag();
+      }, 10000);
+
+      // Also sync when app comes to foreground
+      const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') loadBag();
+      });
+
+      return () => {
+        clearInterval(interval);
+        appStateSubscription.remove();
+      };
     }, [])
   );
 
-  const loadBag = async () => {
-    const stored = await AsyncStorage.getItem('delivery_bag');
-    if (stored) setBag(JSON.parse(stored));
-    else setBag([]);
+  const loadBag = async (name?: string) => {
+    const bagName = name || await AsyncStorage.getItem('delivery_name') || '';
+    const stored = await AsyncStorage.getItem(`delivery_bag_${bagName}`);
+    if (stored) {
+      const parsedBag = JSON.parse(stored);
+      setBag(parsedBag);
+      
+      // Fetch accepted times for orders that don't have them yet
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const updatedBag = await Promise.all(parsedBag.map(async (order: BagOrder) => {
+        if (!order.accepted_time && (order.status === 'pending' || order.status === 'delivering')) {
+          try {
+            const res = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
+            const result = await res.json();
+            if (result.success && result.accepted_time) {
+              return { ...order, accepted_time: result.accepted_time, accepted_at: result.accepted_at };
+            }
+          } catch (e) {}
+        }
+        return order;
+      }));
+      
+      setBag(updatedBag);
+      await AsyncStorage.setItem(`delivery_bag_${bagName}`, JSON.stringify(updatedBag));
+    } else {
+      setBag([]);
+    }
   };
 
   const saveBag = async (newBag: BagOrder[]) => {
     setBag(newBag);
-    await AsyncStorage.setItem('delivery_bag', JSON.stringify(newBag));
+    const bagName = await AsyncStorage.getItem('delivery_name') || '';
+    await AsyncStorage.setItem(`delivery_bag_${bagName}`, JSON.stringify(newBag));
   };
 
   const handleStartDelivering = async (order: BagOrder) => {
+    // Check if there's already an order being delivered
+    const alreadyDelivering = bag.find(o => o.status === 'delivering');
+    if (alreadyDelivering) {
+      Alert.alert(
+        t.cannotStartDelivery,
+        t.cannotStartDeliveryMsg,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const newBag = bag.map(o =>
       o.order_id === order.order_id ? { ...o, status: 'delivering' as const } : o
     );
 
     await saveBag(newBag);
+
+    // Update claim status to delivering
+    await fetch(`${BACKEND_URL}/claim-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_id: order.order_id,
+        delivery_name: deliveryName,
+        restaurant_code: await AsyncStorage.getItem('restaurant_code') || '',
+        delivery_status: 'delivering',
+      }),
+    });
 
     if (order.address) {
       const encoded = encodeURIComponent(order.address);
@@ -116,16 +245,37 @@ export default function BagScreen() {
   };
 
   const handleMarkDelivered = async (order: BagOrder) => {
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+    
     await fetch(`${BACKEND_URL}/mark-delivered`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: order.order_id, delivery_name: deliveryName, restaurant_code: await AsyncStorage.getItem('restaurant_code') || '' }),
+      body: JSON.stringify({ order_id: order.order_id, delivery_name: deliveryName, restaurant_code: code }),
     });
 
     await fetch(`${BACKEND_URL}/release-claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: order.order_id, restaurant_code: await AsyncStorage.getItem('restaurant_code') || '' }),
+      body: JSON.stringify({ order_id: order.order_id, restaurant_code: code }),
+    });
+
+    // Notify owner that order is completed
+    await fetch(`${BACKEND_URL}/status-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurant_code: code,
+        order_id: order.order_id,
+        status: 'completed',
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        total: order.total,
+        currency: order.currency,
+        items: order.items,
+        payment_method: order.payment_method,
+        shipping: { method: 'Lieferung', address: order.address },
+        event_type: 'status_update',
+      }),
     });
 
     const deliveredAt = new Date().toLocaleString();
@@ -183,6 +333,11 @@ export default function BagScreen() {
 
   const groupedDelivered = groupByDate(deliveredOrders, t);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadBag();
+    setRefreshing(false);
+  };
   const moveOrder = async (index: number, direction: 'up' | 'down') => {
     const newPending = [...pendingOrders];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
@@ -208,7 +363,12 @@ export default function BagScreen() {
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
+            }
+          >
           {bag.length === 0 && (
             <View style={styles.empty}>
               <Ionicons name="bag-outline" size={48} color="#D0D0D0" />
@@ -245,6 +405,23 @@ export default function BagScreen() {
                         </View>
 
                         <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
+                        {order.note && !isExpanded ? (
+                          <View style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center', 
+                            gap: 4, 
+                            marginTop: 4,
+                            backgroundColor: '#fffbeb',
+                            borderRadius: 6,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderLeftWidth: 3,
+                            borderLeftColor: '#f39c12',
+                          }}>
+                            <Ionicons name="alert-circle-outline" size={13} color="#f39c12" />
+                            <Text style={{ fontSize: 12, color: '#111', fontWeight: '600', flex: 1 }} numberOfLines={1}>{order.note}</Text>
+                          </View>
+                        ) : null}
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -332,9 +509,30 @@ export default function BagScreen() {
                         ) : null}
 
                         {order.payment_method ? (
-                          <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                          <View style={[styles.row, !order.note ? { borderBottomWidth: 0 } : {}]}>
                             <Ionicons name="card-outline" size={16} color="#999" />
-                            <Text style={styles.rowValue}>{order.payment_method}</Text>
+                            <Text style={styles.rowValue}>
+                              {order.payment_method?.toLowerCase().includes('bar') ? t.cash : order.payment_method?.toLowerCase().includes('online') ? t.online : order.payment_method}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {order.note ? (
+                          <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                            <View style={{ 
+                              backgroundColor: '#fffbeb', 
+                              borderRadius: 8, 
+                              padding: 10, 
+                              flex: 1,
+                              flexDirection: 'row',
+                              alignItems: 'flex-start',
+                              gap: 8,
+                              borderLeftWidth: 3,
+                              borderLeftColor: '#f39c12',
+                            }}>
+                              <Ionicons name="alert-circle-outline" size={16} color="#f39c12" style={{ marginTop: 1 }} />
+                              <Text style={{ fontSize: 14, color: '#111', fontWeight: '600', flex: 1 }}>{order.note}</Text>
+                            </View>
                           </View>
                         ) : null}
 
@@ -352,6 +550,13 @@ export default function BagScreen() {
                         )}
                       </>
                     )}
+
+                    {order.accepted_time && order.accepted_at ? (
+                      <CountdownTimer
+                        accepted_at={order.accepted_at}
+                        accepted_time={order.accepted_time}
+                      />
+                    ) : null}
 
                     <View style={styles.divider} />
 
@@ -416,9 +621,8 @@ export default function BagScreen() {
                 const isExpanded = expandedOrders.includes(order.order_id);
 
                 return (
-                  <TouchableOpacity
-                    key={order.order_id}
-                    style={styles.section}
+                  <View key={order.order_id} style={styles.section}>
+                    <TouchableOpacity
                     onPress={() => toggleExpanded(order.order_id)}
                     activeOpacity={0.8}
                   >
@@ -426,10 +630,35 @@ export default function BagScreen() {
                       <View>
                         <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
                         <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
+                        {order.note ? (
+                          <View style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center', 
+                            gap: 4, 
+                            marginTop: 4,
+                            backgroundColor: '#fffbeb',
+                            borderRadius: 6,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderLeftWidth: 3,
+                            borderLeftColor: '#f39c12',
+                          }}>
+                            <Ionicons name="alert-circle-outline" size={13} color="#f39c12" />
+                            <Text style={{ fontSize: 12, color: '#111', fontWeight: '600', flex: 1 }} numberOfLines={1}>{order.note}</Text>
+                          </View>
+                        ) : null}
                       </View>
 
-                      <View style={styles.deliveredBadge}>
-                        <Text style={styles.deliveredBadgeText}>{t.delivered}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={styles.deliveredBadge}>
+                          <Text style={styles.deliveredBadgeText}>{t.delivered}</Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveFromBag(order.order_id)}
+                          style={styles.removeBtn}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#999" />
+                        </TouchableOpacity>
                       </View>
                     </View>
 
@@ -483,6 +712,7 @@ export default function BagScreen() {
                       </>
                     )}
                   </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>

@@ -23,11 +23,13 @@ function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
 
 const TabLayout = React.memo(function TabLayout() {
   const [role, setRole] = useState<string | null>(null);
+  const [roleLoaded, setRoleLoaded] = useState(false);
   const [bagCount, setBagCount] = useState(0);
 
   useEffect(() => {
     const loadBagCount = async () => {
-      const stored = await AsyncStorage.getItem('delivery_bag');
+      const bagName = await AsyncStorage.getItem('delivery_name') || '';
+      const stored = await AsyncStorage.getItem(`delivery_bag_${bagName}`);
       if (stored) {
         const bag = JSON.parse(stored);
         const active = bag.filter((o: any) => o.status === 'pending' || o.status === 'delivering');
@@ -43,11 +45,12 @@ const TabLayout = React.memo(function TabLayout() {
     const loadRole = async () => {
       const r = await AsyncStorage.getItem('user_role');
       setRole(r);
+      setRoleLoaded(true);
     };
-
     loadRole();
   }, []);
 
+  if (!roleLoaded) return null;
   if (!role) return null;
 
   if (role === 'owner') {
@@ -60,6 +63,7 @@ const TabLayout = React.memo(function TabLayout() {
           tabBarStyle: { paddingTop: 10, paddingBottom: 30, height: 90 },
           tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
           tabBarItemStyle: { flex: 1 },
+          tabBarHideOnKeyboard: true,
         }}
       >
         <Tabs.Screen
@@ -102,6 +106,7 @@ const TabLayout = React.memo(function TabLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'none',
+        tabBarIconStyle: { transform: [{ translateX: 0 }] },
         tabBarStyle: { paddingTop: 10, paddingBottom: 30, height: 90 },
         tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
         tabBarItemStyle: { flex: 1 },

@@ -75,9 +75,19 @@ export default function SettingsScreen() {
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
+const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
+const [storeLoading, setStoreLoading] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('restaurant_code').then(c => setRestaurantCode(c || ''));
+    AsyncStorage.getItem('restaurant_code').then(c => {
+      setRestaurantCode(c || '');
+      if(c) {
+        fetch(`${BACKEND_URL}/store-status/${c}`)
+          .then(r => r.json())
+          .then(result => { if(result.success) setStoreIsOpen(result.is_open); })
+          .catch(() => {});
+      }
+    });
 
     AsyncStorage.getItem('user_role').then(r => {
       setRole(r || '');
@@ -126,10 +136,20 @@ export default function SettingsScreen() {
         setRestaurantAddress(result.profile.address || '');
         setRestaurantHours(result.profile.hours || '');
         setRestaurantWebsite(result.profile.website || '');
+        // Fetch store status
+        if (result.profile.website) {
+          const website = result.profile.website.startsWith('http') ? result.profile.website : `https://${result.profile.website}`;
+          const statusRes = await fetch(`${website}/foodup-store-status.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: 'foodup2026', action: 'get' }),
+          });
+          const statusResult = await statusRes.json();
+          if (statusResult.success) setStoreIsOpen(statusResult.is_open);
+        }
       }
     } catch (e) {}
   };
-
   const handleAddAccount = async () => {
     Keyboard.dismiss();
 
@@ -296,16 +316,26 @@ export default function SettingsScreen() {
 
   const handleLogout = async () => {
     const ordersHistory = await AsyncStorage.getItem('foodup_orders');
-    const deliveryBag = await AsyncStorage.getItem('delivery_bag');
     const deliveryHistory = await AsyncStorage.getItem('delivery_history');
     const restaurantCode = await AsyncStorage.getItem('restaurant_code');
+
+    // Save all delivery bags before clearing
+    const allKeys = await AsyncStorage.getAllKeys();
+    const bagKeys = allKeys.filter(k => k.startsWith('delivery_bag_'));
+    const bagEntries: [string, string][] = [];
+    for (const key of bagKeys) {
+      const val = await AsyncStorage.getItem(key);
+      if (val) bagEntries.push([key, val]);
+    }
 
     await AsyncStorage.clear();
 
     if (ordersHistory) await AsyncStorage.setItem('foodup_orders', ordersHistory);
-    if (deliveryBag) await AsyncStorage.setItem('delivery_bag', deliveryBag);
     if (deliveryHistory) await AsyncStorage.setItem('delivery_history', deliveryHistory);
     if (restaurantCode) await AsyncStorage.setItem('restaurant_code', restaurantCode);
+    for (const [key, val] of bagEntries) {
+      await AsyncStorage.setItem(key, val);
+    }
 
     router.replace('/onboarding');
   };
@@ -499,6 +529,70 @@ export default function SettingsScreen() {
                     </Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && storeIsOpen !== null && (
+            <>
+              <Text style={styles.groupLabel}>{t.storeStatus}</Text>
+              <View style={styles.section}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>
+                      {storeIsOpen ? t.storeOpen : t.storeClosed}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#999', marginTop: 2 }}>
+                      {storeIsOpen ? t.storeOpenSub : t.storeClosedSub}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (storeLoading) return;
+                      setStoreLoading(true);
+                      try {
+                        const pin = await AsyncStorage.getItem('owner_pin') || '';
+                        const code = await AsyncStorage.getItem('restaurant_code') || '';
+                        const response = await fetch(`${BACKEND_URL}/store-status`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            restaurant_code: code,
+                            is_open: !storeIsOpen,
+                          }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          setStoreIsOpen(result.is_open);
+                          if(restaurantWebsite) {
+                            const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
+                            fetch(`${website}/foodup-store-status.php`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                secret: 'foodup2026', 
+                                action: 'set', 
+                                is_open: !storeIsOpen,
+                                restaurant_code: code,
+                              }),
+                            }).catch(() => {});
+                          }
+                        }
+                      } catch (e) {}
+                      setStoreLoading(false);
+                    }}
+                    style={{
+                      backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
+                      borderRadius: 20,
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                      {storeLoading ? '...' : storeIsOpen ? t.closeStore : t.openStore}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </>
           )}
@@ -729,6 +823,47 @@ export default function SettingsScreen() {
               </>
             )}
           </View>
+
+{role === 'owner' && (
+            <>
+              <Text style={styles.groupLabel}>{t.dangerZone}</Text>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  onPress={async () => {
+                    Alert.alert(
+                      t.clearOrders,
+                      t.clearOrdersConfirm,
+                      [
+                        { text: t.cancel, style: 'cancel' },
+                        {
+                          text: t.clear,
+                          style: 'destructive',
+                          onPress: async () => {
+                            const pin = await AsyncStorage.getItem('owner_pin') || '';
+                            const code = await AsyncStorage.getItem('restaurant_code') || '';
+                            try {
+                              await fetch(`${BACKEND_URL}/clear-orders/${code}`, {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ owner_pin: pin }),
+                              });
+                              await AsyncStorage.removeItem('foodup_orders');
+                              Alert.alert('Done', t.ordersCleared);
+                            } catch (e) {
+                              Alert.alert('Error', t.connectionError);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  style={{ paddingVertical: 14, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#e74c3c', fontSize: 15, fontWeight: '500' }}>{t.clearOrders}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
           <Text style={styles.groupLabel}>{t.account}</Text>
 

@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    Image, SafeAreaView, ScrollView,
-    StyleSheet, Text, TouchableOpacity, View,
+  Image, SafeAreaView, ScrollView,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -57,15 +57,48 @@ function getEndOfPastYear() {
   const d = new Date(); d.setMonth(0, 1); d.setHours(0, 0, 0, 0); return d;
 }
 
+const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
+
 export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const { t } = useLanguage();
 
-  useFocusEffect(
+useFocusEffect(
     useCallback(() => {
-      AsyncStorage.getItem('foodup_orders').then(stored => {
-        if (stored) setOrders(JSON.parse(stored));
+      AsyncStorage.getItem('restaurant_code').then(code => {
+        if (code) {
+          fetch(`https://foodup-order-alerts-backend.onrender.com/orders/${code}`)
+            .then(r => r.json())
+            .then(result => {
+              if (result.success) {
+                const validOrders = result.orders
+                  .filter((o: any) => o.date_created)
+                  .map((o: any) => ({
+                    order_id: parseInt(o.order_id),
+                    total: String(o.total || ''),
+                    currency: o.currency || 'CHF',
+                    status: o.status || '',
+                    payment_method: o.payment_method || '',
+                    timestamp: new Date(o.date_created).getTime(),
+                    shipping_method: o.shipping?.method || '',
+                  }));
+                setOrders(validOrders);
+              }
+            })
+            .catch(() => {});
+        }
+      });
+      AsyncStorage.getItem('restaurant_code').then(code => {
+        if (code) {
+          fetch(`${BACKEND_URL}/courier-stats/${code}`)
+            .then(r => r.json())
+            .then(result => {
+              if (result.success) setCourierStats(result.stats);
+            })
+            .catch(() => {});
+        }
       });
     }, [])
   );
@@ -91,23 +124,23 @@ export default function StatsScreen() {
       </View>
       <View style={styles.row}>
         <Ionicons name="bicycle-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.delivery}</Text>
+        <Text style={styles.rowLabel}>{t.deliveryLabel}</Text>
         <Text style={styles.rowValue}>{stats.deliveries}</Text>
       </View>
       <View style={styles.row}>
         <Ionicons name="bag-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.pickup}</Text>
+        <Text style={styles.rowLabel}>{t.pickupLabel}</Text>
         <Text style={styles.rowValue}>{stats.pickups}</Text>
       </View>
       <View style={styles.divider} />
       <View style={styles.row}>
         <Ionicons name="cash-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>Barzahlung</Text>
+        <Text style={styles.rowLabel}>{t.cash}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.cash.toFixed(2)}</Text>
       </View>
       <View style={styles.row}>
         <Ionicons name="card-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>Online Zahlung</Text>
+        <Text style={styles.rowLabel}>{t.online}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.online.toFixed(2)}</Text>
       </View>
       <View style={[styles.row, { borderBottomWidth: 0 }]}>
@@ -171,7 +204,30 @@ export default function StatsScreen() {
             <CollapsibleCard title={t.thisWeek} statsKey="week" stats={weekStats} />
             <CollapsibleCard title={t.thisMonth} statsKey="month" stats={monthStats} />
             <CollapsibleCard title={t.thisYear} statsKey="year" stats={yearStats} />
-            <CollapsibleCard title={t.pastYear} statsKey="pastyear" stats={pastYearStats} />
+            {Object.keys(courierStats).length > 0 && (
+            <>
+              <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
+              <View style={styles.section}>
+                {Object.entries(courierStats)
+            .sort(([a], [b]) => {
+              if (a === 'Owner') return -1;
+              if (b === 'Owner') return 1;
+              return a.localeCompare(b);
+            })
+            .map(([name, stats], i, arr) => (
+                  <View key={name} style={[styles.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                    <Ionicons name="bicycle-outline" size={16} color="#999" />
+                    <Text style={[styles.rowLabel, { flex: 1, fontWeight: '600', color: '#111' }]}>{name}</Text>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      <Text style={{ fontSize: 12, color: '#999' }}>{t.today}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.today}</Text></Text>
+                      <Text style={{ fontSize: 12, color: '#999' }}>{t.thisWeek}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.week}</Text></Text>
+                      <Text style={{ fontSize: 12, color: '#999' }}>{t.total}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.total}</Text></Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
 
         </ScrollView>
       </SafeAreaView>

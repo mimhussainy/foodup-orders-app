@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   AppState,
+  FlatList,
   Image,
   Linking,
   RefreshControl,
@@ -12,9 +13,12 @@ import {
   ScrollView,
   SectionList,
   StyleSheet,
-  Text, TouchableOpacity,
+  Text,
+  TextInput,
+  TouchableOpacity,
   View
 } from 'react-native';
+import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
 interface OrderAddon {
@@ -48,6 +52,51 @@ interface Order {
   restaurant_code?: string;
 }
 
+function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (!accepted_at || !accepted_time) return;
+    const minutes = parseInt(accepted_time.replace(/[^0-9]/g, ''));
+    if (isNaN(minutes)) return;
+    const acceptedDate = new Date(accepted_at);
+    if (isNaN(acceptedDate.getTime())) return;
+    const deadlineMs = acceptedDate.getTime() + minutes * 60 * 1000;
+    const total = minutes * 60;
+    setTotalSeconds(total);
+    const update = () => {
+      const diff = Math.floor((deadlineMs - Date.now()) / 1000);
+      setRemaining(diff);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [accepted_at, accepted_time]);
+
+  if (remaining === null || totalSeconds === 0) return null;
+
+  const mins = Math.floor(Math.abs(remaining) / 60);
+  const secs = Math.abs(remaining) % 60;
+  const isLate = remaining < 0;
+  const percentage = remaining / totalSeconds;
+  const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
+  const progress = Math.max(0, Math.min(1, remaining / totalSeconds));
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <Ionicons name="time-outline" size={13} color={color} />
+        <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+          {isLate ? `${mins}m ${secs}s overdue` : `${mins}m ${secs}s remaining`}
+        </Text>
+      </View>
+      <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+        <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
+      </View>
+    </View>
+  );
+}
 function getStatusColor(status: string) {
   switch (status) {
     case 'processing': return '#2ecc71';
@@ -67,6 +116,30 @@ function getStatusLabel(status: string, t: any) {
     case 'pending': return t.pending;
     case 'on-hold': return t.onHold;
     default: return status;
+  }
+}
+
+function getDeliveryStatusColor(claim: any) {
+  if (!claim) return '#f39c12';
+  const status = typeof claim === 'string' ? 'delivering' : claim.status;
+  switch (status) {
+    case 'delivered': return '#3498db';
+    case 'delivering': return '#f39c12';
+    case 'in_bag': return '#9b59b6';
+    default: return '#f39c12';
+  }
+}
+
+function getDeliveryStatusLabel(claim: any, item: any, t: any) {
+  if (item.status === 'cancelled') return t.cancelled;
+  if (!claim) return t.newOrder;
+  const status = typeof claim === 'string' ? 'delivering' : claim.status;
+  const isPickup = item.shipping_method === 'Abholung' || item.shipping_method?.toLowerCase().includes('pickup');
+  switch (status) {
+    case 'delivered': return isPickup ? t.pickedUp : t.delivered;
+    case 'delivering': return t.delivering;
+    case 'in_bag': return t.inBag;
+    default: return t.newOrder;
   }
 }
 
@@ -98,7 +171,10 @@ export default function OrdersScreen() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [role, setRole] = useState<string | null>(null);
-  const [claims, setClaims] = useState<{ [key: string]: string }>({});
+  const [claims, setClaims] = useState<{ [key: string]: any }>({});
+const [acceptedTimes, setAcceptedTimes] = useState<{ [key: string]: any }>({});
+const [filter, setFilter] = useState<string>('new');
+const [search, setSearch] = useState<string>('');
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -107,10 +183,9 @@ export default function OrdersScreen() {
       setRole(r);
       if (r === 'delivery') router.replace('/(tabs)/delivery');
     });
-    AsyncStorage.getItem(STORAGE_KEY).then(stored => {
-      if (stored) setOrders(JSON.parse(stored));
-    });
+    AsyncStorage.removeItem(STORAGE_KEY);
     fetchOrdersFromBackend();
+    fetchClaims();
 
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
@@ -119,7 +194,14 @@ export default function OrdersScreen() {
       }
     });
 
-    return () => appStateSubscription.remove();
+    const claimsInterval = setInterval(() => fetchClaims(), 10000);
+    const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 30000);
+
+    return () => {
+      appStateSubscription.remove();
+      clearInterval(claimsInterval);
+      clearInterval(ordersInterval);
+    };
   }, []);
 
   const fetchClaims = async () => {
@@ -129,6 +211,25 @@ export default function OrdersScreen() {
       const response = await fetch(`${BACKEND_URL}/claims/${code}`);
       const result = await response.json();
       if (result.success) setClaims(result.claims);
+    } catch (e) {}
+  };
+
+  const fetchAcceptedTimes = async (orderList: Order[]) => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      if (!code) return;
+      const processingOrders = orderList.filter(o => o.status !== 'cancelled');
+      const times: { [key: string]: any } = {};
+      await Promise.all(processingOrders.map(async (order) => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
+          const result = await res.json();
+          if (result.success) {
+            times[String(order.order_id)] = result;
+          }
+        } catch (e) {}
+      }));
+      setAcceptedTimes(times);
     } catch (e) {}
   };
   const fetchOrdersFromBackend = async () => {
@@ -150,25 +251,27 @@ export default function OrdersScreen() {
           items: o.items || [],
           payment_method: o.payment_method || '',
           note: o.note || '',
-          date: new Date().toLocaleString(),
-          timestamp: Date.now(),
+          date: o.date_created ? new Date(o.date_created).toLocaleString() : new Date().toLocaleString(),
+          timestamp: o.date_created ? new Date(o.date_created).getTime() : Date.now(),
           shipping_method: o.shipping?.method || '',
           shipping_address: o.shipping?.address || '',
           restaurant_code: o.restaurant_code || '',
         }));
         setOrders(prev => {
+          // Start with backend orders as source of truth for status
           const merged = [...prev];
           backendOrders.forEach(bo => {
             const exists = merged.findIndex(o => o.order_id === bo.order_id);
             if (exists === -1) {
               merged.push(bo);
             } else {
-              // Update status of existing order
+              // Backend is always source of truth for status
               merged[exists] = { ...merged[exists], status: bo.status };
             }
           });
           merged.sort((a, b) => b.order_id - a.order_id);
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          fetchAcceptedTimes(merged);
           return merged;
         });
       }
@@ -196,8 +299,8 @@ export default function OrdersScreen() {
         items: JSON.parse(data.items || '[]'),
         payment_method: data.payment_method,
         note: data.note,
-        date: new Date().toLocaleString(),
-        timestamp: Date.now(),
+        date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
+        timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
         shipping_method: data.shipping_method || '',
         shipping_address: data.shipping_address || '',
         restaurant_code: data.restaurant_code || '',
@@ -231,11 +334,30 @@ export default function OrdersScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchOrdersFromBackend();
-    fetchClaims();
-    setRefreshing(false);
+    await fetchClaims();
+    setTimeout(() => setRefreshing(false), 500);
   };
 
-  const sections = groupOrdersByDate(orders, t);
+  const getDeliveryStatus = (order: Order) => {
+    const claim = claims[String(order.order_id)];
+    if (order.status === 'cancelled') return 'cancelled';
+    if (!claim) return 'new';
+    const status = typeof claim === 'string' ? 'delivering' : claim.status;
+    return status;
+  };
+
+  const filteredOrders = orders
+    .filter(o => filter === 'all' || getDeliveryStatus(o) === filter)
+    .filter(o => {
+      if (!search.trim()) return true;
+      const s = search.toLowerCase();
+      return (
+        String(o.order_id).includes(s) ||
+        o.customer_name.toLowerCase().includes(s) ||
+        o.customer_phone.toLowerCase().includes(s)
+      );
+    });
+const sections = groupOrdersByDate(filteredOrders, t);
 
   if (role === 'delivery') return null;
 
@@ -254,9 +376,9 @@ export default function OrdersScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.detailTitleRow}>
               <Text style={styles.detailOrderId}>Order #{selectedOrder.order_id}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedOrder.status) + '20' }]}>
-                <Text style={[styles.statusBadgeText, { color: getStatusColor(selectedOrder.status) }]}>
-                  {getStatusLabel(selectedOrder.status, t)}
+              <View style={[styles.statusBadge, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
+                <Text style={[styles.statusBadgeText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
+                  {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
                 </Text>
               </View>
             </View>
@@ -297,13 +419,17 @@ export default function OrdersScreen() {
               {selectedOrder.payment_method ? (
                 <View style={[styles.row, !selectedOrder.shipping_method && !selectedOrder.shipping_address && !selectedOrder.note && { borderBottomWidth: 0 }]}>
                   <Ionicons name="card-outline" size={16} color="#999" />
-                  <Text style={styles.rowValue}>{selectedOrder.payment_method}</Text>
+                  <Text style={styles.rowValue}>
+                    {selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? t.cash : t.online}
+                  </Text>
                 </View>
               ) : null}
               {selectedOrder.shipping_method ? (
                 <View style={[styles.row, !selectedOrder.shipping_address && !selectedOrder.note && { borderBottomWidth: 0 }]}>
                   <Ionicons name="bicycle-outline" size={16} color="#999" />
-                  <Text style={styles.rowValue}>{selectedOrder.shipping_method}</Text>
+                  <Text style={styles.rowValue}>
+                    {selectedOrder.shipping_method === 'Abholung' ? t.pickupLabel : selectedOrder.shipping_method === 'Lieferung' ? t.deliveryLabel : selectedOrder.shipping_method}
+                  </Text>
                 </View>
               ) : null}
               {selectedOrder.shipping_address ? (
@@ -347,6 +473,87 @@ export default function OrdersScreen() {
               <Text style={styles.totalLabel}>{t.total}</Text>
               <Text style={styles.totalValue}>{selectedOrder.currency} {selectedOrder.total}</Text>
             </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#111',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+                marginHorizontal: 16,
+                marginBottom: 16,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+              onPress={() => printOrder(selectedOrder)}
+            >
+              <Ionicons name="print-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.printOrder}</Text>
+            </TouchableOpacity>
+
+            {(() => {
+              const claim = claims[String(selectedOrder.order_id)];
+              const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+              const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
+              const isOverdue = acceptedData ? (() => {
+                const minutes = parseInt(acceptedData.accepted_time?.replace(/[^0-9]/g, '') || '0');
+                const acceptedAt = new Date(acceptedData.accepted_at).getTime();
+                const deadline = acceptedAt + minutes * 60 * 1000;
+                return Date.now() > deadline;
+              })() : false;
+              const isPickup = selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup');
+              if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isOverdue || isPickup)) {
+                return (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup') ? '#2ecc71' : '#3498db',
+                      borderRadius: 12,
+                      padding: 16,
+                      alignItems: 'center',
+                      marginHorizontal: 16,
+                      marginBottom: 16,
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                    onPress={async () => {
+                      const code = await AsyncStorage.getItem('restaurant_code') || '';
+                      const claim = claims[String(selectedOrder.order_id)];
+                      const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : 'Owner';
+                      await fetch(`${BACKEND_URL}/mark-delivered`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          order_id: selectedOrder.order_id,
+                          delivery_name: courierName,
+                          restaurant_code: code,
+                        }),
+                      });
+                      await fetch(`${BACKEND_URL}/release-claim`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          order_id: selectedOrder.order_id,
+                          restaurant_code: code,
+                        }),
+                      });
+                      setClaims(prev => ({
+                        ...prev,
+                        [String(selectedOrder.order_id)]: { name: courierName, status: 'delivered' },
+                      }));
+                      setSelectedOrder(null);
+                    }}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                      {selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup') ? t.markPickedUp : t.markDelivered}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            })()}
           </ScrollView>
         </SafeAreaView>
       </View>
@@ -361,11 +568,71 @@ export default function OrdersScreen() {
         <View style={styles.headerPlaceholder} />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ 
+            backgroundColor: '#fff', 
+            paddingHorizontal: 16, 
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: '#F0F0F0',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <Ionicons name="search-outline" size={18} color="#999" />
+            <TextInput
+              style={{ flex: 1, fontSize: 15, color: '#111' }}
+              placeholder="Search by name, phone or order ID"
+              placeholderTextColor="#C0C0C0"
+              value={search}
+              onChangeText={setSearch}
+              clearButtonMode="while-editing"
+            />
+          </View>
+          <View style={{ height: 52, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[
+              { key: 'new', label: t.newOrder, color: '#f39c12' },
+              { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
+              { key: 'delivering', label: t.delivering, color: '#f39c12' },
+              { key: 'delivered', label: t.delivered, color: '#3498db' },
+              { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
+              { key: 'all', label: t.all, color: '#111' },
+            ]}
+            keyExtractor={item => item.key}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center', paddingVertical: 10 }}
+            renderItem={({ item: f }) => (
+              <TouchableOpacity
+                onPress={() => setFilter(f.key)}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                  borderRadius: 20,
+                  backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20',
+                }}
+              >
+                <Text style={{
+                  fontSize: 13,
+                  fontWeight: '600',
+                  color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color,
+                }}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
         {orders.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
             <Text style={styles.emptyText}>{t.noOrders}</Text>
             <Text style={styles.emptySubText}>{t.noOrdersSub}</Text>
+          </View>
+        ) : filteredOrders.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="filter-outline" size={48} color="#D0D0D0" />
+            <Text style={styles.emptyText}>{t.noOrdersFilter}</Text>
           </View>
         ) : (
           <SectionList
@@ -383,9 +650,9 @@ export default function OrdersScreen() {
               <TouchableOpacity style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]} onPress={() => setSelectedOrder(item)}>
                 <View style={styles.orderTopRow}>
                   <Text style={styles.orderId}>Order #{item.order_id}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                    <Text style={[styles.statusPillText, { color: getStatusColor(item.status) }]}>
-                      {getStatusLabel(item.status, t)}
+                  <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(item.order_id)]) + '20' }]}>
+                    <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(item.order_id)]) }]}>
+                      {getDeliveryStatusLabel(claims[String(item.order_id)], item, t)}
                     </Text>
                   </View>
                 </View>
@@ -398,17 +665,48 @@ export default function OrdersScreen() {
                   <Ionicons name="cash-outline" size={14} color="#999" />
                   <Text style={styles.orderTotal}>{item.currency} {item.total}</Text>
                 </View>
-                <View style={styles.orderBottomRow}>
+                {acceptedTimes[String(item.order_id)] && 
+                  (() => {
+                    const claim = claims[String(item.order_id)];
+                    const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                    return status !== 'delivered';
+                  })() && (
+                    <OrderCountdown
+                      accepted_at={acceptedTimes[String(item.order_id)].accepted_at}
+                      accepted_time={acceptedTimes[String(item.order_id)].accepted_time}
+                    />
+                  )}
+                  <View style={styles.orderBottomRow}>
                   {item.shipping_method ? (
                     <View style={styles.orderMeta}>
                       <Ionicons name={item.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
-                      <Text style={styles.orderShipping}>{item.shipping_method}</Text>
+                      <Text style={styles.orderShipping}>
+                        {item.shipping_method === 'Abholung' ? t.pickupLabel : item.shipping_method === 'Lieferung' ? t.deliveryLabel : item.shipping_method}
+                      </Text>
                     </View>
                   ) : <View />}
                   {claims[String(item.order_id)] ? (
                     <View style={styles.orderMeta}>
-                      <Ionicons name="bicycle-outline" size={14} color="#8B38CB" />
-                      <Text style={styles.courierName}>{claims[String(item.order_id)]}</Text>
+                      {(() => {
+                        const claim = claims[String(item.order_id)];
+                        const name = typeof claim === 'string' ? claim : claim.name;
+                        const status = typeof claim === 'string' ? 'delivering' : claim.status;
+                        const color = status === 'delivered' ? '#3498db' : status === 'delivering' ? '#f39c12' : '#9b59b6';
+                        return (
+                          <>
+                            <Ionicons 
+                              name={
+                                status === 'delivered' ? 'checkmark-circle-outline' : 
+                                status === 'delivering' ? 'car-outline' : 
+                                'bag-outline'
+                              } 
+                              size={16} 
+                              color={color}
+                            />
+                            <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
+                          </>
+                        );
+                      })()}
                     </View>
                   ) : null}
                 </View>
@@ -423,7 +721,17 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
-  header: { backgroundColor: '#fff', paddingTop: 70, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  header: {
+  backgroundColor: '#fff',
+  paddingTop: 40, // Android top spacing reduced
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F0F0F0',
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+},
   logo: { width: 100, height: 30 },
   headerPlaceholder: { width: 36 },
   backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center' },

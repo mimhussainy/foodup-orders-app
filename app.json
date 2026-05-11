@@ -1,13 +1,12 @@
 {
   "expo": {
     "name": "FoodUp Courier",
-    "slug": "foodup-courier",
+    "slug": "FoodUpOrderAlerts",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fooduporderalerts",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.foodup.orderalerts",
       "buildNumber": "1",
@@ -15,22 +14,19 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch",
-          "remote-notification",
-          "fetch",
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.foodup.orderalerts",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      }
     },
     "web": {
       "output": "static",
@@ -38,6 +34,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -50,8 +47,6 @@
           }
         }
       ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging",
       "expo-localization"
     ],
     "experiments": {

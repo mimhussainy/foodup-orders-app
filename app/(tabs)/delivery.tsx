@@ -86,7 +86,7 @@ export default function AddOrderScreen() {
           return;
         }
 
-        const stored = await AsyncStorage.getItem('delivery_bag');
+        const stored = await AsyncStorage.getItem(`delivery_bag_${deliveryName}`);
         const bag = stored ? JSON.parse(stored) : [];
 
         const inBag = bag.find(
@@ -127,6 +127,7 @@ export default function AddOrderScreen() {
           order_id: order.order_id,
           delivery_name: deliveryName,
           restaurant_code: code,
+          delivery_status: 'in_bag',
         }),
       });
 
@@ -137,6 +138,18 @@ export default function AddOrderScreen() {
         return;
       }
 
+      // Fetch accepted time from backend
+      let accepted_time = '';
+      let accepted_at = '';
+      try {
+        const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
+        const acceptedResult = await acceptedRes.json();
+        if (acceptedResult.success) {
+          accepted_time = acceptedResult.accepted_time || '';
+          accepted_at = acceptedResult.accepted_at || '';
+        }
+      } catch (e) {}
+
       const bagOrder = {
         order_id: order.order_id,
         customer_name: order.customer_name,
@@ -146,15 +159,18 @@ export default function AddOrderScreen() {
         currency: order.currency,
         items: order.items || [],
         payment_method: order.payment_method || '',
+        note: order.note || '',
         status: 'pending' as const,
         added_at: new Date().toLocaleString(),
+        accepted_time,
+        accepted_at,
       };
 
-      const stored = await AsyncStorage.getItem('delivery_bag');
+      const stored = await AsyncStorage.getItem(`delivery_bag_${deliveryName}`);
       const bag = stored ? JSON.parse(stored) : [];
 
       await AsyncStorage.setItem(
-        'delivery_bag',
+        `delivery_bag_${deliveryName}`,
         JSON.stringify([...bag, bagOrder])
       );
 

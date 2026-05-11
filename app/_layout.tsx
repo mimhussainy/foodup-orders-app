@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
@@ -18,20 +19,7 @@ Notifications.setNotificationHandler({
 });
 
 async function unregisterPushNotifications() {
-  if (!Device.isDevice) return;
-  try {
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') return;
-    const code = await AsyncStorage.getItem('restaurant_code') || '';
-    const token = (await Notifications.getExpoPushTokenAsync({
-      projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
-    })).data;
-    await fetch(`${BACKEND_URL}/unregister-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, restaurant_code: code }),
-    });
-  } catch (e) {}
+  // Keep tokens registered so owner always receives notifications
 }
 
 async function registerForPushNotifications() {
@@ -76,10 +64,14 @@ const checkUserRole = async () => {
       if (role === 'owner') {
         registerForPushNotifications();
       } else if (role === 'delivery') {
-        unregisterPushNotifications();
+        // Don't unregister - owner token stays active
       }
       setTimeout(() => {
-              router.replace('/(tabs)');
+              if (role === 'delivery') {
+                router.replace('/(tabs)/delivery');
+              } else {
+                router.replace('/(tabs)');
+              }
             }, 100);
           } catch (e) {
             router.replace('/onboarding');
@@ -130,8 +122,8 @@ const checkUserRole = async () => {
           items: JSON.parse(data.items || '[]'),
           payment_method: data.payment_method || '',
           note: data.note || '',
-          date: new Date().toLocaleString(),
-          timestamp: Date.now(),
+          date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
+          timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
           shipping_method: data.shipping_method || '',
           shipping_address: data.shipping_address || '',
           restaurant_code: data.restaurant_code || '',
@@ -154,11 +146,13 @@ const checkUserRole = async () => {
   }, []);
 
   return (
-    <LanguageProvider>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      </Stack>
-    </LanguageProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <LanguageProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        </Stack>
+      </LanguageProvider>
+    </GestureHandlerRootView>
   );
 }
