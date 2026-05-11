@@ -8,8 +8,7 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "prebuildCommand": "echo 'skipping prebuild'"
+      "distribution": "internal"
     },
     "production": {}
   },
