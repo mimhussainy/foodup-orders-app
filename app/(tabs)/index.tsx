@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
 interface OrderAddon {
@@ -368,7 +369,9 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <View style={styles.headerPlaceholder} />
+          <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
+            <Ionicons name="print-outline" size={20} color="#111" />
+          </TouchableOpacity>
         </View>
 
         <SafeAreaView style={{ flex: 1 }}>
