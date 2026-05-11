@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
@@ -25,6 +26,7 @@ const TabLayout = React.memo(function TabLayout() {
   const [role, setRole] = useState<string | null>(null);
   const [roleLoaded, setRoleLoaded] = useState(false);
   const [bagCount, setBagCount] = useState(0);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const loadBagCount = async () => {
@@ -60,7 +62,7 @@ const TabLayout = React.memo(function TabLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
-          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? 30 : 30, height: Platform.OS === 'android' ? 80 : 90 },
+          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? insets.bottom + 10 : 30, height: Platform.OS === 'android' ? insets.bottom + 60 : 90 },
           tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
           tabBarItemStyle: { flex: 1 },
           tabBarHideOnKeyboard: true,
