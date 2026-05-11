@@ -60,7 +60,7 @@ const TabLayout = React.memo(function TabLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
-          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? 10 : 30, height: Platform.OS === 'android' ? 60 : 90 },
+          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? 30 : 30, height: Platform.OS === 'android' ? 80 : 90 },
           tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
           tabBarItemStyle: { flex: 1 },
           tabBarHideOnKeyboard: true,
