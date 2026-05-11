@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
@@ -60,7 +60,7 @@ const TabLayout = React.memo(function TabLayout() {
         screenOptions={{
           headerShown: false,
           animation: 'none',
-          tabBarStyle: { paddingTop: 10, paddingBottom: 30, height: 90 },
+          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? 10 : 30, height: Platform.OS === 'android' ? 60 : 90 },
           tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
           tabBarItemStyle: { flex: 1 },
           tabBarHideOnKeyboard: true,
@@ -107,7 +107,7 @@ const TabLayout = React.memo(function TabLayout() {
         headerShown: false,
         animation: 'none',
         tabBarIconStyle: { transform: [{ translateX: 0 }] },
-        tabBarStyle: { paddingTop: 10, paddingBottom: 30, height: 90 },
+        tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? 10 : 30, height: Platform.OS === 'android' ? 60 : 90 },
         tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
         tabBarItemStyle: { flex: 1 },
       }}

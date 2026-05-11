@@ -369,7 +369,9 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <View style={styles.headerPlaceholder} />
+          <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
+            <Ionicons name="print-outline" size={20} color="#111" />
+          </TouchableOpacity>
         </View>
 
         <SafeAreaView style={{ flex: 1 }}>
@@ -474,23 +476,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               <Text style={styles.totalValue}>{selectedOrder.currency} {selectedOrder.total}</Text>
             </View>
 
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#111',
-                borderRadius: 12,
-                padding: 16,
-                alignItems: 'center',
-                marginHorizontal: 16,
-                marginBottom: 16,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-              onPress={() => printOrder(selectedOrder)}
-            >
-              <Ionicons name="print-outline" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.printOrder}</Text>
-            </TouchableOpacity>
+            
 
             {(() => {
               const claim = claims[String(selectedOrder.order_id)];
