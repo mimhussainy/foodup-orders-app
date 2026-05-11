@@ -1,7 +1,6 @@
 const { withAppBuildGradle, withAndroidManifest } = require('@expo/config-plugins');
 
 module.exports = function withMinSdk(config) {
-  // Fix build.gradle
   config = withAppBuildGradle(config, (config) => {
     config.modResults.contents = config.modResults.contents.replace(
       'minSdkVersion rootProject.ext.minSdkVersion',
@@ -10,16 +9,11 @@ module.exports = function withMinSdk(config) {
     return config;
   });
 
-  // Fix AndroidManifest.xml
   config = withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
-    if (!manifest['uses-sdk']) {
-      manifest['uses-sdk'] = [];
-    }
+    manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
     manifest['uses-sdk'] = [{
       '$': {
-        'xmlns:tools': 'http://schemas.android.com/tools',
-        'android:minSdkVersion': '26',
         'tools:overrideLibrary': 'com.goodcom.react.EzPrinter'
       }
     }];
