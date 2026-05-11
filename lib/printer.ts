@@ -1,5 +1,5 @@
+import { BluetoothEscposPrinter, BluetoothManager } from '@brooons/react-native-bluetooth-escpos-printer';
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
-import { BluetoothEscposPrinter, BluetoothManager } from 'react-native-bluetooth-escpos-printer';
 
 export async function printOrder(order: any) {
   if (Platform.OS !== 'android') {
