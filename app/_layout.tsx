@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 
@@ -147,6 +148,7 @@ const checkUserRole = async () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.3)" translucent={false} />
       <LanguageProvider>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
