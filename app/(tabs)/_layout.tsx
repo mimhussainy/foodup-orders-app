@@ -109,7 +109,7 @@ const TabLayout = React.memo(function TabLayout() {
         headerShown: false,
         animation: 'none',
         tabBarIconStyle: { transform: [{ translateX: 0 }] },
-        tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? insets.bottom + 10 : 30, height: Platform.OS === 'android' ? insets.bottom + 60 : 90 },
+        tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? insets.bottom + 15 : 30, height: Platform.OS === 'android' ? insets.bottom + 65 : 90 },
         tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
         tabBarItemStyle: { flex: 1 },
       }}
