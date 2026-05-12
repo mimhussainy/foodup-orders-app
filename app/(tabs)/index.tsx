@@ -8,6 +8,7 @@ import {
   FlatList,
   Image,
   Linking,
+  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -709,7 +710,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
   header: {
   backgroundColor: '#fff',
-  paddingTop: 40, // Android top spacing reduced
+  paddingTop: Platform.OS === 'android' ? 40 : 59,
   paddingBottom: 12,
   borderBottomWidth: 1,
   borderBottomColor: '#F0F0F0',
