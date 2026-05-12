@@ -78,6 +78,8 @@ export default function SettingsScreen() {
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
 const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const [storeLoading, setStoreLoading] = useState(false);
+const [acceptanceTimes, setAcceptanceTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
+const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(c => {
@@ -105,6 +107,14 @@ const [storeLoading, setStoreLoading] = useState(false);
 
     AsyncStorage.getItem('delivery_name').then(n => setDeliveryName(n || ''));
     AsyncStorage.getItem('notification_sound').then(s => setNotificationSound(s || 'default'));
+    AsyncStorage.getItem('restaurant_code').then(async code => {
+      if (!code) return;
+      try {
+        const res = await fetch(`https://foodup-order-alerts-backend.onrender.com/acceptance-times/${code}`);
+        const result = await res.json();
+        if (result.success) setAcceptanceTimes(result.times);
+      } catch (e) {}
+    });
   }, []);
 
   const loadAccounts = async () => {
@@ -827,6 +837,71 @@ const [storeLoading, setStoreLoading] = useState(false);
 
 {role === 'owner' && (
             <>
+              {role === 'owner' && (
+            <>
+              <Text style={styles.groupLabel}>Acceptance Times</Text>
+              <View style={styles.section}>
+                <View style={{ paddingVertical: 14 }}>
+                  <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
+                    Set the time options shown when accepting orders
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                    {acceptanceTimes.map((time, i) => (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{time} min</Text>
+                        <TouchableOpacity onPress={() => {
+                          const updated = acceptanceTimes.filter((_, idx) => idx !== i);
+                          setAcceptanceTimes(updated);
+                        }}>
+                          <Ionicons name="close-circle" size={16} color="#999" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1, marginTop: 0 }]}
+                      placeholder="Add time (e.g. 20)"
+                      placeholderTextColor="#C0C0C0"
+                      keyboardType="numeric"
+                      value={newAcceptanceTime}
+                      onChangeText={setNewAcceptanceTime}
+                    />
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 16, justifyContent: 'center' }}
+                      onPress={() => {
+                        const num = parseInt(newAcceptanceTime);
+                        if (!isNaN(num) && num > 0 && !acceptanceTimes.includes(num)) {
+                          const updated = [...acceptanceTimes, num].sort((a, b) => a - b);
+                          setAcceptanceTimes(updated);
+                          setNewAcceptanceTime('');
+                        }
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, { marginTop: 12 }]}
+                    onPress={async () => {
+                      const pin = await AsyncStorage.getItem('owner_pin') || '';
+                      const code = await AsyncStorage.getItem('restaurant_code') || '';
+                      try {
+                        await fetch(`https://foodup-order-alerts-backend.onrender.com/acceptance-times`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ restaurant_code: code, owner_pin: pin, times: acceptanceTimes }),
+                        });
+                      } catch (e) {}
+                    }}
+                  >
+                    <Text style={styles.primaryBtnText}>Save Times</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+              
               <Text style={styles.groupLabel}>{t.dangerZone}</Text>
               <View style={styles.section}>
                 <TouchableOpacity

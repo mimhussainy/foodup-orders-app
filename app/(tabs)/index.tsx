@@ -8,6 +8,7 @@ import {
   FlatList,
   Image,
   Linking,
+  Modal,
   Platform,
   RefreshControl,
   SafeAreaView,
@@ -167,6 +168,247 @@ function groupOrdersByDate(orders: Order[], t: any) {
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
+function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, visible: boolean, onClose: () => void }) {
+  const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
+  const [selectedTime, setSelectedTime] = useState<number | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>('');
+  const [customReason, setCustomReason] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+
+  const times = [15, 20, 25, 30, 45, 60];
+  const reasons = ['Too busy', 'Restaurant closed', 'Out of stock', 'Other'];
+
+  useEffect(() => {
+    if (visible) {
+      setStep('main');
+      setSelectedTime(null);
+      setSelectedReason('');
+      setCustomReason('');
+    }
+  }, [visible]);
+
+  if (!order) return null;
+
+  const handleConfirmAccept = async () => {
+    if (!selectedTime) return;
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      await fetch(`${BACKEND_URL}/accepted-time`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: `${selectedTime} Minutes`,
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        }),
+      });
+      await printOrder(order, selectedTime);
+      onClose();
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  const handleConfirmReject = async () => {
+    const reason = selectedReason === 'Other' ? customReason : selectedReason;
+    if (!reason) return;
+    setLoading(true);
+    try {
+      await printOrder(order, undefined, true, reason);
+      onClose();
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+      }}>
+        <View style={{
+          backgroundColor: '#fff',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          padding: 24,
+          paddingBottom: 40,
+        }}>
+          {step === 'main' && (
+            <>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 4 }}>
+                Order #{order.order_id}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#999', marginBottom: 24 }}>
+                {order.customer_name} · {order.currency} {order.total}
+              </Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#2ecc71',
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                  marginBottom: 12,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                onPress={() => setStep('accept')}
+              >
+                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Accept Order</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#e74c3c',
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                onPress={() => setStep('reject')}
+              >
+                <Ionicons name="close-circle-outline" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Reject Order</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} style={{ marginTop: 16, alignItems: 'center' }}>
+                <Text style={{ color: '#999', fontSize: 14 }}>Dismiss</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'accept' && (
+            <>
+              <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
+                <Text style={{ color: '#007AFF', fontSize: 14 }}>← Back</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
+                Select Preparation Time
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+                {times.map(time => (
+                  <TouchableOpacity
+                    key={time}
+                    onPress={() => setSelectedTime(time)}
+                    style={{
+                      paddingHorizontal: 20,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: selectedTime === time ? '#2ecc71' : '#F5F5F5',
+                      minWidth: 80,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: selectedTime === time ? '#fff' : '#111',
+                    }}>
+                      {time} min
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: selectedTime ? '#111' : '#ccc',
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                onPress={handleConfirmAccept}
+                disabled={!selectedTime || loading}
+              >
+                <Ionicons name="print-outline" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                  {loading ? 'Printing...' : 'Confirm & Print'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'reject' && (
+            <>
+              <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
+                <Text style={{ color: '#007AFF', fontSize: 14 }}>← Back</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
+                Select Rejection Reason
+              </Text>
+              <View style={{ gap: 10, marginBottom: 16 }}>
+                {reasons.map(reason => (
+                  <TouchableOpacity
+                    key={reason}
+                    onPress={() => setSelectedReason(reason)}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: selectedReason === reason ? '#e74c3c' : '#F5F5F5',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: selectedReason === reason ? '#fff' : '#111',
+                    }}>
+                      {reason}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {selectedReason === 'Other' && (
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#E8E8E8',
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    color: '#111',
+                    marginBottom: 16,
+                  }}
+                  placeholder="Enter reason..."
+                  placeholderTextColor="#C0C0C0"
+                  value={customReason}
+                  onChangeText={setCustomReason}
+                />
+              )}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: selectedReason ? '#e74c3c' : '#1f1919',
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+                onPress={handleConfirmReject}
+                disabled={!selectedReason || loading || (selectedReason === 'Other' && !customReason)}
+              >
+                <Ionicons name="print-outline" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+                  {loading ? 'Printing...' : 'Confirm & Print'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+
+
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -176,6 +418,8 @@ export default function OrdersScreen() {
 const [acceptedTimes, setAcceptedTimes] = useState<{ [key: string]: any }>({});
 const [filter, setFilter] = useState<string>('new');
 const [search, setSearch] = useState<string>('');
+const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
+const [showAcceptReject, setShowAcceptReject] = useState(false);
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -327,6 +571,8 @@ const [search, setSearch] = useState<string>('');
             }
             return [newOrder, ...prev];
           });
+          setAcceptRejectOrder(newOrder);
+          setShowAcceptReject(true);
         }
       });
       return () => subscription.remove();
@@ -552,7 +798,17 @@ const sections = groupOrdersByDate(filteredOrders, t);
       <View style={styles.header}>
         <View style={styles.headerPlaceholder} />
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-        <View style={styles.headerPlaceholder} />
+        <TouchableOpacity 
+          style={styles.headerPlaceholder}
+          onPress={() => {
+            if (orders.length > 0) {
+              setAcceptRejectOrder(orders[0]);
+              setShowAcceptReject(true);
+            }
+          }}
+        >
+          <Ionicons name="print-outline" size={20} color="#111" />
+        </TouchableOpacity>
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ 
@@ -702,6 +958,11 @@ const sections = groupOrdersByDate(filteredOrders, t);
           />
         )}
       </SafeAreaView>
+      <AcceptRejectModal
+        order={acceptRejectOrder}
+        visible={showAcceptReject}
+        onClose={() => setShowAcceptReject(false)}
+      />
     </View>
   );
 }
