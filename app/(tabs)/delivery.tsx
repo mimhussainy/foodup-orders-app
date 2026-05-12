@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: { width: 100, height: 30 },
-  content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 100 },
+  content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20 },
   greeting: { fontSize: 18, color: '#999', marginBottom: 4 },
   title: {
     fontSize: 24,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchBtnText: { fontSize: 20, color: '#fff', textAlign: 'center', lineHeight: 52 },
+  searchBtnText: { fontSize: 20, color: '#fff', includeFontPadding: false },
   error: { color: '#e74c3c', marginTop: 8 },
   successText: { color: '#2ecc71', marginTop: 8 },
   section: {
