@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.foodup.orderalerts",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
