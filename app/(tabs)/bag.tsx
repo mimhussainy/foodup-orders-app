@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, AppState, Image, Linking, RefreshControl, SafeAreaView, ScrollView,
+  Alert, AppState, Image, Linking, Platform,
+  RefreshControl, SafeAreaView, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
 } from 'react-native';
 
@@ -727,7 +728,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
   header: {
     backgroundColor: '#fff',
-    paddingTop: 70,
+    paddingTop: Platform.OS === 'android' ? 40 : 70,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',

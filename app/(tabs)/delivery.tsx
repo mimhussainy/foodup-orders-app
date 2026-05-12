@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import {
   Image,
   Keyboard,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView, StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from 'react-native';
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
   header: {
     backgroundColor: '#fff',
-    paddingTop: 70,
+    paddingTop: Platform.OS === 'android' ? 40 : 70,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',

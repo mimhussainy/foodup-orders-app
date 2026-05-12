@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  Image, SafeAreaView, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View,
+  Image,
+  SafeAreaView, ScrollView,
+  StyleSheet, Text, TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -237,7 +238,7 @@ useFocusEffect(
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
-  header: { backgroundColor: '#fff', paddingTop: 70, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center' },
+  header: { backgroundColor: '#fff', paddingTop: 40, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center' },
   logo: { width: 100, height: 30 },
   scrollContent: { paddingBottom: 40, paddingTop: 8 },
   groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },

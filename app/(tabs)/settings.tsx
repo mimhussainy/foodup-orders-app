@@ -4,8 +4,9 @@ import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert, Image, Keyboard, Linking, SafeAreaView, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  Alert, Image, Keyboard, Linking, Platform,
+  SafeAreaView, ScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -892,8 +893,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
   header: {
     backgroundColor: '#fff',
-    paddingTop: 70,
-    paddingBottom: 14,
+    paddingTop: Platform.OS === 'android' ? 40 : 70,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     alignItems: 'center',
