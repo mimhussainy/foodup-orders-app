@@ -20,7 +20,6 @@
       }
     },
     "android": {
-      "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -58,9 +57,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "a057b1fa-8571-453c-a989-a4de0c33949a"
+        "projectId": "ab0caa45-9ae8-44b7-a68d-a8b64e4b7c31"
       }
     },
-    "owner": "foodup"
+    "owner": "eatime"
   }
 }
