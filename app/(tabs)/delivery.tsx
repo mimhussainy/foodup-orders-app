@@ -6,7 +6,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView, StyleSheet, Text, TextInput,
+  SafeAreaView, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
@@ -208,7 +208,7 @@ export default function AddOrderScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <View style={styles.content}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
             <Text style={styles.greeting}>
               {t.hiCourier}, {deliveryName} 👋
             </Text>
@@ -364,7 +364,7 @@ export default function AddOrderScreen() {
                 </TouchableOpacity>
               </View>
             )}
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -406,6 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderRadius: 10,
     width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },

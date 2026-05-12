@@ -39,7 +39,7 @@ async function registerForPushNotifications() {
     return;
   }
   const token = (await Notifications.getExpoPushTokenAsync({
-    projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
+    projectId: 'ab0caa45-9ae8-44b7-a68d-a8b64e4b7c31',
   })).data;
   console.log('Token:', token);
   const response = await fetch(`${BACKEND_URL}/register-token`, {
@@ -148,7 +148,7 @@ const checkUserRole = async () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.3)" translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
       <LanguageProvider>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
