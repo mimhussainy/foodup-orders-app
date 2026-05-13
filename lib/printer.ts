@@ -1,5 +1,4 @@
 import { Alert } from 'react-native';
-import RNPrint from 'react-native-print';
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string) {
   try {
@@ -97,7 +96,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       </html>
     `;
 
-    await RNPrint.print({ html });
+    await Print.printAsync({ html });
     return true;
 
   } catch (e: any) {
