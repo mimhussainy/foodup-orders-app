@@ -238,7 +238,7 @@ useFocusEffect(
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7F7' },
-  header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? 40 : 59, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center' },
+  header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? 40 : 65, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center' },
   logo: { width: 100, height: 30 },
   scrollContent: { paddingBottom: 40, paddingTop: 8 },
   groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },

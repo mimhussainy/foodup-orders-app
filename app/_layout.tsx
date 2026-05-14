@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { printOrder } from '../lib/printer';
@@ -21,34 +21,53 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function unregisterPushNotifications() {
-  // Keep tokens registered so owner always receives notifications
-}
-
 async function registerForPushNotifications() {
-  if (!Device.isDevice) return;
+  if (!Device.isDevice) {
+    console.log('Push notifications only work on a real device');
+    return;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'FoodUp Orders',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#8B38CB',
+      sound: 'default',
+    });
+  }
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
+
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  if (finalStatus !== 'granted') return;
+
+  if (finalStatus !== 'granted') {
+    console.log('Notification permission not granted');
+    return;
+  }
+
   const code = await AsyncStorage.getItem('restaurant_code') || '';
-  console.log('Registering push token for restaurant:', code);
   if (!code) {
     console.log('No restaurant code found - skipping token registration');
     return;
   }
+
   const token = (await Notifications.getExpoPushTokenAsync({
-    projectId: 'ab0caa45-9ae8-44b7-a68d-a8b64e4b7c31',
+    projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
   })).data;
+
   console.log('Token:', token);
+
   const response = await fetch(`${BACKEND_URL}/register-token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, restaurant_code: code }),
   });
+
   const result = await response.json();
   console.log('Register result:', result);
 }
@@ -59,19 +78,19 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
   const [loading, setLoading] = useState(false);
-
   const [times, setTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;
       try {
-        const res = await fetch(`https://foodup-order-alerts-backend.onrender.com/acceptance-times/${code}`);
+        const res = await fetch(`${BACKEND_URL}/acceptance-times/${code}`);
         const result = await res.json();
         if (result.success) setTimes(result.times);
       } catch (e) {}
     });
   }, [visible]);
+
   const reasons = ['Too busy', 'Restaurant closed', 'Out of stock', 'Other'];
 
   useEffect(() => {
@@ -90,7 +109,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
     setLoading(true);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
-      await fetch('https://foodup-order-alerts-backend.onrender.com/accepted-time', {
+      fetch(`${BACKEND_URL}/accepted-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,11 +119,19 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
           accepted_at: new Date().toISOString(),
           status: 'accepted',
         }),
-      });
-      await printOrder(order, selectedTime);
+      }).catch(e => console.log('accepted-time error:', e));
+      setLoading(false);
       onClose();
-    } catch (e) {}
-    setLoading(false);
+      setTimeout(() => {
+        printOrder(order, selectedTime).catch(e => {
+          console.log('print accept error:', e);
+        });
+      }, 700);
+    } catch (e) {
+      console.log('accept error:', e);
+      setLoading(false);
+      onClose();
+    }
   };
 
   const handleConfirmReject = async () => {
@@ -112,10 +139,47 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
     if (!reason) return;
     setLoading(true);
     try {
-      await printOrder(order, undefined, true, reason);
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const stored = await AsyncStorage.getItem('foodup_orders');
+      const existing = stored ? JSON.parse(stored) : [];
+      const updated = existing.map((o: any) =>
+        o.order_id === order.order_id ? { ...o, status: 'cancelled' } : o
+      );
+      await AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
+      fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'cancelled',
+          customer_name: order.customer_name || '',
+          customer_phone: order.customer_phone || '',
+          total: order.total || '',
+          currency: order.currency || 'CHF',
+          items: order.items || [],
+          payment_method: order.payment_method || '',
+          note: order.note || '',
+          shipping: {
+            method: order.shipping_method || '',
+            address: order.shipping_address || '',
+          },
+          event_type: 'status_update',
+          sound: false,
+        }),
+      }).catch(e => console.log('status-update error:', e));
+      setLoading(false);
       onClose();
-    } catch (e) {}
-    setLoading(false);
+      setTimeout(() => {
+        printOrder(order, undefined, true, reason).catch(e => {
+          console.log('print reject error:', e);
+        });
+      }, 700);
+    } catch (e) {
+      console.log('reject error:', e);
+      setLoading(false);
+      onClose();
+    }
   };
 
   return (
@@ -152,7 +216,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
               </TouchableOpacity>
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>Select Preparation Time</Text>
               <View style={{ marginBottom: 24 }}>
-                {times.map((time, i) => (
+                {times.map((time) => (
                   <TouchableOpacity
                     key={time}
                     onPress={() => setSelectedTime(time)}
@@ -231,9 +295,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
 export default function RootLayout() {
   const router = useRouter();
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
-  const [showOrderModal, setShowOrderModal] = useState(false);
 
-const checkUserRole = async () => {
+  const checkUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('user_role');
       const restaurantCode = await AsyncStorage.getItem('restaurant_code');
@@ -243,20 +306,19 @@ const checkUserRole = async () => {
       }
       if (role === 'owner') {
         registerForPushNotifications();
-      } else if (role === 'delivery') {
-        // Don't unregister - owner token stays active
       }
       setTimeout(() => {
-              if (role === 'delivery') {
-                router.replace('/(tabs)/delivery');
-              } else {
-                router.replace('/(tabs)');
-              }
-            }, 100);
-          } catch (e) {
-            router.replace('/onboarding');
-          }
-        };  
+        if (role === 'delivery') {
+          router.replace('/(tabs)/delivery');
+        } else {
+          router.replace('/(tabs)');
+        }
+      }, 100);
+    } catch (e) {
+      router.replace('/onboarding');
+    }
+  };
+
   useEffect(() => {
     checkUserRole();
     Notifications.setBadgeCountAsync(0);
@@ -287,7 +349,6 @@ const checkUserRole = async () => {
             restaurant_code: data.restaurant_code || '',
           };
           setNewOrderModal(order);
-          setShowOrderModal(true);
         }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
@@ -355,11 +416,7 @@ const checkUserRole = async () => {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack>
-        <AcceptRejectModal
-          order={newOrderModal}
-          visible={showOrderModal}
-          onClose={() => setShowOrderModal(false)}
-        />
+        
       </LanguageProvider>
     </GestureHandlerRootView>
   );

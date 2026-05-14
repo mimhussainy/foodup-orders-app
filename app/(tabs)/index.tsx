@@ -7,6 +7,7 @@ import {
   AppState,
   FlatList,
   Image,
+  InteractionManager,
   Linking,
   Modal,
   Platform,
@@ -194,7 +195,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
     setLoading(true);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
-      await fetch(`${BACKEND_URL}/accepted-time`, {
+      fetch(`${BACKEND_URL}/accepted-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,11 +205,19 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           accepted_at: new Date().toISOString(),
           status: 'accepted',
         }),
-      });
-      await printOrder(order, selectedTime);
+      }).catch(e => console.log('accepted-time error:', e));
+      setLoading(false);
       onClose();
-    } catch (e) {}
-    setLoading(false);
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          printOrder(order, selectedTime).catch(e => console.log('print accept error:', e));
+        }, 500);
+      });
+    } catch (e) {
+      console.log('accept error:', e);
+      setLoading(false);
+      onClose();
+    }
   };
 
   const handleConfirmReject = async () => {
@@ -216,10 +225,47 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
     if (!reason) return;
     setLoading(true);
     try {
-      await printOrder(order, undefined, true, reason);
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const stored = await AsyncStorage.getItem('foodup_orders');
+      const existing = stored ? JSON.parse(stored) : [];
+      const updated = existing.map((o: any) =>
+        o.order_id === order.order_id ? { ...o, status: 'cancelled' } : o
+      );
+      await AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
+      fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'cancelled',
+          customer_name: order.customer_name || '',
+          customer_phone: order.customer_phone || '',
+          total: order.total || '',
+          currency: order.currency || 'CHF',
+          items: order.items || [],
+          payment_method: order.payment_method || '',
+          note: order.note || '',
+          shipping: {
+            method: order.shipping_method || '',
+            address: order.shipping_address || '',
+          },
+          event_type: 'status_update',
+          sound: false,
+        }),
+      }).catch(e => console.log('status-update error:', e));
+      setLoading(false);
       onClose();
-    } catch (e) {}
-    setLoading(false);
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          printOrder(order, undefined, true, reason).catch(e => console.log('print reject error:', e));
+        }, 500);
+      });
+    } catch (e) {
+      console.log('reject error:', e);
+      setLoading(false);
+      onClose();
+    }
   };
 
   return (
@@ -428,7 +474,6 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
       setRole(r);
       if (r === 'delivery') router.replace('/(tabs)/delivery');
     });
-    AsyncStorage.removeItem(STORAGE_KEY);
     fetchOrdersFromBackend();
     fetchClaims();
 
@@ -572,7 +617,7 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
             return [newOrder, ...prev];
           });
           setAcceptRejectOrder(newOrder);
-          setShowAcceptReject(true);
+          if (Platform.OS !== 'ios') setShowAcceptReject(true);
         }
       });
       return () => subscription.remove();
@@ -616,9 +661,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
-            <Ionicons name="print-outline" size={20} color="#111" />
-          </TouchableOpacity>
+          <View style={styles.backCircle} />
         </View>
 
         <SafeAreaView style={{ flex: 1 }}>
@@ -798,17 +841,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
       <View style={styles.header}>
         <View style={styles.headerPlaceholder} />
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-        <TouchableOpacity 
-          style={styles.headerPlaceholder}
-          onPress={() => {
-            if (orders.length > 0) {
-              setAcceptRejectOrder(orders[0]);
-              setShowAcceptReject(true);
-            }
-          }}
-        >
-          <Ionicons name="print-outline" size={20} color="#111" />
-        </TouchableOpacity>
+        <View style={styles.headerPlaceholder} />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ 
@@ -958,11 +991,16 @@ const sections = groupOrdersByDate(filteredOrders, t);
           />
         )}
       </SafeAreaView>
-      <AcceptRejectModal
-        order={acceptRejectOrder}
-        visible={showAcceptReject}
-        onClose={() => setShowAcceptReject(false)}
-      />
+      {Platform.OS !== 'ios' && (
+        <AcceptRejectModal
+          order={acceptRejectOrder}
+          visible={showAcceptReject}
+          onClose={() => {
+            setShowAcceptReject(false);
+            setAcceptRejectOrder(null);
+          }}
+        />
+      )}
     </View>
   );
 }

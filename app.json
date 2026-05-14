@@ -9,12 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.foodup.orderalerts",
-      "buildNumber": "2",
+      "buildNumber": "4",
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
-          "fetch",
-          "remote-notification",
           "fetch",
           "remote-notification"
         ],
@@ -28,7 +26,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.foodup.orderalerts"
+      "package": "com.foodup.orderalerts",
+      "versionCode": 2,
+"blockedPermissions": [
+  "android.permission.RECORD_AUDIO"
+]
     },
     "web": {
       "output": "static",
@@ -59,15 +61,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ab0caa45-9ae8-44b7-a68d-a8b64e4b7c31"
+        "projectId": "a057b1fa-8571-453c-a989-a4de0c33949a"
       }
     },
-    "owner": "eatime",
+    "owner": "foodup",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/ab0caa45-9ae8-44b7-a68d-a8b64e4b7c31"
+      "url": "https://u.expo.dev/a057b1fa-8571-453c-a989-a4de0c33949a"
     }
   }
 }
