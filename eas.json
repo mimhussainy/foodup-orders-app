@@ -15,7 +15,8 @@
       "resourceClass": "large"
     },
     "production": {
-      "channel": "production"
+      "channel": "production",
+      "distribution": "store"
     }
   },
   "submit": {
