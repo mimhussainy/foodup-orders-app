@@ -329,11 +329,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     checkUserRole();
-    Notifications.setBadgeCountAsync(0);
-    Notifications.dismissAllNotificationsAsync();
 
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
-      Notifications.setBadgeCountAsync(0);
       const data = notification.request.content.data as any;
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
@@ -378,7 +375,6 @@ export default function RootLayout() {
     });
 
     const tapSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      Notifications.setBadgeCountAsync(0);
       const data = response.notification.request.content.data as any;
       if (data.order_id) {
         const newOrder = {
