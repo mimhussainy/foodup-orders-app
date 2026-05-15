@@ -213,9 +213,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Reject Order</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} style={{ marginTop: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#999', fontSize: 14 }}>Dismiss</Text>
-              </TouchableOpacity>
+              
             </>
           )}
           {step === 'accept' && (
@@ -409,6 +407,10 @@ export default function RootLayout() {
             AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
           }
         });
+        if (Platform.OS !== 'ios' && data.event_type === 'new_order') {
+          setNewOrderModal(newOrder);
+          setShowOrderModal(true);
+        }
       }
     });
 
@@ -427,6 +429,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack>
         
+      
       {Platform.OS !== 'ios' && (
           <AcceptRejectModal
             order={newOrderModal}

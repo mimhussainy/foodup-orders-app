@@ -36,12 +36,12 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     const dateStr = now.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const acceptanceHtml = acceptedMinutes ? `
-      <div class="divider"></div>
-      <p style="text-align:left; font-size:11px; color:#666; margin:4px 0;">Accepted for:</p>
+      <div style="border-top:1px solid #000; margin:8px 0;"></div>
+      <p style="text-align:left; font-size:11px; color:#333; margin:4px 0;">Accepted for:</p>
       <p style="text-align:left; font-size:13px; margin:2px 0;">${acceptedMinutes} Minutes</p>
     ` : rejected ? `
-      <div class="divider"></div>
-      <p style="text-align:left; font-size:11px; color:#666; margin:4px 0;">Rejected:</p>
+      <div style="border-top:1px solid #000; margin:8px 0;"></div>
+      <p style="text-align:left; font-size:11px; color:#333; margin:4px 0;">Rejected:</p>
       ${rejectionReason ? `<p style="text-align:left; font-size:13px; margin:2px 0;">${rejectionReason}</p>` : ''}
     ` : '';
 
@@ -50,59 +50,57 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
         <head>
           <meta charset="utf-8">
           <style>
-            body { font-family: monospace; font-size: 13px; margin: 0; padding: 8px; width: 280px; }
-            h2 { text-align: center; margin: 4px 0; font-size: 20px; letter-spacing: 2px; }
+            body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px; width: 280px; }
             .center { text-align: center; margin: 2px 0; }
-            .divider { border-top: 1px dashed #000; margin: 6px 0; }
+            .divider { border-top: 1px solid #000; margin: 8px 0; }
+            .divider-dashed { border-top: 1px dashed #000; margin: 8px 0; }
             table { width: 100%; border-collapse: collapse; }
-            td { font-size: 13px; }
-            .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
-            .value { font-size: 13px; font-weight: bold; }
+            td { font-size: 13px; vertical-align: top; }
           </style>
         </head>
         <body>
           ${logoHtml}
-          <h2>Order#${order.order_id}</h2>
-          <p class="center" style="font-size:11px; color:#666;">CreateTime: &nbsp; ${timeStr} ${dateStr}</p>
+          <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 2px 0; letter-spacing:0;">Order#${order.order_id}</h2>
+          <p style="font-size:11px; color:#333; margin:2px 0;">CreateTime: <span style="float:right;">${timeStr}&nbsp;&nbsp;${dateStr}</span></p>
           <div class="divider"></div>
-          <p class="center" style="font-size:11px; color:#666; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">Requested for:</p>
-          <p class="center" style="font-size:18px; font-weight:bold; margin:2px 0;">${timeStr} ${dateStr.replace(/\./g, '-')}</p>
+          <p style="text-align:center; font-size:11px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">Requested for:</p>
+          <p style="text-align:center; font-size:20px; font-weight:900; margin:2px 0;">${timeStr}&nbsp;&nbsp;${dateStr.replace(/\./g, '-')}</p>
           <div class="divider"></div>
-          <table>
+          <table style="margin-bottom:4px;">
             <tr>
-              <td>
-                <div class="label">Shipment Method:</div>
-                <div class="value">${order.shipping_method || '-'}</div>
+              <td style="width:50%;">
+                <div style="font-size:11px; font-weight:bold; text-transform:uppercase;">Shipment Method:</div>
+                <div style="font-size:15px; font-weight:900;">${order.shipping_method || '-'}</div>
               </td>
-              <td style="text-align:right">
-                <div class="label">Payment Mode:</div>
-                <div class="value">${order.payment_method || '-'}</div>
+              <td style="width:50%;">
+                <div style="font-size:11px; font-weight:bold; text-transform:uppercase;">Payment Mode:</div>
+                <div style="font-size:15px; font-weight:900;">${order.payment_method || '-'}</div>
               </td>
             </tr>
           </table>
           <div class="divider"></div>
-          <p style="margin:3px 0; font-weight:bold;">${order.customer_name || ''}</p>
+          <p style="margin:3px 0;">${order.customer_name || ''}</p>
           ${order.shipping_address ? `<p style="margin:3px 0;">${order.shipping_address}</p>` : ''}
           ${order.customer_email ? `<p style="margin:3px 0; font-size:11px;">${order.customer_email}</p>` : ''}
           ${order.customer_phone ? `<p style="margin:3px 0;">${order.customer_phone}</p>` : ''}
           <div class="divider"></div>
           <table>${itemsHtml}</table>
-          <div class="divider"></div>
+          <div class="divider-dashed"></div>
           <table>
             <tr>
               <td style="font-size:13px;">Subtotal</td>
-              <td style="text-align:right; font-size:13px;">${order.currency} ${order.total}</td>
+              <td style="text-align:right; font-size:13px;">${order.total}</td>
             </tr>
           </table>
           <div class="divider"></div>
           <table>
             <tr>
-              <td colspan="2" style="text-align:right; font-size:16px; font-weight:bold;">Total: ${order.currency} ${order.total}</td>
+              <td colspan="2" style="text-align:right; font-size:16px; font-weight:bold;">Total:&nbsp;&nbsp;${order.total}</td>
             </tr>
           </table>
           <div class="divider"></div>
-          <p style="text-align:center; font-size:15px; font-weight:bold; margin:6px 0;">${isPaid ? '✓ Bezahlt' : 'Bestellung wurde<br>noch nicht bezahlt'}</p>
-          ${order.note ? `<div class="divider"></div><p style="font-size:12px;">Note: ${order.note}</p>` : ''}
+          <p style="font-size:20px; font-weight:900; margin:6px 0;">${isPaid ? '✓ Bezahlt' : 'Bestellung wurde<br>noch nicht bezahlt'}</p>
+          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:12px;">Note: ${order.note}</p>` : ''}
           ${acceptanceHtml}
         </body>
       </html>
