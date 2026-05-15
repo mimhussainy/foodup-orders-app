@@ -614,7 +614,9 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
             return [newOrder, ...prev];
           });
           setAcceptRejectOrder(newOrder);
-          if (Platform.OS !== 'ios') setShowAcceptReject(true);
+          if (Platform.OS !== 'ios') {
+            setTimeout(() => setShowAcceptReject(true), 500);
+          }
         }
       });
       return () => subscription.remove();
