@@ -29,9 +29,9 @@
       },
       "package": "com.foodup.orderalerts",
       "versionCode": 2,
-"blockedPermissions": [
-  "android.permission.RECORD_AUDIO"
-]
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,7 +53,8 @@
         }
       ],
       "expo-localization",
-      "./plugins/withMinSdk"
+      "./plugins/withMinSdk",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
