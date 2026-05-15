@@ -922,8 +922,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
               { key: 'all', label: t.all, color: '#111' },
               { key: 'new', label: t.newOrder, color: '#f39c12' },
               { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
-              { key: 'delivering', label: t.delivering, color: '#f39c12' },
-              { key: 'delivered', label: t.delivered, color: '#3498db' },
+              { key: 'delivering', label: t.delivering, color: '#dfdb02' },
+              { key: 'delivered', label: t.delivered, color: '#2fc053' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}
             keyExtractor={item => item.key}
