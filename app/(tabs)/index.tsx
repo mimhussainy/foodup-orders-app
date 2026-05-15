@@ -651,6 +651,15 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
     });
 const sections = groupOrdersByDate(filteredOrders, t);
 
+  const filterCounts = {
+    new: orders.filter(o => getDeliveryStatus(o) === 'new').length,
+    in_bag: orders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
+    delivering: orders.filter(o => getDeliveryStatus(o) === 'delivering').length,
+    delivered: orders.filter(o => getDeliveryStatus(o) === 'delivered').length,
+    cancelled: orders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
+    all: orders.length,
+  };
+
   if (role === 'delivery') return null;
 
   if (selectedOrder) {
@@ -886,6 +895,9 @@ const sections = groupOrdersByDate(filteredOrders, t);
                   paddingVertical: 6,
                   borderRadius: 20,
                   backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
                 <Text style={{
@@ -895,6 +907,21 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 }}>
                   {f.label}
                 </Text>
+                {filterCounts[f.key as keyof typeof filterCounts] > 0 && (
+                  <View style={{
+                    backgroundColor: filter === f.key ? 'rgba(255,255,255,0.3)' : f.color,
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>
+                      {filterCounts[f.key as keyof typeof filterCounts]}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )}
           />
