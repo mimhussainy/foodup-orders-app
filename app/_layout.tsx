@@ -60,7 +60,9 @@ async function registerForPushNotifications() {
     projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
   })).data;
 
-  console.log('Token:', token);
+  console.log('=== DEVICE TOKEN:', token);
+  console.log('=== PLATFORM:', Platform.OS);
+  console.log('=== RESTAURANT CODE:', code);
 
   const response = await fetch(`${BACKEND_URL}/register-token`, {
     method: 'POST',
