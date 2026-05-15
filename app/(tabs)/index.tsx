@@ -269,7 +269,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => {}}>
       <View style={{
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -321,10 +321,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Reject Order</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} style={{ marginTop: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#999', fontSize: 14 }}>Dismiss</Text>
-              </TouchableOpacity>
-            </>
+              </>
           )}
 
           {step === 'accept' && (
