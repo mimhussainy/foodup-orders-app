@@ -483,11 +483,49 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
 
     const claimsInterval = setInterval(() => fetchClaims(), 10000);
     const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 30000);
+    const newOrderInterval = setInterval(async () => {
+      if (Platform.OS !== 'ios') {
+        const code = await AsyncStorage.getItem('restaurant_code') || '';
+        const role = await AsyncStorage.getItem('user_role') || '';
+        if (!code || role !== 'owner') return;
+        try {
+          const response = await fetch(`${BACKEND_URL}/latest-order/${code}`);
+          const result = await response.json();
+          if (result.success && result.order) {
+            const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
+            if (String(result.order.order_id) !== lastSeenId) {
+              await AsyncStorage.setItem('last_seen_order_id', String(result.order.order_id));
+              const newOrder: Order = {
+                order_id: parseInt(result.order.order_id),
+                customer_name: result.order.customer_name || '',
+                customer_email: result.order.customer_email || '',
+                customer_phone: result.order.customer_phone || '',
+                total: String(result.order.total || ''),
+                currency: result.order.currency || 'CHF',
+                status: result.order.status || '',
+                event_type: 'new_order',
+                items: result.order.items || [],
+                payment_method: result.order.payment_method || '',
+                note: result.order.note || '',
+                date: result.order.date_created ? new Date(result.order.date_created).toLocaleString() : new Date().toLocaleString(),
+                timestamp: result.order.date_created ? new Date(result.order.date_created).getTime() : Date.now(),
+                shipping_method: result.order.shipping?.method || '',
+                shipping_address: result.order.shipping?.address || '',
+                restaurant_code: result.order.restaurant_code || '',
+              };
+              setAcceptRejectOrder(newOrder);
+              setShowAcceptReject(true);
+            }
+          }
+        } catch (e) {}
+      }
+    }, 5000);
 
     return () => {
       appStateSubscription.remove();
       clearInterval(claimsInterval);
       clearInterval(ordersInterval);
+      clearInterval(newOrderInterval);
     };
   }, []);
 
