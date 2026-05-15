@@ -704,7 +704,13 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <View style={styles.backCircle} />
+          {Platform.OS !== 'ios' ? (
+            <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
+              <Ionicons name="print-outline" size={20} color="#111" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backCircle} />
+          )}
         </View>
 
         <SafeAreaView style={{ flex: 1 }}>
