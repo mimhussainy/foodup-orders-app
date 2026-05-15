@@ -280,7 +280,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           padding: 24,
-          paddingBottom: 40,
+          paddingBottom: 80,
         }}>
           {step === 'main' && (
             <>
@@ -489,29 +489,30 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
         const role = await AsyncStorage.getItem('user_role') || '';
         if (!code || role !== 'owner') return;
         try {
-          const response = await fetch(`${BACKEND_URL}/latest-order/${code}`);
+          const response = await fetch(`${BACKEND_URL}/orders/${code}`);
           const result = await response.json();
-          if (result.success && result.order) {
+          if (result.success && result.orders && result.orders.length > 0) {
+            const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            if (String(result.order.order_id) !== lastSeenId) {
-              await AsyncStorage.setItem('last_seen_order_id', String(result.order.order_id));
+            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
+              await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
               const newOrder: Order = {
-                order_id: parseInt(result.order.order_id),
-                customer_name: result.order.customer_name || '',
-                customer_email: result.order.customer_email || '',
-                customer_phone: result.order.customer_phone || '',
-                total: String(result.order.total || ''),
-                currency: result.order.currency || 'CHF',
-                status: result.order.status || '',
+                order_id: parseInt(latestOrder.order_id),
+                customer_name: latestOrder.customer_name || '',
+                customer_email: latestOrder.customer_email || '',
+                customer_phone: latestOrder.customer_phone || '',
+                total: String(latestOrder.total || ''),
+                currency: latestOrder.currency || 'CHF',
+                status: latestOrder.status || '',
                 event_type: 'new_order',
-                items: result.order.items || [],
-                payment_method: result.order.payment_method || '',
-                note: result.order.note || '',
-                date: result.order.date_created ? new Date(result.order.date_created).toLocaleString() : new Date().toLocaleString(),
-                timestamp: result.order.date_created ? new Date(result.order.date_created).getTime() : Date.now(),
-                shipping_method: result.order.shipping?.method || '',
-                shipping_address: result.order.shipping?.address || '',
-                restaurant_code: result.order.restaurant_code || '',
+                items: latestOrder.items || [],
+                payment_method: latestOrder.payment_method || '',
+                note: latestOrder.note || '',
+                date: latestOrder.date_created ? new Date(latestOrder.date_created).toLocaleString() : new Date().toLocaleString(),
+                timestamp: latestOrder.date_created ? new Date(latestOrder.date_created).getTime() : Date.now(),
+                shipping_method: latestOrder.shipping?.method || '',
+                shipping_address: latestOrder.shipping?.address || '',
+                restaurant_code: latestOrder.restaurant_code || '',
               };
               setAcceptRejectOrder(newOrder);
               setShowAcceptReject(true);
