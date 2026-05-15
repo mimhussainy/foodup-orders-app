@@ -394,7 +394,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                     key={reason}
                     onPress={() => setSelectedReason(reason)}
                     style={{
-                      paddingHorizontal: 16,
+                      paddingHorizontal: 12,
                       paddingVertical: 12,
                       borderRadius: 12,
                       backgroundColor: selectedReason === reason ? '#e74c3c' : '#F5F5F5',
@@ -462,7 +462,7 @@ export default function OrdersScreen() {
   const [role, setRole] = useState<string | null>(null);
   const [claims, setClaims] = useState<{ [key: string]: any }>({});
 const [acceptedTimes, setAcceptedTimes] = useState<{ [key: string]: any }>({});
-const [filter, setFilter] = useState<string>('new');
+const [filter, setFilter] = useState<string>('all');
 const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
@@ -878,12 +878,12 @@ const sections = groupOrdersByDate(filteredOrders, t);
             horizontal
             showsHorizontalScrollIndicator={false}
             data={[
+              { key: 'all', label: t.all, color: '#111' },
               { key: 'new', label: t.newOrder, color: '#f39c12' },
               { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
               { key: 'delivering', label: t.delivering, color: '#f39c12' },
               { key: 'delivered', label: t.delivered, color: '#3498db' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
-              { key: 'all', label: t.all, color: '#111' },
             ]}
             keyExtractor={item => item.key}
             contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center', paddingVertical: 10 }}
@@ -909,7 +909,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 </Text>
                 {filterCounts[f.key as keyof typeof filterCounts] > 0 && (
                   <View style={{
-                    backgroundColor: filter === f.key ? 'rgba(255,255,255,0.3)' : f.color,
+                    backgroundColor: '#fff',
                     borderRadius: 10,
                     minWidth: 18,
                     height: 18,
@@ -917,7 +917,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                     alignItems: 'center',
                     paddingHorizontal: 4,
                   }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
                       {filterCounts[f.key as keyof typeof filterCounts]}
                     </Text>
                   </View>

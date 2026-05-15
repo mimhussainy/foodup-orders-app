@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1066964665778",
+    "project_id": "wp-order-alerts-1d31e",
+    "storage_bucket": "wp-order-alerts-1d31e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1066964665778:android:dc59fc48a8479253eb50ab",
+        "android_client_info": {
+          "package_name": "com.foodup.orderalerts"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9xltGHtww_jfZF9PbC2_OiTOPNL1nnOs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
