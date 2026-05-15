@@ -56,22 +56,29 @@ async function registerForPushNotifications() {
     return;
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync({
-    projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
-  })).data;
+  let token = '';
+  try {
+    token = (await Notifications.getExpoPushTokenAsync({
+      projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
+    })).data;
+  } catch (tokenError: any) {
+    console.log('=== TOKEN ERROR:', tokenError?.message || String(tokenError));
+    return;
+  }
 
   console.log('=== DEVICE TOKEN:', token);
-  console.log('=== PLATFORM:', Platform.OS);
-  console.log('=== RESTAURANT CODE:', code);
 
-  const response = await fetch(`${BACKEND_URL}/register-token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, restaurant_code: code }),
-  });
-
-  const result = await response.json();
-  console.log('Register result:', result);
+  try {
+    const response = await fetch(`${BACKEND_URL}/register-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, restaurant_code: code }),
+    });
+    const result = await response.json();
+    console.log('=== REGISTER RESULT:', result);
+  } catch (fetchError: any) {
+    console.log('=== REGISTER FETCH ERROR:', fetchError?.message || String(fetchError));
+  }
 }
 
 function AcceptRejectModal({ order, visible, onClose }: { order: any | null, visible: boolean, onClose: () => void }) {
