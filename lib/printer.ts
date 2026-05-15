@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
@@ -9,8 +10,11 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     try {
       const asset = Asset.fromModule(require('../assets/images/foodup-logo-for-print.png'));
       await asset.downloadAsync();
-      const base64 = await FileSystem.readAsStringAsync(asset.localUri!, { encoding: 'base64' });
-      logoHtml = `<img src="data:image/png;base64,${base64}" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
+      const uri = asset.localUri || asset.uri;
+      if (uri) {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        logoHtml = `<img src="data:image/png;base64,${base64}" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
+      }
     } catch (e) {}
 
     const items = order.items || [];
@@ -39,17 +43,34 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       }
     });
 
+    const lang = (await AsyncStorage.getItem('app_language') || 'de') as 'en' | 'de';
+    const locale = lang === 'de' ? 'de-CH' : 'en-GB';
     const now = new Date();
-    const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-    const dateStr = now.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const labels = {
+      orderLabel: lang === 'de' ? 'Bestellung' : 'Order',
+      createTime: lang === 'de' ? 'Erstellt' : 'CreateTime',
+      requestedFor: lang === 'de' ? 'Gewünschte Lieferzeit' : 'Requested for',
+      shipmentMethod: lang === 'de' ? 'Liefermethode' : 'Shipment Method',
+      paymentMode: lang === 'de' ? 'Zahlungsart' : 'Payment Mode',
+      subtotal: lang === 'de' ? 'Zwischensumme' : 'Subtotal',
+      total: lang === 'de' ? 'Gesamt' : 'Total',
+      notPaid: lang === 'de' ? 'Bestellung wurde<br>noch nicht bezahlt' : 'Order not yet paid',
+      paid: lang === 'de' ? '✓ Bezahlt' : '✓ Paid',
+      note: lang === 'de' ? 'Hinweis' : 'Note',
+      acceptedFor: lang === 'de' ? 'Angenommen für' : 'Accepted for',
+      minutes: lang === 'de' ? 'Minuten' : 'Minutes',
+      rejected: lang === 'de' ? 'Abgelehnt' : 'Rejected',
+    };
 
     const acceptanceHtml = acceptedMinutes ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">Accepted for:</p>
-      <p style="text-align:left; font-size:18px; margin:2px 0;">${acceptedMinutes} Minutes</p>
+      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
+      <p style="text-align:left; font-size:18px; margin:2px 0;">${acceptedMinutes} ${labels.minutes}</p>
     ` : rejected ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">Rejected:</p>
+      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.rejected}:</p>
       ${rejectionReason ? `<p style="text-align:left; font-size:18px; margin:2px 0;">${rejectionReason}</p>` : ''}
     ` : '';
 
@@ -68,20 +89,20 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
         </head>
         <body>
           ${logoHtml}
-          <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 4px 0; letter-spacing:0;">Order#${order.order_id}</h2>
-          <p style="font-size:16px; color:#333; margin:2px 0;">CreateTime: <span style="float:right;">${timeStr}&nbsp;&nbsp;${dateStr}</span></p>
+          <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 4px 0; letter-spacing:0;">${labels.orderLabel}#${order.order_id}</h2>
+          <p style="font-size:16px; color:#333; margin:2px 0;">${labels.createTime}: <span style="float:right;">${timeStr}&nbsp;&nbsp;${dateStr}</span></p>
           <div class="divider"></div>
-          <p style="text-align:center; font-size:17px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">Requested for:</p>
+          <p style="text-align:center; font-size:17px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">${labels.requestedFor}:</p>
           <p style="text-align:center; font-size:22px; font-weight:900; margin:4px 0;">${timeStr}&nbsp;&nbsp;${dateStr.replace(/\./g, '-')}</p>
           <div class="divider"></div>
           <table style="margin-bottom:6px;">
             <tr>
               <td style="width:50%;">
-                <div style="font-size:15px; font-weight:bold; text-transform:uppercase; white-space:nowrap;">Shipment Method:</div>
+                <div style="font-size:15px; font-weight:bold; text-transform:uppercase; white-space:nowrap;">${labels.shipmentMethod}:</div>
                 <div style="font-size:22px; font-weight:900; margin-top:2px;">${order.shipping_method || '-'}</div>
               </td>
               <td style="width:50%; text-align:right;">
-                <div style="font-size:15px; font-weight:bold; text-transform:uppercase;">Payment Mode:</div>
+                <div style="font-size:15px; font-weight:bold; text-transform:uppercase;">${labels.paymentMode}:</div>
                 <div style="font-size:22px; font-weight:900; margin-top:2px; text-align:right;">${order.payment_method || '-'}</div>
               </td>
             </tr>
@@ -96,19 +117,19 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
           <div class="divider-dashed"></div>
           <table>
             <tr>
-              <td style="font-size:18px;">Subtotal</td>
+              <td style="font-size:18px;">${labels.subtotal}</td>
               <td style="text-align:right; font-size:18px;">${order.total}</td>
             </tr>
           </table>
           <div class="divider"></div>
           <table>
             <tr>
-              <td colspan="2" style="text-align:right; font-size:18px; font-weight:bold;">Total:&nbsp;&nbsp;${order.total}</td>
+              <td colspan="2" style="text-align:right; font-size:18px; font-weight:bold;">${labels.total}:&nbsp;&nbsp;${order.total}</td>
             </tr>
           </table>
           <div class="divider"></div>
-          <p style="text-align:center; font-size:20px; font-weight:900; margin:8px 0; line-height:1.2;">${isPaid ? '✓ Bezahlt' : 'Bestellung wurde<br>noch nicht bezahlt'}</p>
-          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:16px;">Note: ${order.note}</p>` : ''}
+          <p style="text-align:center; font-size:20px; font-weight:900; margin:8px 0; line-height:1.2;">${isPaid ? labels.paid : labels.notPaid}</p>
+          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:16px;">${labels.note}: ${order.note}</p>` : ''}
           ${acceptanceHtml}
         </body>
       </html>

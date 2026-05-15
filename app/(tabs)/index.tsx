@@ -897,7 +897,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
         <View style={{ 
             backgroundColor: '#fff', 
             paddingHorizontal: 16, 
-            paddingVertical: 10,
+            paddingVertical: 6,
             borderBottomWidth: 1,
             borderBottomColor: '#F0F0F0',
             flexDirection: 'row',
@@ -914,7 +914,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               clearButtonMode="while-editing"
             />
           </View>
-          <View style={{ height: 52, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+          <View style={{ height: 40, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -927,7 +927,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}
             keyExtractor={item => item.key}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center', paddingVertical: 10 }}
+            contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
             renderItem={({ item: f }) => (
               <TouchableOpacity
                 onPress={() => setFilter(f.key)}
