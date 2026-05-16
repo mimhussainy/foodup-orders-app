@@ -293,6 +293,11 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>
                 {order.customer_name} · {order.currency} {order.total}
               </Text>
+              {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
+                <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
+                  🕐 {(order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
+                </Text>
+              ) : null}
               {order.shipping_address ? (
                 <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 12 }}>
                   📍 {order.shipping_address}
@@ -755,6 +760,11 @@ const sections = groupOrdersByDate(filteredOrders, t);
               </View>
             </View>
             <Text style={styles.detailDate}>{selectedOrder.date}</Text>
+            {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
+              <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8, fontWeight: '600' }}>
+                🕐 {(selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
+              </Text>
+            ) : null}
 
             <Text style={styles.groupLabel}>{t.customer}</Text>
             <View style={styles.section}>
