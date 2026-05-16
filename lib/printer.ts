@@ -44,10 +44,19 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     const createdDateStr = createdDate.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     // Requested delivery time from Orderable
+    console.log('=== ORDERABLE TIME:', order.orderable_order_time, 'DATE:', order.orderable_order_date);
     let requestedStr = `${timeStr}  ${dateStr}`;
     if (order.orderable_order_date && order.orderable_order_time) {
-      const rawTime = order.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim();
-      requestedStr = `${rawTime}  ${order.orderable_order_date}`;
+      const isAsap = order.orderable_order_time.toLowerCase().includes('as soon as possible') || 
+                     order.orderable_order_time.toLowerCase().includes('asap') ||
+                     order.orderable_order_time.toLowerCase().includes('soon') ||
+                     order.orderable_order_time.includes('(');
+      if (isAsap) {
+        requestedStr = lang === 'de' ? `So schnell wie möglich — ${order.orderable_order_date}` : `As soon as possible — ${order.orderable_order_date}`;
+      } else {
+        const rawTime = order.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim();
+        requestedStr = `${rawTime}  ${order.orderable_order_date}`;
+      }
     }
     const labels = {
       orderLabel: lang === 'de' ? 'Bestellung' : 'Order',

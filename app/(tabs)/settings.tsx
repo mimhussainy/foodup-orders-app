@@ -590,7 +590,8 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
                         });
                         const result = await response.json();
                         if (result.success) {
-                          setStoreIsOpen(result.is_open);
+                          const newIsOpen = result.is_open;
+                          setStoreIsOpen(newIsOpen);
                           if(restaurantWebsite) {
                             const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
                             fetch(`${website}/foodup-store-status.php`, {
@@ -599,7 +600,7 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
                               body: JSON.stringify({ 
                                 secret: 'foodup2026', 
                                 action: 'set', 
-                                is_open: !storeIsOpen,
+                                is_open: newIsOpen,
                                 restaurant_code: code,
                               }),
                             }).catch(() => {});
