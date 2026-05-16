@@ -28,12 +28,15 @@ async function registerForPushNotifications() {
   }
 
   if (Platform.OS === 'android') {
+    await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
     await Notifications.setNotificationChannelAsync('default', {
       name: 'FoodUp Orders',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#8B38CB',
       sound: 'default',
+      enableVibrate: true,
+      showBadge: true,
     });
   }
 

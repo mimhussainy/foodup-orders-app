@@ -284,12 +284,33 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         }}>
           {step === 'main' && (
             <>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 4 }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 2 }}>
                 Order #{order.order_id}
               </Text>
-              <Text style={{ fontSize: 14, color: '#999', marginBottom: 24 }}>
+              <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>
                 {order.customer_name} · {order.currency} {order.total}
               </Text>
+              {order.shipping_address ? (
+                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 12 }}>
+                  📍 {order.shipping_address}
+                </Text>
+              ) : null}
+              <View style={{ backgroundColor: '#F7F7F7', borderRadius: 12, padding: 12, marginBottom: 16, maxHeight: 160 }}>
+                <ScrollView nestedScrollEnabled>
+                  {(order.items || []).map((item: any, i: number) => (
+                    <View key={i} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111' }}>
+                        {item.quantity}x {item.name}
+                      </Text>
+                      {item.addons && item.addons.length > 0 && item.addons.map((addon: any, j: number) => (
+                        <Text key={j} style={{ fontSize: 13, color: '#666', paddingLeft: 8 }}>
+                          ↳ {addon.value}
+                        </Text>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
               <TouchableOpacity
                 style={{
                   backgroundColor: '#2ecc71',

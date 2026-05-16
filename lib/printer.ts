@@ -1,27 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string) {
   try {
-    let logoHtml = '';
-    try {
-      const asset = Asset.fromModule(require('../assets/images/foodup-logo-for-print.png'));
-      await asset.downloadAsync();
-      const uri = asset.localUri || asset.uri;
-      console.log('=== LOGO URI:', uri);
-      if (uri) {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-        console.log('=== LOGO BASE64 LENGTH:', base64.length);
-        logoHtml = `<img src="data:image/png;base64,${base64}" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
-      } else {
-        console.log('=== LOGO URI IS NULL');
-      }
-    } catch (e) {
-      console.log('=== LOGO ERROR:', String(e));
-    }
+    const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
 
     const items = order.items || [];
     const isPaid = !order.payment_method?.toLowerCase().includes('bar');
@@ -54,6 +37,13 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     const now = new Date();
     const timeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     const dateStr = now.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Requested delivery time from Orderable
+    let requestedStr = `${timeStr}  ${dateStr}`;
+    if (order.orderable_order_date && order.orderable_order_time) {
+      const rawTime = order.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim();
+      requestedStr = `${rawTime}  ${order.orderable_order_date}`;
+    }
     const labels = {
       orderLabel: lang === 'de' ? 'Bestellung' : 'Order',
       createTime: lang === 'de' ? 'Erstellt' : 'CreateTime',
@@ -99,7 +89,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
           <p style="font-size:16px; color:#333; margin:2px 0;">${labels.createTime}: <span style="float:right;">${timeStr}&nbsp;&nbsp;${dateStr}</span></p>
           <div class="divider"></div>
           <p style="text-align:center; font-size:17px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">${labels.requestedFor}:</p>
-          <p style="text-align:center; font-size:22px; font-weight:900; margin:4px 0;">${timeStr}&nbsp;&nbsp;${dateStr.replace(/\./g, '-')}</p>
+          <p style="text-align:center; font-size:22px; font-weight:900; margin:4px 0;">${requestedStr}</p>
           <div class="divider"></div>
           <table style="margin-bottom:6px;">
             <tr>
