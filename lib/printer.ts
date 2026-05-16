@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string) {
   try {
-    const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
+    const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
 
     const items = order.items || [];
     const isPaid = !order.payment_method?.toLowerCase().includes('bar');
@@ -37,6 +37,11 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     const now = new Date();
     const timeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     const dateStr = now.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Use order creation time for CreateTime field
+    const createdDate = order.date_created ? new Date(order.date_created) : now;
+    const createdTimeStr = createdDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    const createdDateStr = createdDate.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     // Requested delivery time from Orderable
     let requestedStr = `${timeStr}  ${dateStr}`;
@@ -86,7 +91,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
         <body>
           ${logoHtml}
           <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 4px 0; letter-spacing:0;">${labels.orderLabel}#${order.order_id}</h2>
-          <p style="font-size:16px; color:#333; margin:2px 0;">${labels.createTime}: <span style="float:right;">${timeStr}&nbsp;&nbsp;${dateStr}</span></p>
+          <p style="font-size:16px; color:#333; margin:2px 0;">${labels.createTime}: <span style="float:right;">${createdTimeStr}&nbsp;&nbsp;${createdDateStr}</span></p>
           <div class="divider"></div>
           <p style="text-align:center; font-size:17px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">${labels.requestedFor}:</p>
           <p style="text-align:center; font-size:22px; font-weight:900; margin:4px 0;">${requestedStr}</p>

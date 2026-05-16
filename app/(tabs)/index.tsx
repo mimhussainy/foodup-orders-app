@@ -53,6 +53,9 @@ interface Order {
   shipping_method: string;
   shipping_address: string;
   restaurant_code?: string;
+  orderable_order_date?: string;
+  orderable_order_time?: string;
+  date_created?: string;
 }
 
 function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
@@ -534,6 +537,9 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
                 shipping_method: latestOrder.shipping?.method || '',
                 shipping_address: latestOrder.shipping?.address || '',
                 restaurant_code: latestOrder.restaurant_code || '',
+                orderable_order_date: latestOrder.orderable_order_date || '',
+                orderable_order_time: latestOrder.orderable_order_time || '',
+                date_created: latestOrder.date_created || '',
               };
               setAcceptRejectOrder(newOrder);
               setShowAcceptReject(true);
@@ -603,6 +609,9 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
           shipping_method: o.shipping?.method || '',
           shipping_address: o.shipping?.address || '',
           restaurant_code: o.restaurant_code || '',
+          orderable_order_date: o.orderable_order_date || '',
+          orderable_order_time: o.orderable_order_time || '',
+          date_created: o.date_created || '',
         }));
         setOrders(prev => {
           // Start with backend orders as source of truth for status
