@@ -326,6 +326,22 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
   };
 
   const handleLogout = async () => {
+    // Unregister push token before logout
+    try {
+      const { Notifications } = require('expo-notifications');
+      const token = (await Notifications.getExpoPushTokenAsync({
+        projectId: 'a057b1fa-8571-453c-a989-a4de0c33949a',
+      })).data;
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      if (token && code) {
+        await fetch(`${BACKEND_URL}/unregister-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, restaurant_code: code }),
+        });
+      }
+    } catch (e) {}
+
     const ordersHistory = await AsyncStorage.getItem('foodup_orders');
     const deliveryHistory = await AsyncStorage.getItem('delivery_history');
     const restaurantCode = await AsyncStorage.getItem('restaurant_code');
