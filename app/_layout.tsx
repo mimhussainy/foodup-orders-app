@@ -132,6 +132,28 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
           status: 'accepted',
         }),
       }).catch(e => console.log('accepted-time error:', e));
+
+      // Update WP status and send email
+      try {
+        const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+        const profileData = await profileRes.json();
+        console.log('=== LAYOUT PROFILE RAW:', JSON.stringify(profileData));
+        const website = profileData?.profile?.website;
+        console.log('=== LAYOUT WEBSITE:', website);
+        if (website) {
+          const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+          fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              secret: 'foodup2026',
+              order_id: order.order_id,
+              accepted_time: `${selectedTime} Minutes`,
+            }),
+          }).catch(e => console.log('wp accept error:', e));
+        }
+      } catch(e) {}
+
       setLoading(false);
       onClose();
       setTimeout(() => {
@@ -158,6 +180,25 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
         o.order_id === order.order_id ? { ...o, status: 'cancelled' } : o
       );
       await AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
+      // Update WP status and send rejection email
+      try {
+        const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+        const profileData = await profileRes.json();
+        const website = profileData?.profile?.website;
+        if (website) {
+          const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+          fetch(`${baseUrl}/wp-json/foodup/v1/order-rejected`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              secret: 'foodup2026',
+              order_id: order.order_id,
+              reason: reason,
+            }),
+          }).catch(e => console.log('wp reject error:', e));
+        }
+      } catch(e) {}
+
       fetch(`${BACKEND_URL}/status-update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

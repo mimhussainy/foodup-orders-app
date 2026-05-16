@@ -211,10 +211,17 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       }).catch(e => console.log('accepted-time error:', e));
 
       // Update WP status and send email
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch((err) => { console.log('=== PROFILE FETCH ERROR:', err); return {}; });
       const website = restaurantProfile?.profile?.website;
+      console.log('=== WEBSITE:', website, 'PROFILE:', JSON.stringify(restaurantProfile));
+      fetch(`${BACKEND_URL}/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `ACCEPT DEBUG: code=${code} website=${website} profile=${JSON.stringify(restaurantProfile)}` }),
+      }).catch(() => {});
       if (website) {
         const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        console.log('=== CALLING WP:', baseUrl + '/wp-json/foodup/v1/order-accepted');
         fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -556,13 +563,12 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
           if (result.success && result.orders && result.orders.length > 0) {
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            const claim = Object.values({} as any);
-            const deliveryRes = await fetch(`${BACKEND_URL}/claims/${code}`);
-            const deliveryResult = await deliveryRes.json();
-            const orderClaim = deliveryResult.success ? deliveryResult.claims[String(latestOrder.order_id)] : null;
-            const isDelivered = orderClaim && (typeof orderClaim === 'string' ? false : orderClaim.status === 'delivered');
-            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled' && !isDelivered) {
+            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
+              // Check if already accepted
+              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
+              const acceptedResult = await acceptedRes.json();
+              if (acceptedResult.success && acceptedResult.accepted_time) return;
               const newOrder: Order = {
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
@@ -798,6 +804,13 @@ const sections = groupOrdersByDate(filteredOrders, t);
               </View>
             </View>
             <Text style={styles.detailDate}>{selectedOrder.date}</Text>
+            {(() => {
+              const claim = claims[String(selectedOrder.order_id)];
+              if (claim && claim.status === 'delivered' && claim.delivered_at) {
+                return <Text style={{ fontSize: 13, color: '#3498db', marginHorizontal: 16, marginBottom: 8 }}>✓ {t.deliveredAt} {claim.delivered_at}</Text>;
+              }
+              return null;
+            })()}
             {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
               <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8, fontWeight: '600' }}>
                 🕐 {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
@@ -866,8 +879,20 @@ const sections = groupOrdersByDate(filteredOrders, t);
               ) : null}
               {selectedOrder.note ? (
                 <View style={[styles.row, { borderBottomWidth: 0 }]}>
-                  <Ionicons name="document-text-outline" size={16} color="#999" />
-                  <Text style={styles.rowValue}>{selectedOrder.note}</Text>
+                  <View style={{ 
+                    backgroundColor: '#fffbeb', 
+                    borderRadius: 8, 
+                    padding: 10, 
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#f39c12',
+                  }}>
+                    <Ionicons name="alert-circle-outline" size={16} color="#f39c12" style={{ marginTop: 1 }} />
+                    <Text style={{ fontSize: 14, color: '#111', fontWeight: '600', flex: 1 }}>{selectedOrder.note}</Text>
+                  </View>
                 </View>
               ) : null}
             </View>
@@ -942,9 +967,10 @@ const sections = groupOrdersByDate(filteredOrders, t);
                           restaurant_code: code,
                         }),
                       });
+                      const deliveredAt = new Date().toLocaleString();
                       setClaims(prev => ({
                         ...prev,
-                        [String(selectedOrder.order_id)]: { name: courierName, status: 'delivered' },
+                        [String(selectedOrder.order_id)]: { name: courierName, status: 'delivered', delivered_at: deliveredAt },
                       }));
                       setSelectedOrder(null);
                     }}
@@ -1026,19 +1052,21 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 }}>
                   {f.label}
                 </Text>
-                <View style={{
-                  backgroundColor: '#fff',
-                  borderRadius: 10,
-                  minWidth: 18,
-                  height: 18,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  paddingHorizontal: 4,
-                }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
-                    {filterCounts[f.key as keyof typeof filterCounts]}
-                  </Text>
-                </View>
+                {filterCounts[f.key as keyof typeof filterCounts] > 0 && (
+                  <View style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
+                      {filterCounts[f.key as keyof typeof filterCounts]}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )}
           />
