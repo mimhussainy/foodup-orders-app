@@ -209,6 +209,23 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           status: 'accepted',
         }),
       }).catch(e => console.log('accepted-time error:', e));
+
+      // Update WP status and send email
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            accepted_time: `${selectedTime} Minutes`,
+          }),
+        }).catch(e => console.log('wp accept error:', e));
+      }
+
       setLoading(false);
       onClose();
       InteractionManager.runAfterInteractions(() => {
@@ -235,6 +252,22 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         o.order_id === order.order_id ? { ...o, status: 'cancelled' } : o
       );
       await AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
+      // Update WP status and send email
+      const restaurantProfileR = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const websiteR = restaurantProfileR?.profile?.website;
+      if (websiteR) {
+        const baseUrlR = websiteR.startsWith('http') ? websiteR : `https://${websiteR}`;
+        fetch(`${baseUrlR}/wp-json/foodup/v1/order-rejected`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            reason: reason,
+          }),
+        }).catch(e => console.log('wp reject error:', e));
+      }
+
       fetch(`${BACKEND_URL}/status-update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -295,7 +328,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               </Text>
               {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
                 <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
-                  🕐 {(order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
+                  🕐 {(order as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
                 </Text>
               ) : null}
               {order.shipping_address ? (
@@ -523,7 +556,12 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
           if (result.success && result.orders && result.orders.length > 0) {
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
+            const claim = Object.values({} as any);
+            const deliveryRes = await fetch(`${BACKEND_URL}/claims/${code}`);
+            const deliveryResult = await deliveryRes.json();
+            const orderClaim = deliveryResult.success ? deliveryResult.claims[String(latestOrder.order_id)] : null;
+            const isDelivered = orderClaim && (typeof orderClaim === 'string' ? false : orderClaim.status === 'delivered');
+            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled' && !isDelivered) {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
               const newOrder: Order = {
                 order_id: parseInt(latestOrder.order_id),
@@ -762,7 +800,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Text style={styles.detailDate}>{selectedOrder.date}</Text>
             {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
               <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8, fontWeight: '600' }}>
-                🕐 {(selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
+                🕐 {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
               </Text>
             ) : null}
 
@@ -937,7 +975,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
         <View style={{ 
             backgroundColor: '#fff', 
             paddingHorizontal: 16, 
-            paddingVertical: 6,
+            paddingVertical: 3,
             borderBottomWidth: 1,
             borderBottomColor: '#F0F0F0',
             flexDirection: 'row',

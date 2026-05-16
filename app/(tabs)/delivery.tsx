@@ -290,6 +290,14 @@ export default function AddOrderScreen() {
                   </View>
                 ) : null}
 
+                {order.orderable_order_date || order.orderable_order_time ? (
+                  <View style={styles.row}>
+                    <Ionicons name="time-outline" size={16} color="#2ecc71" />
+                    <Text style={[styles.rowValue, { color: '#2ecc71', fontWeight: '600' }]}>
+                      {order.orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : order.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {order.orderable_order_date}
+                    </Text>
+                  </View>
+                ) : null}
                 {order.payment_method ? (
                   <View style={[styles.row, { borderBottomWidth: 0 }]}>
                     <Ionicons name="card-outline" size={16} color="#999" />
