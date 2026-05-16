@@ -11,11 +11,17 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       const asset = Asset.fromModule(require('../assets/images/foodup-logo-for-print.png'));
       await asset.downloadAsync();
       const uri = asset.localUri || asset.uri;
+      console.log('=== LOGO URI:', uri);
       if (uri) {
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        console.log('=== LOGO BASE64 LENGTH:', base64.length);
         logoHtml = `<img src="data:image/png;base64,${base64}" style="width:180px; display:block; margin:0 auto 8px auto;" />`;
+      } else {
+        console.log('=== LOGO URI IS NULL');
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log('=== LOGO ERROR:', String(e));
+    }
 
     const items = order.items || [];
     const isPaid = !order.payment_method?.toLowerCase().includes('bar');

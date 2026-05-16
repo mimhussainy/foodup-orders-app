@@ -334,27 +334,7 @@ export default function RootLayout() {
       const data = notification.request.content.data as any;
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
-        if (role === 'owner' && Platform.OS !== 'ios') {
-          const order = {
-            order_id: parseInt(data.order_id),
-            customer_name: data.customer_name || '',
-            customer_email: data.customer_email || '',
-            customer_phone: data.customer_phone || '',
-            total: data.total || '',
-            currency: data.currency || 'CHF',
-            status: data.status || '',
-            items: JSON.parse(data.items || '[]'),
-            payment_method: data.payment_method || '',
-            note: data.note || '',
-            date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-            timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
-            shipping_method: data.shipping_method || '',
-            shipping_address: data.shipping_address || '',
-            restaurant_code: data.restaurant_code || '',
-          };
-          setNewOrderModal(order);
-          setShowOrderModal(true);
-        }
+        
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
           if (selectedSound === 'default') return;

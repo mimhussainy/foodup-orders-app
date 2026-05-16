@@ -948,21 +948,19 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 }}>
                   {f.label}
                 </Text>
-                {filterCounts[f.key as keyof typeof filterCounts] > 0 && (
-                  <View style={{
-                    backgroundColor: '#fff',
-                    borderRadius: 10,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingHorizontal: 4,
-                  }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
-                      {filterCounts[f.key as keyof typeof filterCounts]}
-                    </Text>
-                  </View>
-                )}
+                <View style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
+                    {filterCounts[f.key as keyof typeof filterCounts]}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
           />
