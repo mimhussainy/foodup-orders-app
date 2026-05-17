@@ -895,34 +895,27 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
                     />
                     <TouchableOpacity
                       style={{ backgroundColor: '#111', borderRadius: 10, paddingHorizontal: 16, justifyContent: 'center' }}
-                      onPress={() => {
+                      onPress={async () => {
                         const num = parseInt(newAcceptanceTime);
                         if (!isNaN(num) && num > 0 && !acceptanceTimes.includes(num)) {
                           const updated = [...acceptanceTimes, num].sort((a, b) => a - b);
                           setAcceptanceTimes(updated);
                           setNewAcceptanceTime('');
+                          const pin = await AsyncStorage.getItem('owner_pin') || '';
+                          const code = await AsyncStorage.getItem('restaurant_code') || '';
+                          try {
+                            await fetch(`${BACKEND_URL}/acceptance-times`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ restaurant_code: code, owner_pin: pin, times: updated }),
+                            });
+                          } catch (e) {}
                         }
                       }}
                     >
                       <Text style={{ color: '#fff', fontWeight: '600' }}>Add</Text>
                     </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.primaryBtn, { marginTop: 12 }]}
-                    onPress={async () => {
-                      const pin = await AsyncStorage.getItem('owner_pin') || '';
-                      const code = await AsyncStorage.getItem('restaurant_code') || '';
-                      try {
-                        await fetch(`https://foodup-order-alerts-backend.onrender.com/acceptance-times`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ restaurant_code: code, owner_pin: pin, times: acceptanceTimes }),
-                        });
-                      } catch (e) {}
-                    }}
-                  >
-                    <Text style={styles.primaryBtnText}>Save Times</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             </>
