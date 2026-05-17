@@ -139,7 +139,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   const handleAutoAction = async () => {
     if (!order || !autoSettings) return;
     if (autoSettings.auto_action === 'accept') {
-      await handleConfirmAcceptWithTime(autoSettings.accept_time);
+      const acceptTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time;
+      await handleConfirmAcceptWithTime(acceptTime);
     } else if (autoSettings.auto_action === 'reject') {
       await handleConfirmRejectWithReason(autoSettings.reject_reason);
     }

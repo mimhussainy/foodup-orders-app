@@ -234,8 +234,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   const handleAutoAction = async () => {
     if (!order || !autoSettings) return;
     if (autoSettings.auto_action === 'accept') {
-      setSelectedTime(parseInt(autoSettings.accept_time) || 30);
-      await handleConfirmAcceptWithTime(autoSettings.accept_time);
+      const acceptTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time;
+      await handleConfirmAcceptWithTime(acceptTime);
     } else if (autoSettings.auto_action === 'reject') {
       await handleConfirmRejectWithReason(autoSettings.reject_reason);
     }
@@ -1323,9 +1323,22 @@ const sections = groupOrdersByDate(filteredOrders, t);
                     const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                     if (status === 'delivered') return null;
                     if (isItemScheduled) {
+                      const scheduledStr = at.split('—')[0].trim(); // e.g. "23:00"
+                      const scheduledDateStr = at.split('—')[1]?.trim(); // e.g. "17/05/2026"
+                      const parts = scheduledDateStr?.split('/');
+                      const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                      const remainingMs = scheduledMs ? scheduledMs - Date.now() : null;
+                      const remainingMins = remainingMs ? Math.floor(remainingMs / 60000) : null;
+                      const isOverdue = remainingMs !== null && remainingMs < 0;
+                      const color = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
                       return (
                         <View style={{ marginTop: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>🕐 {at}</Text>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+                              🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until pickup` : at}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+                          </View>
                         </View>
                       );
                     }
