@@ -187,6 +187,13 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
 
   const times = [15, 20, 25, 30, 45, 60];
   const reasons = [t.tooBusy, t.restaurantClosed, t.outOfStock, t.other];
+  const isScheduled = order ? (
+    order.orderable_order_time &&
+    !order.orderable_order_time.toLowerCase().includes('as soon as possible') &&
+    !order.orderable_order_time.includes('(')
+  ) : false;
+  const scheduledTime = isScheduled ? order?.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim() : '';
+  const scheduledDate = isScheduled ? order?.orderable_order_date : '';
 
   useEffect(() => {
     if (!visible) {
@@ -535,37 +542,51 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
                 <Text style={{ color: '#007AFF', fontSize: 14 }}>{t.back}</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
-                {t.selectPreparationTime}
-              </Text>
-              <View style={{ marginBottom: 24 }}>
-                {times.map(time => (
-                  <TouchableOpacity
-                    key={time}
-                    onPress={() => setSelectedTime(time)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      backgroundColor: selectedTime === time ? '#f0fdf4' : '#F5F5F5',
-                      marginBottom: 8,
-                      borderWidth: selectedTime === time ? 1.5 : 0,
-                      borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#111' }}>{time} {t.minutes}</Text>
-                    {selectedTime === time && (
-                      <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {isScheduled ? (
+                <>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 8 }}>
+                    {t.scheduledOrder}
+                  </Text>
+                  <View style={{ backgroundColor: '#f5eeff', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                    <Text style={{ fontSize: 14, color: '#8B38CB', fontWeight: '600', marginBottom: 4 }}>🕐 {t.scheduledConfirm}</Text>
+                    <Text style={{ fontSize: 22, fontWeight: '900', color: '#8B38CB' }}>{scheduledTime} — {scheduledDate}</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
+                    {t.selectPreparationTime}
+                  </Text>
+                  <View style={{ marginBottom: 24 }}>
+                    {times.map(time => (
+                      <TouchableOpacity
+                        key={time}
+                        onPress={() => setSelectedTime(time)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingVertical: 14,
+                          paddingHorizontal: 16,
+                          borderRadius: 12,
+                          backgroundColor: selectedTime === time ? '#f0fdf4' : '#F5F5F5',
+                          marginBottom: 8,
+                          borderWidth: selectedTime === time ? 1.5 : 0,
+                          borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
+                        }}
+                      >
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#111' }}>{time} {t.minutes}</Text>
+                        {selectedTime === time && (
+                          <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
               <TouchableOpacity
                 style={{
-                  backgroundColor: selectedTime ? '#111' : '#ccc',
+                  backgroundColor: (isScheduled || selectedTime) ? '#111' : '#ccc',
                   borderRadius: 14,
                   padding: 16,
                   alignItems: 'center',
@@ -573,8 +594,14 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   justifyContent: 'center',
                   gap: 8,
                 }}
-                onPress={handleConfirmAccept}
-                disabled={!selectedTime || loading}
+                onPress={() => {
+                  if (isScheduled) {
+                    handleConfirmAcceptWithTime(`${scheduledTime} — ${scheduledDate}`);
+                  } else {
+                    handleConfirmAccept();
+                  }
+                }}
+                disabled={(!isScheduled && !selectedTime) || loading}
               >
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>

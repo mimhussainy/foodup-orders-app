@@ -149,6 +149,9 @@ export const translations = {
     minutes: 'minutes',
     autoAccept: 'Auto-accept',
     autoReject: 'Auto-reject',
+    scheduledOrder: 'Scheduled Order',
+    scheduledConfirm: 'Confirm this scheduled order for',
+    confirmAccept: 'Confirm & Print',
   },
 
 
@@ -302,6 +305,9 @@ export const translations = {
     minutes: 'Minuten',
     autoAccept: 'Auto-annehmen',
     autoReject: 'Auto-ablehnen',
+    scheduledOrder: 'Geplante Bestellung',
+    scheduledConfirm: 'Diese geplante Bestellung bestätigen für',
+    confirmAccept: 'Bestätigen & Drucken',
   },
 };
 
