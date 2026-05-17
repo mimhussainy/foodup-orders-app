@@ -450,19 +450,24 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         }}>
           {step === 'main' && (
             <>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>
                   Order #{order.order_id}
                 </Text>
                 {countdown !== null && autoSettings && (
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
-                      ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                      {autoSettings.auto_action === 'accept' ? `Auto-accept: ${autoSettings.accept_time}` : `Auto-reject: ${autoSettings.reject_reason}`}
-                    </Text>
-                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
+                    ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 14, color: '#999' }}>
+                  {order.customer_name} · {order.currency} {order.total}
+                </Text>
+                {countdown !== null && autoSettings && (
+                  <Text style={{ fontSize: 11, color: '#999' }}>
+                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
+                  </Text>
                 )}
               </View>
               <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>
@@ -1186,7 +1191,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               { key: 'all', label: t.all, color: '#111' },
               { key: 'new', label: t.newOrder, color: '#f39c12' },
               { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
-              { key: 'delivering', label: t.delivering, color: '#dfdb02' },
+              { key: 'delivering', label: t.delivering, color: '#08fcfc' },
               { key: 'delivered', label: t.delivered, color: '#2fc053' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}

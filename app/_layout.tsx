@@ -9,6 +9,7 @@ import { Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } f
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { printOrder } from '../lib/printer';
+import { useLanguage } from '../lib/useLanguage';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -93,6 +94,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   const [times, setTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
   const [autoSettings, setAutoSettings] = useState<any>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(async code => {
@@ -355,20 +357,22 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
         <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
           {step === 'main' && (
             <>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>Order #{order.order_id}</Text>
                 {countdown !== null && autoSettings && (
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
-                      ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                      {autoSettings.auto_action === 'accept' ? `Auto-accept: ${autoSettings.accept_time}` : `Auto-reject: ${autoSettings.reject_reason}`}
-                    </Text>
-                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
+                    ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                  </Text>
                 )}
               </View>
-              <Text style={{ fontSize: 14, color: '#999', marginBottom: 24 }}>{order.customer_name} · {order.currency} {order.total}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name} · {order.currency} {order.total}</Text>
+                {countdown !== null && autoSettings && (
+                  <Text style={{ fontSize: 11, color: '#999' }}>
+                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
+                  </Text>
+                )}
+              </View>
               <TouchableOpacity
                 style={{ backgroundColor: '#2ecc71', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                 onPress={() => setStep('accept')}

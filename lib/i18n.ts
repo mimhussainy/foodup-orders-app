@@ -147,6 +147,8 @@ export const translations = {
     other: 'Other',
     enterReason: 'Enter reason...',
     minutes: 'minutes',
+    autoAccept: 'Auto-accept',
+    autoReject: 'Auto-reject',
   },
 
 
@@ -298,6 +300,8 @@ export const translations = {
     other: 'Sonstiges',
     enterReason: 'Grund eingeben...',
     minutes: 'Minuten',
+    autoAccept: 'Auto-annehmen',
+    autoReject: 'Auto-ablehnen',
   },
 };
 
