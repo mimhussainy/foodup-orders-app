@@ -960,6 +960,7 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
             </>
           )}
 
+          <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 8 }}>v1.0.0 — build bc20cba</Text>
           <Text style={styles.groupLabel}>{t.account}</Text>
 
           <View style={styles.section}>
