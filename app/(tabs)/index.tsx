@@ -64,6 +64,8 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
 
   useEffect(() => {
     if (!accepted_at || !accepted_time) return;
+    // If accepted_time contains ':' and '—' it's a scheduled time string, not minutes
+    if (accepted_time.includes('—') || accepted_time.includes(':')) return;
     const minutes = parseInt(accepted_time.replace(/[^0-9]/g, ''));
     if (isNaN(minutes)) return;
     const acceptedDate = new Date(accepted_at);
@@ -276,7 +278,12 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       onClose();
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => {
-          printOrder(order, parseInt(acceptTime) || 30).catch(() => {});
+          const mins = parseInt(acceptTime);
+          if (isNaN(mins)) {
+            printOrder(order, undefined, false, '', acceptTime).catch(() => {});
+          } else {
+            printOrder(order, mins).catch(() => {});
+          }
         }, 500);
       });
     } catch (e) {
