@@ -190,12 +190,15 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   const times = [15, 20, 25, 30, 45, 60];
   const reasons = [t.tooBusy, t.restaurantClosed, t.outOfStock, t.other];
   const isScheduled = order ? (
-    order.orderable_order_time &&
+    !!order.orderable_order_time &&
+    order.orderable_order_time.trim() !== '' &&
     !order.orderable_order_time.toLowerCase().includes('as soon as possible') &&
+    !order.orderable_order_time.toLowerCase().includes('asap') &&
     !order.orderable_order_time.includes('(')
   ) : false;
   const scheduledTime = isScheduled ? order?.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim() : '';
   const scheduledDate = isScheduled ? order?.orderable_order_date : '';
+  console.log('=== isScheduled:', isScheduled, 'time:', order?.orderable_order_time, 'date:', order?.orderable_order_date);
 
   useEffect(() => {
     if (!visible) {
@@ -341,7 +344,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         body: JSON.stringify({
           restaurant_code: code,
           order_id: order.order_id,
-          accepted_time: `${selectedTime} Minutes`,
+          accepted_time: isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} Minutes`,
           accepted_at: new Date().toISOString(),
           status: 'accepted',
         }),
@@ -365,7 +368,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           body: JSON.stringify({
             secret: 'foodup2026',
             order_id: order.order_id,
-            accepted_time: `${selectedTime} Minutes`,
+            accepted_time: isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} Minutes`,
           }),
         }).catch(e => console.log('wp accept error:', e));
       }
@@ -1313,13 +1316,23 @@ const sections = groupOrdersByDate(filteredOrders, t);
                   (() => {
                     const claim = claims[String(item.order_id)];
                     const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
-                    return status !== 'delivered';
-                  })() && (
-                    <OrderCountdown
-                      accepted_at={acceptedTimes[String(item.order_id)].accepted_at}
-                      accepted_time={acceptedTimes[String(item.order_id)].accepted_time}
-                    />
-                  )}
+                    const at = acceptedTimes[String(item.order_id)].accepted_time || '';
+                    const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                    if (status === 'delivered') return null;
+                    if (isItemScheduled) {
+                      return (
+                        <View style={{ marginTop: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>🕐 {at}</Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <OrderCountdown
+                        accepted_at={acceptedTimes[String(item.order_id)].accepted_at}
+                        accepted_time={at}
+                      />
+                    );
+                  })()}
                   <View style={styles.orderBottomRow}>
                   {item.shipping_method ? (
                     <View style={styles.orderMeta}>
