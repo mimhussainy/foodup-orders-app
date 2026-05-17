@@ -17,6 +17,9 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
   useEffect(() => {
     if (!accepted_at || !accepted_time) return;
 
+    // Skip if scheduled time string
+    if (accepted_time.includes('—') || (accepted_time.includes(':') && !accepted_time.includes('Minutes'))) return;
+
     const minutes = parseInt(accepted_time.replace(/[^0-9]/g, ''));
     if (isNaN(minutes)) return;
 
@@ -46,7 +49,7 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
   const progress = Math.max(0, Math.min(1, remaining / totalSeconds));
 
   const percentage = remaining / totalSeconds;
-const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
+  const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
 
   return (
     <View style={{ marginTop: 10 }}>
@@ -553,10 +556,42 @@ const [refreshing, setRefreshing] = useState(false);
                     )}
 
                     {order.accepted_time && order.accepted_at ? (
-                      <CountdownTimer
-                        accepted_at={order.accepted_at}
-                        accepted_time={order.accepted_time}
-                      />
+                      (() => {
+                        const at = order.accepted_time;
+                        const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                        if (isItemScheduled) {
+                          const scheduledStr = at.split('—')[0].trim();
+                          const scheduledDateStr = at.split('—')[1]?.trim();
+                          const parts = scheduledDateStr?.split('/');
+                          const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                          const remainingMs = scheduledMs ? scheduledMs - Date.now() : null;
+                          const remainingMins = remainingMs ? Math.floor(remainingMs / 60000) : null;
+                          const isOverdue = remainingMs !== null && remainingMs < 0;
+                          const color = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
+                          const orderPlacedMs = new Date(order.added_at).getTime() || (Date.now() - 3600000);
+                          const totalMs = scheduledMs ? scheduledMs - orderPlacedMs : 1;
+                          const progress = scheduledMs ? Math.max(0, Math.min(1, 1 - (remainingMs || 0) / totalMs)) : 0;
+                          return (
+                            <View style={{ marginTop: 8 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+                                  🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until scheduled time` : at}
+                                </Text>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+                              </View>
+                              <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                                <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
+                              </View>
+                            </View>
+                          );
+                        }
+                        return (
+                          <CountdownTimer
+                            accepted_at={order.accepted_at}
+                            accepted_time={at}
+                          />
+                        );
+                      })()
                     ) : null}
 
                     <View style={styles.divider} />
