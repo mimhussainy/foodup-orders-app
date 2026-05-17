@@ -12,7 +12,7 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "resourceClass": "large"
+      "resourceClass": "medium"
     },
     "production": {
       "channel": "production",
