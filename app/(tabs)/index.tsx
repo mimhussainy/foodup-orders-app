@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   FlatList,
@@ -401,27 +401,28 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
                 Select Preparation Time
               </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+              <View style={{ marginBottom: 24 }}>
                 {times.map(time => (
                   <TouchableOpacity
                     key={time}
                     onPress={() => setSelectedTime(time)}
                     style={{
-                      paddingHorizontal: 20,
-                      paddingVertical: 12,
-                      borderRadius: 12,
-                      backgroundColor: selectedTime === time ? '#2ecc71' : '#F5F5F5',
-                      minWidth: 80,
+                      flexDirection: 'row',
                       alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      backgroundColor: selectedTime === time ? '#f0fdf4' : '#F5F5F5',
+                      marginBottom: 8,
+                      borderWidth: selectedTime === time ? 1.5 : 0,
+                      borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
                     }}
                   >
-                    <Text style={{
-                      fontSize: 15,
-                      fontWeight: '600',
-                      color: selectedTime === time ? '#fff' : '#111',
-                    }}>
-                      {time} min
-                    </Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#111' }}>{time} minutes</Text>
+                    {selectedTime === time && (
+                      <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -534,6 +535,15 @@ const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
   const { t } = useLanguage();
   const router = useRouter();
+  const listRef = useRef<any>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrdersFromBackend();
+      fetchClaims();
+      listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, animated: true, viewOffset: 0 });
+    }, [])
+  );
 
   useEffect(() => {
     AsyncStorage.getItem('user_role').then(r => {
@@ -592,6 +602,7 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
               };
               setAcceptRejectOrder(newOrder);
               setShowAcceptReject(true);
+              router.replace('/(tabs)');
             }
           }
         } catch (e) {}
@@ -1036,8 +1047,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
               <TouchableOpacity
                 onPress={() => setFilter(f.key)}
                 style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
                   borderRadius: 20,
                   backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20',
                   flexDirection: 'row',
@@ -1046,10 +1057,10 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 }}
               >
                 <Text style={{
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: '600',
                   color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color,
-                }}>
+                }} numberOfLines={1}>
                   {f.label}
                 </Text>
                 {filterCounts[f.key as keyof typeof filterCounts] > 0 && (
@@ -1084,6 +1095,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
           </View>
         ) : (
           <SectionList
+            ref={listRef}
             sections={sections}
             keyExtractor={(item) => String(item.order_id)}
             contentContainerStyle={styles.scrollContent}
@@ -1105,10 +1117,12 @@ const sections = groupOrdersByDate(filteredOrders, t);
                   </View>
                 </View>
                 <View style={styles.divider} />
-                <View style={styles.orderNameRow}>
-                  <Text style={styles.orderCustomer}>{item.customer_name}</Text>
-                  <Text style={styles.orderDate}>{item.date}</Text>
-                </View>
+                <Text style={styles.orderCustomer}>{item.customer_name}</Text>
+                {acceptedTimes[String(item.order_id)] && (
+                  <Text style={{ fontSize: 13, color: '#8B38CB', fontWeight: '600', marginTop: 2, marginBottom: 4 }}>
+                    ✓ {acceptedTimes[String(item.order_id)].accepted_time}
+                  </Text>
+                )}
                 <View style={styles.orderMeta}>
                   <Ionicons name="cash-outline" size={14} color="#999" />
                   <Text style={styles.orderTotal}>{item.currency} {item.total}</Text>

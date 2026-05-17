@@ -32,7 +32,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       }
     });
 
-    const lang = (await AsyncStorage.getItem('app_language') || 'de') as 'en' | 'de';
+    const lang = (await AsyncStorage.getItem('app_language') || await AsyncStorage.getItem('language') || 'en') as 'en' | 'de';
     const locale = lang === 'de' ? 'de-CH' : 'en-GB';
     const now = new Date();
     const timeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
