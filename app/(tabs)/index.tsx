@@ -374,7 +374,11 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       onClose();
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => {
-          printOrder(order, selectedTime).catch(e => console.log('print accept error:', e));
+          if (isScheduled) {
+            printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(e => console.log('print accept error:', e));
+          } else {
+            printOrder(order, selectedTime).catch(e => console.log('print accept error:', e));
+          }
         }, 500);
       });
     } catch (e) {
@@ -480,7 +484,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 </Text>
                 {countdown !== null && autoSettings && (
                   <Text style={{ fontSize: 11, color: '#999' }}>
-                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
+                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
                   </Text>
                 )}
               </View>
