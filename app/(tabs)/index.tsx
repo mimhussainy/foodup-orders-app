@@ -460,7 +460,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   </Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <Text style={{ fontSize: 14, color: '#999' }}>
                   {order.customer_name} · {order.currency} {order.total}
                 </Text>
@@ -470,9 +470,6 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   </Text>
                 )}
               </View>
-              <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>
-                {order.customer_name} · {order.currency} {order.total}
-              </Text>
               {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
                 <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
                   🕐 {(order as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
@@ -581,8 +578,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               >
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-                  {loading ? 'Printing...' : 'Confirm & Print'}
-                {loading ? t.printing : t.confirmAndPrint}
+                  {loading ? t.printing : t.confirmAndPrint}
                 </Text>
               </TouchableOpacity>
             </>
@@ -1191,7 +1187,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               { key: 'all', label: t.all, color: '#111' },
               { key: 'new', label: t.newOrder, color: '#f39c12' },
               { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
-              { key: 'delivering', label: t.delivering, color: '#08fcfc' },
+              { key: 'delivering', label: t.delivering, color: '#3498db' },
               { key: 'delivered', label: t.delivered, color: '#2fc053' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}
