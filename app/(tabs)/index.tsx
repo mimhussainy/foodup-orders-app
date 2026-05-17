@@ -1335,9 +1335,17 @@ const sections = groupOrdersByDate(filteredOrders, t);
                         <View style={{ marginTop: 8 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                             <Text style={{ fontSize: 12, fontWeight: '700', color }}>
-                              🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until pickup` : at}
+                              🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until scheduled time` : at}
                             </Text>
                             <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+                          </View>
+                          <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                            <View style={{ 
+                              height: 4, 
+                              width: `${Math.max(0, Math.min(100, remainingMs !== null && scheduledMs !== null ? (1 - remainingMs / (scheduledMs - (acceptedTimes[String(item.order_id)]?.accepted_at ? new Date(acceptedTimes[String(item.order_id)].accepted_at).getTime() : Date.now() - 3600000) )) * 100 : 0))}%`, 
+                              backgroundColor: color, 
+                              borderRadius: 2 
+                            }} />
                           </View>
                         </View>
                       );
