@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
 
-export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string) {
+export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string) {
   try {
     const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
 
@@ -74,7 +74,11 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       rejected: lang === 'de' ? 'Abgelehnt' : 'Rejected',
     };
 
-    const acceptanceHtml = acceptedMinutes ? `
+    const acceptanceHtml = scheduledTimeStr ? `
+      <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
+      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
+      <p style="text-align:left; font-size:18px; margin:2px 0;">${scheduledTimeStr}</p>
+    ` : acceptedMinutes ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
       <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
       <p style="text-align:left; font-size:18px; margin:2px 0;">${acceptedMinutes} ${labels.minutes}</p>
