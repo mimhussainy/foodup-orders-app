@@ -253,6 +253,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   if (!order) return null;
 
   const handleConfirmAcceptWithTime = async (acceptTime: string) => {
+    console.log('=== handleConfirmAcceptWithTime called with:', acceptTime);
+    console.log('=== includes —:', acceptTime.includes('—'), 'includes ::', acceptTime.includes(':'));
     setLoading(true);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
