@@ -187,7 +187,13 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
       setLoading(false);
       onClose();
       setTimeout(() => {
-        printOrder(order, parseInt(acceptTime) || 30).catch(() => {});
+        const mins = parseInt(acceptTime);
+        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+        if (isScheduledTime) {
+          printOrder(order, undefined, false, '', acceptTime).catch(() => {});
+        } else {
+          printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
+        }
       }, 700);
     } catch (e) {
       setLoading(false);
