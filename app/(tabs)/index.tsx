@@ -91,11 +91,14 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
 
   return (
     <View style={{ marginTop: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <Ionicons name="time-outline" size={13} color={color} />
-        <Text style={{ fontSize: 12, fontWeight: '700', color }}>
-          {isLate ? `${mins}m ${secs}s overdue` : `${mins}m ${secs}s remaining`}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="time-outline" size={13} color={color} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+            {isLate ? `${mins}m ${secs}s overdue` : `${mins}m ${secs}s remaining`}
+          </Text>
+        </View>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {accepted_time}</Text>
       </View>
       <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
         <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
@@ -178,9 +181,53 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [autoSettings, setAutoSettings] = useState<any>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const { t } = useLanguage();
 
   const times = [15, 20, 25, 30, 45, 60];
-  const reasons = ['Too busy', 'Restaurant closed', 'Out of stock', 'Other'];
+  const reasons = [t.tooBusy, t.restaurantClosed, t.outOfStock, t.other];
+
+  useEffect(() => {
+    if (!visible) {
+      setCountdown(null);
+      setAutoSettings(null);
+      return;
+    }
+    // Fetch auto settings
+    AsyncStorage.getItem('restaurant_code').then(async code => {
+      if (!code) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/auto-settings/${code}`);
+        const result = await res.json();
+        if (result.success && result.settings.auto_action !== 'disabled') {
+          setAutoSettings(result.settings);
+          setCountdown(result.settings.wait_minutes * 60);
+        }
+      } catch (e) {}
+    });
+  }, [visible]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      // Auto action time!
+      handleAutoAction();
+      return;
+    }
+    const timer = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleAutoAction = async () => {
+    if (!order || !autoSettings) return;
+    if (autoSettings.auto_action === 'accept') {
+      setSelectedTime(parseInt(autoSettings.accept_time) || 30);
+      await handleConfirmAcceptWithTime(autoSettings.accept_time);
+    } else if (autoSettings.auto_action === 'reject') {
+      await handleConfirmRejectWithReason(autoSettings.reject_reason);
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -192,6 +239,82 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
   }, [visible]);
 
   if (!order) return null;
+
+  const handleConfirmAcceptWithTime = async (acceptTime: string) => {
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      fetch(`${BACKEND_URL}/accepted-time`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: acceptTime,
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        }),
+      }).catch(() => {});
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
+        }).catch(() => {});
+      }
+      setLoading(false);
+      onClose();
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          printOrder(order, parseInt(acceptTime) || 30).catch(() => {});
+        }, 500);
+      });
+    } catch (e) {
+      setLoading(false);
+      onClose();
+    }
+  };
+
+  const handleConfirmRejectWithReason = async (reason: string) => {
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-rejected`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
+        }).catch(() => {});
+      }
+      fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'cancelled',
+          event_type: 'status_update',
+          sound: false,
+        }),
+      }).catch(() => {});
+      setLoading(false);
+      onClose();
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          printOrder(order, undefined, true, reason).catch(() => {});
+        }, 500);
+      });
+    } catch (e) {
+      setLoading(false);
+      onClose();
+    }
+  };
 
   const handleConfirmAccept = async () => {
     if (!selectedTime) return;
@@ -327,9 +450,21 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         }}>
           {step === 'main' && (
             <>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 2 }}>
-                Order #{order.order_id}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>
+                  Order #{order.order_id}
+                </Text>
+                {countdown !== null && autoSettings && (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
+                      ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      {autoSettings.auto_action === 'accept' ? `Auto-accept: ${autoSettings.accept_time}` : `Auto-reject: ${autoSettings.reject_reason}`}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text style={{ fontSize: 14, color: '#999', marginBottom: 4 }}>
                 {order.customer_name} · {order.currency} {order.total}
               </Text>
@@ -373,7 +508,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 onPress={() => setStep('accept')}
               >
                 <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Accept Order</Text>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.acceptOrder}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{
@@ -388,7 +523,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 onPress={() => setStep('reject')}
               >
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Reject Order</Text>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.rejectOrder}</Text>
               </TouchableOpacity>
               </>
           )}
@@ -396,10 +531,10 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           {step === 'accept' && (
             <>
               <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
-                <Text style={{ color: '#007AFF', fontSize: 14 }}>← Back</Text>
+                <Text style={{ color: '#007AFF', fontSize: 14 }}>{t.back}</Text>
               </TouchableOpacity>
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
-                Select Preparation Time
+                {t.selectPreparationTime}
               </Text>
               <View style={{ marginBottom: 24 }}>
                 {times.map(time => (
@@ -419,7 +554,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                       borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
                     }}
                   >
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#111' }}>{time} minutes</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#111' }}>{time} {t.minutes}</Text>
                     {selectedTime === time && (
                       <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
                     )}
@@ -442,6 +577,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
                   {loading ? 'Printing...' : 'Confirm & Print'}
+                {loading ? t.printing : t.confirmAndPrint}
                 </Text>
               </TouchableOpacity>
             </>
@@ -450,10 +586,10 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           {step === 'reject' && (
             <>
               <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
-                <Text style={{ color: '#007AFF', fontSize: 14 }}>← Back</Text>
+                <Text style={{ color: '#007AFF', fontSize: 14 }}>{t.back}</Text>
               </TouchableOpacity>
               <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>
-                Select Rejection Reason
+                {t.selectRejectionReason}
               </Text>
               <View style={{ gap: 10, marginBottom: 16 }}>
                 {reasons.map(reason => (
@@ -488,7 +624,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                     color: '#111',
                     marginBottom: 16,
                   }}
-                  placeholder="Enter reason..."
+                  placeholder={t.enterReason}
                   placeholderTextColor="#C0C0C0"
                   value={customReason}
                   onChangeText={setCustomReason}
@@ -509,7 +645,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               >
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-                  {loading ? 'Printing...' : 'Confirm & Print'}
+                  {loading ? t.printing : t.confirmAndPrint}
                 </Text>
               </TouchableOpacity>
             </>
@@ -1129,11 +1265,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 </View>
                 <View style={styles.divider} />
                 <Text style={styles.orderCustomer}>{item.customer_name}</Text>
-                {acceptedTimes[String(item.order_id)] && (
-                  <Text style={{ fontSize: 13, color: '#8B38CB', fontWeight: '600', marginTop: 2, marginBottom: 4 }}>
-                    ✓ {acceptedTimes[String(item.order_id)].accepted_time}
-                  </Text>
-                )}
+              
                 <View style={styles.orderMeta}>
                   <Ionicons name="cash-outline" size={14} color="#999" />
                   <Text style={styles.orderTotal}>{item.currency} {item.total}</Text>

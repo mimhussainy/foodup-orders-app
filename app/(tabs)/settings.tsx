@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, Image, Keyboard, Linking, Platform,
   SafeAreaView, ScrollView,
@@ -48,6 +48,15 @@ export default function SettingsScreen() {
   ];
 
   const [role, setRole] = useState('');
+  const scrollRef = useRef<any>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      setTimeout(() => {
+        try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
+      }, 300);
+    }, [])
+  );
   const [restaurantCode, setRestaurantCode] = useState('');
   const [accounts, setAccounts] = useState<any[]>([]);
   const [newUsername, setNewUsername] = useState('');
@@ -381,7 +390,7 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {role === 'delivery' && (
             <>
               <Text style={styles.groupLabel}>{t.profile}</Text>

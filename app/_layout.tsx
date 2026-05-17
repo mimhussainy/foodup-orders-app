@@ -91,6 +91,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   const [customReason, setCustomReason] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [times, setTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
+  const [autoSettings, setAutoSettings] = useState<any>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(async code => {
@@ -102,6 +104,44 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
       } catch (e) {}
     });
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setCountdown(null);
+      setAutoSettings(null);
+      return;
+    }
+    AsyncStorage.getItem('restaurant_code').then(async code => {
+      if (!code) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/auto-settings/${code}`);
+        const result = await res.json();
+        if (result.success && result.settings.auto_action !== 'disabled') {
+          setAutoSettings(result.settings);
+          setCountdown(result.settings.wait_minutes * 60);
+        }
+      } catch (e) {}
+    });
+  }, [visible]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      handleAutoAction();
+      return;
+    }
+    const timer = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleAutoAction = async () => {
+    if (!order || !autoSettings) return;
+    if (autoSettings.auto_action === 'accept') {
+      await handleConfirmAcceptWithTime(autoSettings.accept_time);
+    } else if (autoSettings.auto_action === 'reject') {
+      await handleConfirmRejectWithReason(autoSettings.reject_reason);
+    }
+  };
 
   const reasons = ['Too busy', 'Restaurant closed', 'Out of stock', 'Other'];
 
@@ -115,6 +155,80 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   }, [visible]);
 
   if (!order) return null;
+
+  const handleConfirmAcceptWithTime = async (acceptTime: string) => {
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      fetch(`${BACKEND_URL}/accepted-time`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: acceptTime,
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        }),
+      }).catch(() => {});
+      const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+      const profileData = await profileRes.json().catch(() => ({}));
+      const website = profileData?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
+        }).catch(() => {});
+      }
+      setLoading(false);
+      onClose();
+      setTimeout(() => {
+        printOrder(order, parseInt(acceptTime) || 30).catch(() => {});
+      }, 700);
+    } catch (e) {
+      setLoading(false);
+      onClose();
+    }
+  };
+
+  const handleConfirmRejectWithReason = async (reason: string) => {
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+      const profileData = await profileRes.json().catch(() => ({}));
+      const website = profileData?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-rejected`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
+        }).catch(() => {});
+      }
+      fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'cancelled',
+          event_type: 'status_update',
+          sound: false,
+        }),
+      }).catch(() => {});
+      setLoading(false);
+      onClose();
+      setTimeout(() => {
+        printOrder(order, undefined, true, reason).catch(() => {});
+      }, 700);
+    } catch (e) {
+      setLoading(false);
+      onClose();
+    }
+  };
 
   const handleConfirmAccept = async () => {
     if (!selectedTime) return;
@@ -241,7 +355,19 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
         <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
           {step === 'main' && (
             <>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 4 }}>Order #{order.order_id}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>Order #{order.order_id}</Text>
+                {countdown !== null && autoSettings && (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
+                      ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      {autoSettings.auto_action === 'accept' ? `Auto-accept: ${autoSettings.accept_time}` : `Auto-reject: ${autoSettings.reject_reason}`}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text style={{ fontSize: 14, color: '#999', marginBottom: 24 }}>{order.customer_name} · {order.currency} {order.total}</Text>
               <TouchableOpacity
                 style={{ backgroundColor: '#2ecc71', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}

@@ -134,7 +134,22 @@ export const translations = {
     online: 'Online Payment',
     deliveryLabel: 'Delivery',
     pickupLabel: 'Pickup',
+    acceptOrder: 'Accept Order',
+    rejectOrder: 'Reject Order',
+    selectPreparationTime: 'Select Preparation Time',
+    selectRejectionReason: 'Select Rejection Reason',
+    confirmAndPrint: 'Confirm & Print',
+    printing: 'Printing...',
+    back: '← Back',
+    tooBusy: 'Too busy',
+    restaurantClosed: 'Restaurant closed',
+    outOfStock: 'Out of stock',
+    other: 'Other',
+    enterReason: 'Enter reason...',
+    minutes: 'minutes',
   },
+
+
 
   de: {
     welcome: 'Willkommen zurück',
@@ -270,6 +285,19 @@ export const translations = {
     online: 'Online Zahlung',
     deliveryLabel: 'Lieferung',
     pickupLabel: 'Abholung',
+    acceptOrder: 'Bestellung annehmen',
+    rejectOrder: 'Bestellung ablehnen',
+    selectPreparationTime: 'Vorbereitungszeit wählen',
+    selectRejectionReason: 'Ablehnungsgrund wählen',
+    confirmAndPrint: 'Bestätigen & Drucken',
+    printing: 'Wird gedruckt...',
+    back: '← Zurück',
+    tooBusy: 'Zu beschäftigt',
+    restaurantClosed: 'Restaurant geschlossen',
+    outOfStock: 'Nicht vorrätig',
+    other: 'Sonstiges',
+    enterReason: 'Grund eingeben...',
+    minutes: 'Minuten',
   },
 };
 

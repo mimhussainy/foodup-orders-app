@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Image, Platform,
   SafeAreaView, ScrollView,
@@ -65,9 +65,13 @@ export default function StatsScreen() {
   const [expanded, setExpanded] = useState<string[]>([]);
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const { t } = useLanguage();
+  const scrollRef = useRef<any>(null);
 
 useFocusEffect(
     useCallback(() => {
+      setTimeout(() => {
+        try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
+      }, 300);
       AsyncStorage.getItem('restaurant_code').then(code => {
         if (code) {
           fetch(`https://foodup-order-alerts-backend.onrender.com/orders/${code}`)
@@ -195,7 +199,7 @@ useFocusEffect(
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
 
           <Text style={styles.groupLabel}>{t.today}</Text>
           <View style={styles.section}>
