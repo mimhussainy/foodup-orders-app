@@ -144,7 +144,15 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
       await handleConfirmRejectWithReason(autoSettings.reject_reason);
     }
   };
-
+const isScheduled = order ? (
+  !!order.orderable_order_time &&
+  order.orderable_order_time.trim() !== '' &&
+  !order.orderable_order_time.toLowerCase().includes('as soon as possible') &&
+  !order.orderable_order_time.toLowerCase().includes('asap') &&
+  !order.orderable_order_time.includes('(')
+) : false;
+const scheduledTime = isScheduled ? order?.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim() : '';
+const scheduledDate = isScheduled ? order?.orderable_order_date : '';
   const reasons = ['Too busy', 'Restaurant closed', 'Out of stock', 'Other'];
 
   useEffect(() => {
@@ -279,7 +287,10 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
       setLoading(false);
       onClose();
       setTimeout(() => {
-        printOrder(order, selectedTime).catch(e => {
+        (isScheduled
+          ? printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`)
+          : printOrder(order, selectedTime)
+        ).catch(e => {
           console.log('print accept error:', e);
         });
       }, 700);

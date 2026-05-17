@@ -283,11 +283,12 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       onClose();
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => {
-          const mins = parseInt(acceptTime);
-          if (isNaN(mins)) {
+          const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+          if (isScheduledTime) {
             printOrder(order, undefined, false, '', acceptTime).catch(() => {});
           } else {
-            printOrder(order, mins).catch(() => {});
+            const mins = parseInt(acceptTime);
+            printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
           }
         }, 500);
       });
