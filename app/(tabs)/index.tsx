@@ -1435,7 +1435,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                         const claim = claims[String(item.order_id)];
                         const name = typeof claim === 'string' ? claim : claim.name;
                         const status = typeof claim === 'string' ? 'delivering' : claim.status;
-                        const color = status === 'delivered' ? '#3498db' : status === 'delivering' ? '#f39c12' : '#9b59b6';
+                        const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
                         return (
                           <>
                             <Ionicons 
