@@ -1284,6 +1284,11 @@ const sections = groupOrdersByDate(filteredOrders, t);
                           restaurant_code: code,
                         }),
                       });
+                      const updatedReady = { ...pickupReadyOrders };
+                      delete updatedReady[String(selectedOrder.order_id)];
+                      setPickupReadyOrders(updatedReady);
+                      await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updatedReady));
+
                       const deliveredAt = new Date().toLocaleString();
                       setClaims(prev => ({
                         ...prev,
