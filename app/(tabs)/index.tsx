@@ -1227,7 +1227,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 const deadline = acceptedAt + minutes * 60 * 1000;
                 return Date.now() > deadline;
               })() : false;
-              const isPickup = selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup');
+              const isPickup = (() => { const m = (selectedOrder.shipping_method || '').toLowerCase().trim(); return m.includes('abholung') || m.includes('abholen') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('orderable_pickup') || m.includes('takeaway'); })();
               if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isOverdue || isPickup)) {
                 return (
                   <TouchableOpacity
@@ -1244,7 +1244,11 @@ const sections = groupOrdersByDate(filteredOrders, t);
                     }}
                     onPress={async () => {
                       const isPickupReady = pickupReadyOrders[String(selectedOrder.order_id)];
-                      const isPickupOrder = selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup');
+                      const isPickupMethod = (method?: string) => {
+                        const m = (method || '').toLowerCase().trim();
+                        return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
+                      };
+                      const isPickupOrder = isPickupMethod(selectedOrder.shipping_method);
 
                       if (isPickupOrder && !isPickupReady) {
                         const code = await AsyncStorage.getItem('restaurant_code') || '';
