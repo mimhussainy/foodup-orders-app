@@ -4,7 +4,7 @@ import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
@@ -503,6 +503,7 @@ export default function RootLayout() {
   const router = useRouter();
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const orderSoundRef = useRef<any>(null);
 
   const checkUserRole = async () => {
     try {
@@ -539,17 +540,22 @@ export default function RootLayout() {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
           if (selectedSound === 'default') return;
           const soundMap: { [key: string]: string } = {
-            cash: 'https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3',
-            bell: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
-            chime: 'https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3',
+            data_scanner: 'https://assets.mixkit.co/active_storage/sfx/2847/2847.wav',
+            security_alarm: 'https://assets.mixkit.co/active_storage/sfx/994/994.wav',
+            tick_tock: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
+            classic_alarm: 'https://assets.mixkit.co/active_storage/sfx/995/995.wav',
+            slot_machine: 'https://assets.mixkit.co/active_storage/sfx/1995/1995.wav',
           };
           const uri = soundMap[selectedSound];
           if (!uri) return;
-          const { sound } = await Audio.Sound.createAsync({ uri });
+          if (orderSoundRef.current) {
+            await orderSoundRef.current.stopAsync().catch(() => {});
+            await orderSoundRef.current.unloadAsync().catch(() => {});
+            orderSoundRef.current = null;
+          }
+          const { sound } = await Audio.Sound.createAsync({ uri }, { isLooping: true });
+          orderSoundRef.current = sound;
           await sound.playAsync();
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-            if (status.isLoaded && status.didJustFinish) sound.unloadAsync();
-          });
         } catch (e) {}
       }
     });
@@ -610,7 +616,12 @@ export default function RootLayout() {
           <AcceptRejectModal
             order={newOrderModal}
             visible={showOrderModal}
-            onClose={() => {
+            onClose={async () => {
+              if (orderSoundRef.current) {
+                await orderSoundRef.current.stopAsync().catch(() => {});
+                await orderSoundRef.current.unloadAsync().catch(() => {});
+                orderSoundRef.current = null;
+              }
               setShowOrderModal(false);
               setNewOrderModal(null);
             }}
