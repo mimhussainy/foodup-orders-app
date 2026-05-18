@@ -72,6 +72,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       acceptedFor: lang === 'de' ? 'Angenommen für' : 'Accepted for',
       minutes: lang === 'de' ? 'Minuten' : 'Minutes',
       rejected: lang === 'de' ? 'Abgelehnt' : 'Rejected',
+      scanQr: lang === 'de' ? 'QR-Code scannen für Navigation' : 'Scan for navigation',
     };
 
     const inferredScheduledStr = (() => {
@@ -163,12 +164,10 @@ const acceptanceHtml = resolvedScheduledStr ? `
           ${acceptanceHtml}
           ${order.shipping_address ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <p style="text-align:center; font-size:13px; color:#333; margin:4px 0;">Lieferadresse</p>
-          <p style="text-align:center; font-size:14px; font-weight:bold; margin:4px 0;">${order.shipping_address}</p>
           <div style="text-align:center; margin:8px 0;">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="150" height="150" />
           </div>
-          <p style="text-align:center; font-size:11px; color:#666; margin:4px 0;">QR-Code scannen für Navigation</p>
+          <p style="text-align:center; font-size:11px; color:#666; margin:4px 0;">${labels.scanQr}</p>
           ` : ''}
         </body>
       </html>
