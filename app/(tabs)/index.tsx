@@ -134,7 +134,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
             {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
         </View>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {accepted_time}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {accepted_time.replace('Minutes', t.minutes || 'minutes')}</Text>
       </View>
       <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
         <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
@@ -1027,6 +1027,14 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
     return status;
   };
 
+  const isScheduledOrder = (o: Order) => {
+    return !!o.orderable_order_time &&
+      o.orderable_order_time.trim() !== '' &&
+      !o.orderable_order_time.toLowerCase().includes('as soon as possible') &&
+      !o.orderable_order_time.toLowerCase().includes('asap') &&
+      !o.orderable_order_time.includes('(');
+  };
+
   const filteredOrders = orders
     .filter(o => {
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
@@ -1042,14 +1050,6 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
       );
     });
 const sections = groupOrdersByDate(filteredOrders, t);
-
-  const isScheduledOrder = (o: Order) => {
-    return !!o.orderable_order_time &&
-      o.orderable_order_time.trim() !== '' &&
-      !o.orderable_order_time.toLowerCase().includes('as soon as possible') &&
-      !o.orderable_order_time.toLowerCase().includes('asap') &&
-      !o.orderable_order_time.includes('(');
-  };
 
   const filterCounts = {
     new: orders.filter(o => getDeliveryStatus(o) === 'new').length,
