@@ -484,14 +484,20 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   </Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <Text style={{ fontSize: 14, color: '#999' }}>
-                  {order.customer_name} · {order.currency} {order.total}
-                </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <View>
+                  <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
+                  <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
+                </View>
                 {countdown !== null && autoSettings && (
-                  <Text style={{ fontSize: 11, color: '#999' }}>
-                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
-                  </Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 11, color: '#999' }}>
+                      {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#999' }}>
+                      {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
+                    </Text>
+                  </View>
                 )}
               </View>
               {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
@@ -1330,23 +1336,22 @@ const sections = groupOrdersByDate(filteredOrders, t);
                       const remainingMs = scheduledMs ? scheduledMs - Date.now() : null;
                       const remainingMins = remainingMs ? Math.floor(remainingMs / 60000) : null;
                       const isOverdue = remainingMs !== null && remainingMs < 0;
-                      const color = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
+                      const barColor = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
+                      const showBar = isOverdue || (remainingMins !== null && remainingMins <= 60);
+                      const countdownProgress = scheduledMs ? Math.max(0, Math.min(1, (scheduledMs - Date.now()) / (60 * 60 * 1000))) : 0;
                       return (
                         <View style={{ marginTop: 8 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>
                               🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until scheduled time` : at}
                             </Text>
                             <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
                           </View>
-                          <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-                            <View style={{ 
-                              height: 4, 
-                              width: `${Math.max(0, Math.min(100, remainingMs !== null && scheduledMs !== null ? (1 - remainingMs / (scheduledMs - (acceptedTimes[String(item.order_id)]?.accepted_at ? new Date(acceptedTimes[String(item.order_id)].accepted_at).getTime() : Date.now() - 3600000) )) * 100 : 0))}%`, 
-                              backgroundColor: color, 
-                              borderRadius: 2 
-                            }} />
-                          </View>
+                          {showBar && (
+                            <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                              <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
+                            </View>
+                          )}
                         </View>
                       );
                     }

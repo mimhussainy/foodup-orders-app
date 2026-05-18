@@ -571,17 +571,22 @@ const [refreshing, setRefreshing] = useState(false);
                           const orderPlacedMs = new Date(order.added_at).getTime() || (Date.now() - 3600000);
                           const totalMs = scheduledMs ? scheduledMs - orderPlacedMs : 1;
                           const progress = scheduledMs ? Math.max(0, Math.min(1, 1 - (remainingMs || 0) / totalMs)) : 0;
+                          const showBar = isOverdue || (remainingMins !== null && remainingMins <= 60);
+                          const countdownProgress = scheduledMs ? Math.max(0, Math.min(1, (scheduledMs - Date.now()) / (60 * 60 * 1000))) : 0;
+                          const barColor = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
                           return (
                             <View style={{ marginTop: 8 }}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>
                                   🕐 {isOverdue ? 'Overdue' : remainingMins !== null ? `${Math.floor(remainingMins / 60)}h ${remainingMins % 60}m until scheduled time` : at}
                                 </Text>
                                 <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
                               </View>
-                              <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-                                <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
-                              </View>
+                              {showBar && (
+                                <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+                                  <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
+                                </View>
+                              )}
                             </View>
                           );
                         }
