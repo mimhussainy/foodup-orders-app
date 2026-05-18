@@ -1444,7 +1444,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                                 status === 'delivering' ? 'car-outline' : 
                                 'bag-outline'
                               } 
-                              size={16} 
+                              size={20} 
                               color={color}
                             />
                             <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
