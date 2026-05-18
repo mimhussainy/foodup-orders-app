@@ -168,9 +168,9 @@ function getDeliveryStatusColor(claim: any) {
   if (!claim) return '#f39c12';
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   switch (status) {
-    case 'delivered': return '#3498db';
-    case 'delivering': return '#f39c12';
-    case 'in_bag': return '#9b59b6';
+    case 'delivered': return '#2fc053';
+    case 'delivering': return '#16a085';
+    case 'in_bag': return '#2980b9';
     default: return '#f39c12';
   }
 }
