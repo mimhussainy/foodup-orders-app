@@ -383,12 +383,20 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                   </Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name} · {order.currency} {order.total}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <View>
+                  <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
+                  <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
+                </View>
                 {countdown !== null && autoSettings && (
-                  <Text style={{ fontSize: 11, color: '#999' }}>
-                    {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}: {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
-                  </Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 11, color: '#999' }}>
+                      {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#999' }}>
+                      {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
+                    </Text>
+                  </View>
                 )}
               </View>
               <TouchableOpacity
