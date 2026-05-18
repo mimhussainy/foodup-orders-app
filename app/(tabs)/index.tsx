@@ -357,7 +357,6 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       });
     } catch (e) {
       setLoading(false);
-      onClose();
     }
   };
 
@@ -784,6 +783,7 @@ const [filter, setFilter] = useState<string>('all');
 const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
+const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boolean}>({});
   const { t } = useLanguage();
   const router = useRouter();
   const listRef = useRef<any>(null);
@@ -1019,6 +1019,15 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
     setTimeout(() => setRefreshing(false), 500);
   };
 
+  const loadPickupReadyOrders = async () => {
+    const stored = await AsyncStorage.getItem('pickup_ready_orders');
+    if (stored) setPickupReadyOrders(JSON.parse(stored));
+  };
+
+  useEffect(() => {
+    loadPickupReadyOrders();
+  }, []);
+
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
     if (order.status === 'cancelled') return 'cancelled';
@@ -1234,6 +1243,27 @@ const sections = groupOrdersByDate(filteredOrders, t);
                       gap: 8,
                     }}
                     onPress={async () => {
+                      const isPickupReady = pickupReadyOrders[String(selectedOrder.order_id)];
+                      const isPickupOrder = selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup');
+
+                      if (isPickupOrder && !isPickupReady) {
+                        const code = await AsyncStorage.getItem('restaurant_code') || '';
+                        const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+                        const website = restaurantProfile?.profile?.website;
+                        if (website) {
+                          const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+                          fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }),
+                          }).catch(() => {});
+                        }
+                        const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                        setPickupReadyOrders(updated);
+                        await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                        return;
+                      }
+
                       const code = await AsyncStorage.getItem('restaurant_code') || '';
                       const claim = claims[String(selectedOrder.order_id)];
                       const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : 'Owner';
@@ -1264,7 +1294,9 @@ const sections = groupOrdersByDate(filteredOrders, t);
                   >
                     <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                     <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-                      {selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup') ? t.markPickedUp : t.markDelivered}
+                      {selectedOrder.shipping_method === 'Abholung' || selectedOrder.shipping_method?.toLowerCase().includes('pickup')
+                        ? (pickupReadyOrders[String(selectedOrder.order_id)] ? t.markPickedUp : t.readyForPickup || 'Ready for Pickup')
+                        : t.markDelivered}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1302,8 +1334,12 @@ const sections = groupOrdersByDate(filteredOrders, t);
               placeholderTextColor="#C0C0C0"
               value={search}
               onChangeText={setSearch}
-              clearButtonMode="while-editing"
             />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color="#C0C0C0" />
+              </TouchableOpacity>
+            )}
           </View>
           <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
           <FlatList

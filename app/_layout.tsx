@@ -206,7 +206,6 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
       }, 700);
     } catch (e) {
       setLoading(false);
-      onClose();
     }
   };
 
