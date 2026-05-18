@@ -26,7 +26,8 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
   const showBar = isOverdue || remainingMs <= 3600000;
   const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
-  const label = isOverdue ? 'Overdue' : hours >= 1 ? `${hours}h ${mins}m until scheduled time` : `${mins}m ${secs}s until scheduled time`;
+  const { t } = useLanguage();
+  const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
 
   return (
     <View style={{ marginTop: 8 }}>
@@ -45,6 +46,7 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
 function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!accepted_at || !accepted_time) return;
@@ -89,8 +91,8 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
         <Ionicons name="time-outline" size={14} color={color} />
         <Text style={{ fontSize: 13, fontWeight: '700', color }}>
           {isLate
-            ? `${mins}m ${secs}s overdue`
-            : `${mins}m ${secs}s remaining`}
+            ? `${mins}m ${secs}s ${t.overdue || 'overdue'}`
+            : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
         </Text>
       </View>
       <View style={{ height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' }}>
@@ -493,7 +495,7 @@ const [refreshing, setRefreshing] = useState(false);
                               order.status === 'delivering' && { color: '#f39c12' },
                             ]}
                           >
-                            {order.status === 'delivering' ? t.delivering : 'Pending'}
+                            {order.status === 'delivering' ? t.delivering : t.pending || 'Pending'}
                           </Text>
                         </View>
 

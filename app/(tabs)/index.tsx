@@ -74,7 +74,8 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
   const showBar = isOverdue || remainingMs <= 3600000;
   const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
-  const label = isOverdue ? 'Overdue' : hours >= 1 ? `${hours}h ${mins}m until scheduled time` : `${mins}m ${secs}s until scheduled time`;
+  const { t } = useLanguage();
+  const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
 
   return (
     <View style={{ marginTop: 8 }}>
@@ -93,6 +94,7 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
 function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!accepted_at || !accepted_time) return;
@@ -129,7 +131,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="time-outline" size={13} color={color} />
           <Text style={{ fontSize: 12, fontWeight: '700', color }}>
-            {isLate ? `${mins}m ${secs}s overdue` : `${mins}m ${secs}s remaining`}
+            {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
         </View>
         <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {accepted_time}</Text>
@@ -208,6 +210,34 @@ function groupOrdersByDate(orders: Order[], t: any) {
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
+
+async function scheduleScheduledOrderReminder(order: any, acceptTime: string) {
+  try {
+    const parts = acceptTime.split('—');
+    if (parts.length < 2) return;
+    const timePart = parts[0].trim();
+    const datePart = parts[1].trim().split('/');
+    if (datePart.length < 3) return;
+    const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
+    const reminderMs = scheduledMs - 30 * 60 * 1000;
+    const now = Date.now();
+    if (reminderMs <= now) return; // already past 30 min mark
+    const secondsUntilReminder = Math.floor((reminderMs - now) / 1000);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⏰ Scheduled Order Reminder',
+        body: `Order #${order.order_id} for ${order.customer_name} is due in 30 minutes! (${timePart})`,
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: secondsUntilReminder,
+      },
+    });
+  } catch (e) {
+    console.log('scheduleScheduledOrderReminder error:', e);
+  }
+}
 
 function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, visible: boolean, onClose: () => void }) {
   const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
@@ -318,6 +348,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
           if (isScheduledTime) {
             printOrder(order, undefined, false, '', acceptTime).catch(() => {});
+            scheduleScheduledOrderReminder(order, acceptTime).catch(() => {});
           } else {
             const mins = parseInt(acceptTime);
             printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
@@ -414,6 +445,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
         setTimeout(() => {
           if (isScheduled) {
             printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(e => console.log('print accept error:', e));
+            scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`).catch(() => {});
           } else {
             printOrder(order, selectedTime).catch(e => console.log('print accept error:', e));
           }
@@ -534,7 +566,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
               </View>
               {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
                 <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
-                  🕐 {(order as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
+                  🕐 {(order as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? t.asap || 'ASAP' : (order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
                 </Text>
               ) : null}
               {order.shipping_address ? (
@@ -996,7 +1028,10 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
   };
 
   const filteredOrders = orders
-    .filter(o => filter === 'all' || getDeliveryStatus(o) === filter)
+    .filter(o => {
+      if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
+      return filter === 'all' || getDeliveryStatus(o) === filter;
+    })
     .filter(o => {
       if (!search.trim()) return true;
       const s = search.toLowerCase();
@@ -1008,8 +1043,17 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
     });
 const sections = groupOrdersByDate(filteredOrders, t);
 
+  const isScheduledOrder = (o: Order) => {
+    return !!o.orderable_order_time &&
+      o.orderable_order_time.trim() !== '' &&
+      !o.orderable_order_time.toLowerCase().includes('as soon as possible') &&
+      !o.orderable_order_time.toLowerCase().includes('asap') &&
+      !o.orderable_order_time.includes('(');
+  };
+
   const filterCounts = {
     new: orders.filter(o => getDeliveryStatus(o) === 'new').length,
+    scheduled: orders.filter(o => isScheduledOrder(o) && o.status !== 'cancelled').length,
     in_bag: orders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
     delivering: orders.filter(o => getDeliveryStatus(o) === 'delivering').length,
     delivered: orders.filter(o => getDeliveryStatus(o) === 'delivered').length,
@@ -1056,7 +1100,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
             })()}
             {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
               <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8, fontWeight: '600' }}>
-                🕐 {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? 'ASAP' : (selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
+                🕐 {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? t.asap || 'ASAP' : (selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
               </Text>
             ) : null}
 
@@ -1254,7 +1298,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <Ionicons name="search-outline" size={18} color="#999" />
             <TextInput
               style={{ flex: 1, fontSize: 15, color: '#111' }}
-              placeholder="Search by name, phone or order ID"
+              placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
               placeholderTextColor="#C0C0C0"
               value={search}
               onChangeText={setSearch}
@@ -1268,8 +1312,9 @@ const sections = groupOrdersByDate(filteredOrders, t);
             data={[
               { key: 'all', label: t.all, color: '#111' },
               { key: 'new', label: t.newOrder, color: '#f39c12' },
-              { key: 'in_bag', label: t.inBag, color: '#9b59b6' },
-              { key: 'delivering', label: t.delivering, color: '#3498db' },
+              { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
+              { key: 'in_bag', label: t.inBag, color: '#2980b9' },
+              { key: 'delivering', label: t.delivering, color: '#16a085' },
               { key: 'delivered', label: t.delivered, color: '#2fc053' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}
