@@ -1270,7 +1270,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
 
                       const code = await AsyncStorage.getItem('restaurant_code') || '';
                       const claim = claims[String(selectedOrder.order_id)];
-                      const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : 'Owner';
+                      const isPickupOrder2 = (() => { const m = (selectedOrder.shipping_method || '').toLowerCase().trim(); return m.includes('abholung') || m.includes('abholen') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('orderable_pickup') || m.includes('takeaway'); })();
+                      const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : (isPickupOrder2 ? t.pickedUp : 'Owner');
                       await fetch(`${BACKEND_URL}/mark-delivered`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
