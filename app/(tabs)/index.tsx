@@ -57,7 +57,39 @@ interface Order {
   orderable_order_time?: string;
   date_created?: string;
 }
+function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: string }) {
+  const [now, setNow] = useState(Date.now());
 
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const remainingMs = scheduledMs - now;
+  const isOverdue = remainingMs < 0;
+  const absMs = Math.abs(remainingMs);
+  const hours = Math.floor(absMs / 3600000);
+  const mins = Math.floor((absMs % 3600000) / 60000);
+  const secs = Math.floor((absMs % 60000) / 1000);
+  const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
+  const showBar = isOverdue || remainingMs <= 3600000;
+  const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
+  const label = isOverdue ? 'Overdue' : hours >= 1 ? `${hours}h ${mins}m until scheduled time` : `${mins}m ${secs}s until scheduled time`;
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+      </View>
+      {showBar && (
+        <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+          <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
+        </View>
+      )}
+    </View>
+  );
+}
 function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
@@ -1329,31 +1361,12 @@ const sections = groupOrdersByDate(filteredOrders, t);
                     const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                     if (status === 'delivered') return null;
                     if (isItemScheduled) {
-                      const scheduledStr = at.split('—')[0].trim(); // e.g. "23:00"
-                      const scheduledDateStr = at.split('—')[1]?.trim(); // e.g. "17/05/2026"
+                      const scheduledStr = at.split('—')[0].trim();
+                      const scheduledDateStr = at.split('—')[1]?.trim();
                       const parts = scheduledDateStr?.split('/');
                       const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
-                      const remainingMs = scheduledMs ? scheduledMs - Date.now() : null;
-                      const remainingMins = remainingMs ? Math.floor(remainingMs / 60000) : null;
-                      const isOverdue = remainingMs !== null && remainingMs < 0;
-                      const barColor = isOverdue ? '#e74c3c' : remainingMins !== null && remainingMins < 30 ? '#f39c12' : '#8B38CB';
-                      const showBar = isOverdue || (remainingMins !== null && remainingMins <= 60);
-                      const countdownProgress = scheduledMs ? Math.max(0, Math.min(1, (scheduledMs - Date.now()) / (60 * 60 * 1000))) : 0;
-                      return (
-                        <View style={{ marginTop: 8 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>
-                              🕐 {isOverdue ? 'Overdue' : remainingMs !== null ? (remainingMs >= 3600000 ? `${Math.floor(remainingMs / 3600000)}h ${Math.floor((remainingMs % 3600000) / 60000)}m until scheduled time` : `${Math.floor(remainingMs / 60000)}m ${Math.floor((remainingMs % 60000) / 1000)}s until scheduled time`) : at}
-                            </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
-                          </View>
-                          {showBar && (
-                            <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-                              <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
-                            </View>
-                          )}
-                        </View>
-                      );
+                      if (!scheduledMs) return null;
+                      return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
                     }
                     return (
                       <OrderCountdown
