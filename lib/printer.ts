@@ -161,6 +161,15 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:20px; font-weight:900; margin:8px 0; line-height:1.2;">${isPaid ? labels.paid : labels.notPaid}</p>
           ${order.note ? `<div class="divider-dashed"></div><p style="font-size:16px;">${labels.note}: ${order.note}</p>` : ''}
           ${acceptanceHtml}
+          ${order.shipping_address ? `
+          <div style="border-top:1px dashed #000; margin:12px 0;"></div>
+          <p style="text-align:center; font-size:13px; color:#333; margin:4px 0;">Lieferadresse</p>
+          <p style="text-align:center; font-size:14px; font-weight:bold; margin:4px 0;">${order.shipping_address}</p>
+          <div style="text-align:center; margin:8px 0;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="150" height="150" />
+          </div>
+          <p style="text-align:center; font-size:11px; color:#666; margin:4px 0;">QR-Code scannen für Navigation</p>
+          ` : ''}
         </body>
       </html>
     `;

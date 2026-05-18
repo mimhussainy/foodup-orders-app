@@ -1033,6 +1033,8 @@ const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boole
     if (order.status === 'cancelled') return 'cancelled';
     if (!claim) return 'new';
     const status = typeof claim === 'string' ? 'delivering' : claim.status;
+    const isPickup = (() => { const m = (order.shipping_method || '').toLowerCase().trim(); return m.includes('abholung') || m.includes('abholen') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('orderable_pickup') || m.includes('takeaway'); })();
+    if (status === 'delivered' && isPickup) return 'pickedUp';
     return status;
   };
 
@@ -1066,6 +1068,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
     in_bag: orders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
     delivering: orders.filter(o => getDeliveryStatus(o) === 'delivering').length,
     delivered: orders.filter(o => getDeliveryStatus(o) === 'delivered').length,
+    pickedUp: orders.filter(o => getDeliveryStatus(o) === 'pickedUp').length,
     cancelled: orders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
     all: orders.length,
   };
@@ -1362,6 +1365,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               { key: 'in_bag', label: t.inBag, color: '#2980b9' },
               { key: 'delivering', label: t.delivering, color: '#16a085' },
               { key: 'delivered', label: t.delivered, color: '#2fc053' },
+              { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
               { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
             ]}
             keyExtractor={item => item.key}
