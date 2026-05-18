@@ -247,7 +247,6 @@ const [refreshing, setRefreshing] = useState(false);
   };
 
   const handleStartDelivering = async (order: BagOrder) => {
-    // Check if there's already an order being delivered
     const alreadyDelivering = bag.find(o => o.status === 'delivering');
     if (alreadyDelivering) {
       Alert.alert(
@@ -264,17 +263,36 @@ const [refreshing, setRefreshing] = useState(false);
 
     await saveBag(newBag);
 
-    // Update claim status to delivering
+    const restaurantCode = await AsyncStorage.getItem('restaurant_code') || '';
+
     await fetch(`${BACKEND_URL}/claim-order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         order_id: order.order_id,
         delivery_name: deliveryName,
-        restaurant_code: await AsyncStorage.getItem('restaurant_code') || '',
+        restaurant_code: restaurantCode,
         delivery_status: 'delivering',
       }),
     });
+
+    try {
+      const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${restaurantCode}`);
+      const profileData = await profileRes.json();
+      const website = profileData?.profile?.website;
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-delivering`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            delivery_name: deliveryName,
+          }),
+        }).catch(() => {});
+      }
+    } catch (e) {}
 
     if (order.address) {
       const encoded = encodeURIComponent(order.address);
