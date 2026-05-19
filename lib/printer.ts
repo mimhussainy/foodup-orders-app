@@ -19,7 +19,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
                      order.orderable_order_time.toLowerCase().includes('soon') ||
                      order.orderable_order_time.includes('(');
       if (isAsap) {
-        requestedStr = lang === 'de' ? `So schnell wie möglich - ${order.orderable_order_date}` : `As soon as possible - ${order.orderable_order_date}`;
+        requestedStr = lang === 'de' ? 'So schnell wie möglich' : 'As soon as possible';
       } else {
         const rawTime = order.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim();
         requestedStr = `${rawTime}  ${order.orderable_order_date}`;
@@ -75,34 +75,34 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
 
           // Order number
           EzPrinter.drawCustom(`${labels.orderLabel}#${order.order_id}`, FontSize.BigBold, AlignmentType.Center);
-          EzPrinter.drawCustom(`${labels.createTime}: ${createdTimeStr} ${createdDateStr}`, FontSize.Small, AlignmentType.Left);
+          EzPrinter.drawCustom(`${labels.createTime}: ${createdTimeStr}  ${createdDateStr}`, FontSize.Default, AlignmentType.Left);
           EzPrinter.drawOneLineDefault();
 
           // Requested time
           if (requestedStr) {
-            EzPrinter.drawCustom(labels.requestedFor.toUpperCase(), FontSize.Small, AlignmentType.Center);
+            EzPrinter.drawCustom(labels.requestedFor.toUpperCase(), FontSize.SmallBold, AlignmentType.Center);
             EzPrinter.drawCustom(requestedStr, FontSize.BigBold, AlignmentType.Center);
             EzPrinter.drawOneLineDefault();
           }
 
           // Shipment & Payment
           EzPrinter.drawText(
-            `${labels.shipmentMethod}:`, FontSize.Small,
+            `${labels.shipmentMethod}:`, FontSize.SmallBold,
             '', FontSize.Default,
-            `${labels.paymentMode}:`, FontSize.Small
+            `${labels.paymentMode}:`, FontSize.SmallBold
           );
           EzPrinter.drawText(
-            order.shipping_method || '-', FontSize.MediumBold,
+            order.shipping_method || '-', FontSize.BigBold,
             '', FontSize.Default,
-            order.payment_method || '-', FontSize.MediumBold
+            order.payment_method || '-', FontSize.BigBold
           );
           EzPrinter.drawOneLineDefault();
 
           // Customer info
-          EzPrinter.drawCustom(order.customer_name || '', FontSize.MediumBold, AlignmentType.Left);
-          if (order.shipping_address) EzPrinter.drawCustom(order.shipping_address, FontSize.Default, AlignmentType.Left);
-          if (order.customer_email) EzPrinter.drawCustom(order.customer_email, FontSize.Default, AlignmentType.Left);
-          if (order.customer_phone) EzPrinter.drawCustom(order.customer_phone, FontSize.Default, AlignmentType.Left);
+          EzPrinter.drawCustom(order.customer_name || '', FontSize.BigBold, AlignmentType.Left);
+          if (order.shipping_address) EzPrinter.drawCustom(order.shipping_address, FontSize.MediumBold, AlignmentType.Left);
+          if (order.customer_email) EzPrinter.drawCustom(order.customer_email, FontSize.MediumBold, AlignmentType.Left);
+          if (order.customer_phone) EzPrinter.drawCustom(order.customer_phone, FontSize.MediumBold, AlignmentType.Left);
           EzPrinter.drawOneLineDefault();
 
           // Items
@@ -114,14 +114,12 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
             );
             if (item.addons && item.addons.length > 0) {
               item.addons.forEach((addon: any) => {
-                EzPrinter.drawCustom(`  > ${addon.value}${addon.price ? ` (${order.currency} ${addon.price})` : ''}`, FontSize.Small, AlignmentType.Left);
+                EzPrinter.drawCustom(`  > ${addon.value}${addon.price ? ` (${order.currency} ${addon.price})` : ''}`, FontSize.SmallBold, AlignmentType.Left);
               });
             }
           });
 
-          // Subtotal / Total
-          EzPrinter.drawOneLine(FontSize.Small);
-          EzPrinter.drawLeftRight(labels.subtotal, FontSize.Default, `${order.total}`, FontSize.Default);
+          // Total only
           EzPrinter.drawOneLineDefault();
           EzPrinter.drawLeftRight(`${labels.total}:`, FontSize.MediumBold, `${order.total}`, FontSize.MediumBold);
           EzPrinter.drawOneLineDefault();
@@ -132,29 +130,26 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
           // Note
           if (order.note) {
             EzPrinter.drawOneLine(FontSize.Small);
-            EzPrinter.drawCustom(`${labels.note}: ${order.note}`, FontSize.Default, AlignmentType.Left);
+            EzPrinter.drawCustom(`${labels.note}: ${order.note}`, FontSize.MediumBold, AlignmentType.Left);
           }
 
           // Acceptance / Rejection
           if (resolvedScheduledStr) {
-            EzPrinter.drawOneLineDefault();
-            EzPrinter.drawCustom(`${labels.acceptedFor}:`, FontSize.Default, AlignmentType.Left);
-            EzPrinter.drawCustom(resolvedScheduledStr, FontSize.MediumBold, AlignmentType.Left);
+            EzPrinter.drawOneLine(FontSize.Small);
+            EzPrinter.drawCustom(`${labels.acceptedFor}: ${resolvedScheduledStr}`, FontSize.MediumBold, AlignmentType.Left);
           } else if (resolvedMinutes) {
-            EzPrinter.drawOneLineDefault();
-            EzPrinter.drawCustom(`${labels.acceptedFor}:`, FontSize.Default, AlignmentType.Left);
-            EzPrinter.drawCustom(`${resolvedMinutes} ${labels.minutes}`, FontSize.MediumBold, AlignmentType.Left);
+            EzPrinter.drawOneLine(FontSize.Small);
+            EzPrinter.drawCustom(`${labels.acceptedFor}: ${resolvedMinutes} ${labels.minutes}`, FontSize.MediumBold, AlignmentType.Left);
           } else if (rejected) {
-            EzPrinter.drawOneLineDefault();
-            EzPrinter.drawCustom(`${labels.rejected}:`, FontSize.Default, AlignmentType.Left);
-            if (rejectionReason) EzPrinter.drawCustom(rejectionReason, FontSize.MediumBold, AlignmentType.Left);
+            EzPrinter.drawOneLine(FontSize.Small);
+            EzPrinter.drawCustom(`${labels.rejected}: ${rejectionReason || ''}`, FontSize.MediumBold, AlignmentType.Left);
           }
 
-          // QR Code for delivery address
+          // QR Code
           if (order.shipping_address) {
             EzPrinter.drawOneLine(FontSize.Small);
             const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.shipping_address)}`;
-            EzPrinter.drawQrCodeWithHeight(mapsUrl, AlignmentType.Center, 120);
+            EzPrinter.drawQrCodeWithHeight(mapsUrl, AlignmentType.Center, 304);
             EzPrinter.drawCustom(labels.scanQr, FontSize.Small, AlignmentType.Center);
           }
 

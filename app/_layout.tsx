@@ -169,6 +169,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
 
   const handleConfirmAcceptWithTime = async (acceptTime: string) => {
     setLoading(true);
+    setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       fetch(`${BACKEND_URL}/accepted-time`, {
@@ -211,6 +212,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
 
   const handleConfirmRejectWithReason = async (reason: string) => {
     setLoading(true);
+    setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
@@ -249,6 +251,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
   const handleConfirmAccept = async () => {
     if (!selectedTime) return;
     setLoading(true);
+    setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       fetch(`${BACKEND_URL}/accepted-time`, {
@@ -305,6 +308,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
     const reason = selectedReason === 'Other' ? customReason : selectedReason;
     if (!reason) return;
     setLoading(true);
+    setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       const stored = await AsyncStorage.getItem('foodup_orders');
@@ -534,7 +538,30 @@ export default function RootLayout() {
       const data = notification.request.content.data as any;
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
-        
+        if (role === 'owner') {
+          const newOrder = {
+            order_id: parseInt(data.order_id),
+            customer_name: data.customer_name || '',
+            customer_email: data.customer_email || '',
+            customer_phone: data.customer_phone || '',
+            total: data.total || '',
+            currency: data.currency || 'CHF',
+            status: data.status || '',
+            event_type: data.event_type || 'new_order',
+            items: JSON.parse(data.items || '[]'),
+            payment_method: data.payment_method || '',
+            note: data.note || '',
+            date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
+            timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
+            shipping_method: data.shipping_method || '',
+            shipping_address: data.shipping_address || '',
+            restaurant_code: data.restaurant_code || '',
+            orderable_order_time: data.orderable_order_time || '',
+            orderable_order_date: data.orderable_order_date || '',
+          };
+          setNewOrderModal(newOrder);
+          setShowOrderModal(true);
+        }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
           if (selectedSound === 'default') return;
@@ -561,7 +588,7 @@ export default function RootLayout() {
 
     const tapSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as any;
-      if (data.order_id) {
+      if (data.order_id && Platform.OS !== 'ios' && data.event_type === 'new_order') {
         const newOrder = {
           order_id: parseInt(data.order_id),
           customer_name: data.customer_name || '',
@@ -579,19 +606,11 @@ export default function RootLayout() {
           shipping_method: data.shipping_method || '',
           shipping_address: data.shipping_address || '',
           restaurant_code: data.restaurant_code || '',
+          orderable_order_time: data.orderable_order_time || '',
+          orderable_order_date: data.orderable_order_date || '',
         };
-        AsyncStorage.getItem('foodup_orders').then(stored => {
-          const existing = stored ? JSON.parse(stored) : [];
-          const exists = existing.findIndex((o: any) => o.order_id === newOrder.order_id);
-          if (exists === -1) {
-            const updated = [newOrder, ...existing];
-            AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
-          }
-        });
-        if (Platform.OS !== 'ios' && data.event_type === 'new_order') {
-          setNewOrderModal(newOrder);
-          setShowOrderModal(true);
-        }
+        setNewOrderModal(newOrder);
+        setShowOrderModal(true);
       }
     });
 
@@ -609,24 +628,22 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack>
-        
-      
-      {Platform.OS !== 'ios' && (
-          <AcceptRejectModal
-            order={newOrderModal}
-            visible={showOrderModal}
-            onClose={async () => {
-              if (orderSoundRef.current) {
-                await orderSoundRef.current.stopAsync().catch(() => {});
-                await orderSoundRef.current.unloadAsync().catch(() => {});
-                orderSoundRef.current = null;
-              }
-              setShowOrderModal(false);
-              setNewOrderModal(null);
-            }}
-          />
-        )}
       </LanguageProvider>
+      {Platform.OS !== 'ios' && (
+        <AcceptRejectModal
+          order={newOrderModal}
+          visible={showOrderModal}
+          onClose={async () => {
+            if (orderSoundRef.current) {
+              await orderSoundRef.current.stopAsync().catch(() => {});
+              await orderSoundRef.current.unloadAsync().catch(() => {});
+              orderSoundRef.current = null;
+            }
+            setShowOrderModal(false);
+            setNewOrderModal(null);
+          }}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

@@ -704,7 +704,7 @@ export default function SettingsScreen() {
                     return (
                       <View key={cat}>
                         <TouchableOpacity
-                          style={[styles.row, { borderBottomWidth: isOpen || !isLast ? 1 : 0, backgroundColor: '#FAFAFA' }]}
+                          style={[styles.row, { borderBottomWidth: isOpen || !isLast ? 1 : 0 }]}
                           onPress={() => setOpenCategory(isOpen ? null : cat)}
                         >
                           <Ionicons name="folder-outline" size={16} color="#8B38CB" />
