@@ -88,10 +88,14 @@ export default function SettingsScreen() {
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
-const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
-const [storeLoading, setStoreLoading] = useState(false);
-const [acceptanceTimes, setAcceptanceTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
-const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
+  const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
+  const [storeLoading, setStoreLoading] = useState(false);
+  const [acceptanceTimes, setAcceptanceTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
+  const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [showProducts, setShowProducts] = useState(false);
+  const [togglingProduct, setTogglingProduct] = useState<number | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(c => {
@@ -145,7 +149,34 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
       }
     } catch (e) {}
   };
+  const loadProducts = async () => {
+    if (!restaurantWebsite) return;
+    setProductsLoading(true);
+    try {
+      const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
+      const res = await fetch(`${website}/wp-json/foodup/v1/products?secret=foodup2026`);
+      const result = await res.json();
+      if (result.success) setProducts(result.products);
+    } catch (e) {}
+    setProductsLoading(false);
+  };
 
+  const toggleProduct = async (productId: number, enabled: boolean) => {
+    setTogglingProduct(productId);
+    try {
+      const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
+      const res = await fetch(`${website}/wp-json/foodup/v1/product-toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: 'foodup2026', product_id: productId, enabled }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, enabled } : p));
+      }
+    } catch (e) {}
+    setTogglingProduct(null);
+  };
   const loadRestaurantProfile = async () => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -636,7 +667,51 @@ const [newAcceptanceTime, setNewAcceptanceTime] = useState('');
               </View>
             </>
           )}
+          {role === 'owner' && restaurantWebsite ? (
+            <>
+              <Text style={styles.groupLabel}>Product Management</Text>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showProducts ? 1 : 0 }]}
+                  onPress={() => {
+                    setShowProducts(!showProducts);
+                    if (!showProducts && products.length === 0) loadProducts();
+                  }}
+                >
+                  <Ionicons name="fast-food-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>Manage Products</Text>
+                  {productsLoading && <Text style={{ color: '#999', fontSize: 13 }}>Loading...</Text>}
+                  <Text style={styles.chevron}>{showProducts ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
 
+                {showProducts && products.map((product, i) => (
+                  <View key={product.id} style={[styles.row, i === products.length - 1 && { borderBottomWidth: 0 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, color: product.enabled ? '#111' : '#999', fontWeight: '500' }}>{product.name}</Text>
+                      {product.price ? <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>CHF {product.price}</Text> : null}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => toggleProduct(product.id, !product.enabled)}
+                      disabled={togglingProduct === product.id}
+                      style={{
+                        width: 50, height: 28, borderRadius: 14,
+                        backgroundColor: togglingProduct === product.id ? '#ccc' : product.enabled ? '#2ecc71' : '#ddd',
+                        justifyContent: 'center',
+                        paddingHorizontal: 2,
+                      }}
+                    >
+                      <View style={{
+                        width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+                        alignSelf: product.enabled ? 'flex-end' : 'flex-start',
+                        shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+                      }} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
+          
           {role === 'owner' && (
             <>
               <Text style={styles.groupLabel}>{t.notificationSound}</Text>
