@@ -96,6 +96,7 @@ export default function SettingsScreen() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
   const [togglingProduct, setTogglingProduct] = useState<number | null>(null);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(c => {
@@ -684,34 +685,54 @@ export default function SettingsScreen() {
                   <Text style={styles.chevron}>{showProducts ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showProducts && products.map((product, i) => (
-                  <View key={product.id} style={[styles.row, i === products.length - 1 && { borderBottomWidth: 0 }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, color: product.enabled ? '#111' : '#999', fontWeight: '500' }}>{product.name}</Text>
-                      {product.price ? <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>CHF {product.price}</Text> : null}
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => toggleProduct(product.id, !product.enabled)}
-                      disabled={togglingProduct === product.id}
-                      style={{
-                        width: 50, height: 28, borderRadius: 14,
-                        backgroundColor: togglingProduct === product.id ? '#ccc' : product.enabled ? '#2ecc71' : '#ddd',
-                        justifyContent: 'center',
-                        paddingHorizontal: 2,
-                      }}
-                    >
-                      <View style={{
-                        width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
-                        alignSelf: product.enabled ? 'flex-end' : 'flex-start',
-                        shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
-                      }} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                {showProducts && (() => {
+                  const categories = [...new Set(products.map(p => p.category || 'Other'))];
+                  return categories.map((cat, ci) => {
+                    const catProducts = products.filter(p => (p.category || 'Other') === cat);
+                    const isOpen = openCategory === cat;
+                    const isLast = ci === categories.length - 1;
+                    return (
+                      <View key={cat}>
+                        <TouchableOpacity
+                          style={[styles.row, { borderBottomWidth: isOpen || !isLast ? 1 : 0, backgroundColor: '#FAFAFA' }]}
+                          onPress={() => setOpenCategory(isOpen ? null : cat)}
+                        >
+                          <Ionicons name="folder-outline" size={16} color="#8B38CB" />
+                          <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#111' }}>{cat}</Text>
+                          <Text style={{ fontSize: 12, color: '#999', marginRight: 8 }}>{catProducts.length}</Text>
+                          <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
+                        </TouchableOpacity>
+                        {isOpen && catProducts.map((product, i) => (
+                          <View key={product.id} style={[styles.row, { paddingLeft: 32, borderBottomWidth: i === catProducts.length - 1 && isLast ? 0 : 1 }]}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 14, color: product.enabled ? '#111' : '#999', fontWeight: '500' }}>{product.name}</Text>
+                              {product.price ? <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>CHF {product.price}</Text> : null}
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => toggleProduct(product.id, !product.enabled)}
+                              disabled={togglingProduct === product.id}
+                              style={{
+                                width: 50, height: 28, borderRadius: 14,
+                                backgroundColor: togglingProduct === product.id ? '#ccc' : product.enabled ? '#2ecc71' : '#ddd',
+                                justifyContent: 'center', paddingHorizontal: 2,
+                              }}
+                            >
+                              <View style={{
+                                width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+                                alignSelf: product.enabled ? 'flex-end' : 'flex-start',
+                                shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+                              }} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  });
+                })()}
               </View>
             </>
           ) : null}
-          
+
           {role === 'owner' && (
             <>
               <Text style={styles.groupLabel}>{t.notificationSound}</Text>
