@@ -19,19 +19,29 @@ const SOUND_MAP: { [key: string]: string } = {
   classic_alarm: 'https://assets.mixkit.co/active_storage/sfx/995/995.wav',
   slot_machine: 'https://assets.mixkit.co/active_storage/sfx/1995/1995.wav',
 };
+let previewSoundRef: any = null;
+
 async function previewSound(key: string) {
   if (key === 'default') return;
 
   try {
+    if (previewSoundRef) {
+      await previewSoundRef.stopAsync().catch(() => {});
+      await previewSoundRef.unloadAsync().catch(() => {});
+      previewSoundRef = null;
+    }
+
     const uri = SOUND_MAP[key];
     if (!uri) return;
 
     const { sound } = await Audio.Sound.createAsync({ uri });
+    previewSoundRef = sound;
     await sound.playAsync();
 
     sound.setOnPlaybackStatusUpdate((status: any) => {
       if (status.isLoaded && status.didJustFinish) {
         sound.unloadAsync();
+        previewSoundRef = null;
       }
     });
   } catch (e) {}
@@ -763,7 +773,7 @@ export default function SettingsScreen() {
                       style={[
                         styles.rowValue,
                         { flex: 1 },
-                        notificationSound === sound.key && { fontWeight: '700', color: '#111' },
+                        notificationSound === sound.key && { fontWeight: '700', color: '#8B38CB' },
                       ]}
                     >
                       {sound.label}

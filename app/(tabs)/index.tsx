@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   AppState,
   FlatList,
   Image,
@@ -1254,20 +1255,39 @@ const sections = groupOrdersByDate(filteredOrders, t);
                       const isPickupOrder = isPickupMethod(selectedOrder.shipping_method);
 
                       if (isPickupOrder && !isPickupReady) {
-                        const code = await AsyncStorage.getItem('restaurant_code') || '';
-                        const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-                        const website = restaurantProfile?.profile?.website;
-                        if (website) {
-                          const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-                          fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }),
-                          }).catch(() => {});
-                        }
-                        const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
-                        setPickupReadyOrders(updated);
-                        await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                        Alert.alert(
+                          'Ready for Pickup',
+                          'Send an email to the customer that their order is ready?',
+                          [
+                            {
+                              text: 'Skip Email',
+                              onPress: async () => {
+                                const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                                setPickupReadyOrders(updated);
+                                await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                              },
+                            },
+                            {
+                              text: 'Send Email',
+                              onPress: async () => {
+                                const code = await AsyncStorage.getItem('restaurant_code') || '';
+                                const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+                                const website = restaurantProfile?.profile?.website;
+                                if (website) {
+                                  const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+                                  fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }),
+                                  }).catch(() => {});
+                                }
+                                const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                                setPickupReadyOrders(updated);
+                                await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                              },
+                            },
+                          ]
+                        );
                         return;
                       }
 
