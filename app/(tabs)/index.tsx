@@ -792,7 +792,7 @@ const pulseAnim = useRef(new Animated.Value(1)).current;
 useEffect(() => {
   Animated.loop(
     Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0.8, duration: 800, useNativeDriver: true }),
       Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
     ])
   ).start();
@@ -841,6 +841,7 @@ useEffect(() => {
 
     const claimsInterval = setInterval(() => fetchClaims(), 10000);
     const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 30000);
+    const storeInterval = setInterval(() => fetchStoreStatus(), 15000);
     const newOrderInterval = setInterval(async () => {
       if (Platform.OS !== 'ios') {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -892,6 +893,7 @@ useEffect(() => {
       appStateSubscription.remove();
       clearInterval(claimsInterval);
       clearInterval(ordersInterval);
+      clearInterval(storeInterval);
       clearInterval(newOrderInterval);
     };
   }, []);
@@ -1416,7 +1418,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
               opacity: pulseAnim,
             }}>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
-                {storeIsOpen ? (t.storeOpen || 'Store is Open') : (t.storeClosed || 'Store is Closed')}
+                {storeIsOpen ? t.storeOpen : t.storeClosed}
               </Text>
             </Animated.View>
           )}
