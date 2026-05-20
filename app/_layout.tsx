@@ -404,14 +404,14 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: '#2ecc71', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                onPress={() => setStep('accept')}
+                onPress={() => { setStep('accept'); setCountdown(null); }}
               >
                 <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.acceptOrder}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ backgroundColor: '#e74c3c', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                onPress={() => setStep('reject')}
+                onPress={() => { setStep('reject'); setCountdown(null); }}
               >
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.rejectOrder}</Text>
@@ -637,19 +637,21 @@ export default function RootLayout() {
         </Stack>
       </LanguageProvider>
       {Platform.OS !== 'ios' && (
-        <AcceptRejectModal
-          order={newOrderModal}
-          visible={showOrderModal}
-          onClose={async () => {
-            if (orderSoundRef.current) {
-              await orderSoundRef.current.stopAsync().catch(() => {});
-              await orderSoundRef.current.unloadAsync().catch(() => {});
-              orderSoundRef.current = null;
-            }
-            setShowOrderModal(false);
-            setNewOrderModal(null);
-          }}
-        />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, pointerEvents: showOrderModal ? 'auto' : 'none' }}>
+          <AcceptRejectModal
+            order={newOrderModal}
+            visible={showOrderModal}
+            onClose={async () => {
+              if (orderSoundRef.current) {
+                await orderSoundRef.current.stopAsync().catch(() => {});
+                await orderSoundRef.current.unloadAsync().catch(() => {});
+                orderSoundRef.current = null;
+              }
+              setShowOrderModal(false);
+              setNewOrderModal(null);
+            }}
+          />
+        </View>
       )}
     </GestureHandlerRootView>
   );

@@ -228,7 +228,7 @@ export default function AddOrderScreen() {
                   setAddedToBag(false);
                 }}
                 onSubmitEditing={handleSearch}
-                returnKeyType="search"
+                returnKeyType="done"
               />
 
               <TouchableOpacity

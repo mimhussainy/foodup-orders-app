@@ -1559,7 +1559,7 @@ const styles = StyleSheet.create({
   logo: { width: 100, height: 30 },
   headerPlaceholder: { width: 36 },
   backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center' },
-  backArrow: { fontSize: 24, color: '#111', lineHeight: 28 },
+  backArrow: { fontSize: 24, color: '#111', lineHeight: 24, textAlignVertical: 'center', includeFontPadding: false },
   scrollContent: { paddingBottom: 40, paddingTop: 8 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#333', marginTop: 8 },

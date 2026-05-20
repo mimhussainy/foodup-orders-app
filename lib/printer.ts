@@ -97,8 +97,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
       <p style="text-align:left; font-size:18px; margin:2px 0;">${resolvedScheduledStr}</p>
     ` : resolvedMinutes ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
-      <p style="text-align:left; font-size:18px; margin:2px 0;">${resolvedMinutes} ${labels.minutes}</p>
+      <p style="text-align:left; font-size:18px; margin:2px 0;">${labels.acceptedFor}: ${resolvedMinutes} ${labels.minutes}</p>
     ` : rejected ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
       <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.rejected}:</p>
@@ -153,17 +152,17 @@ const acceptanceHtml = resolvedScheduledStr ? `
           </table>
           <div class="divider"></div>
           <p style="text-align:center; font-size:20px; font-weight:900; margin:8px 0; line-height:1.2;">${isPaid ? labels.paid : labels.notPaid}</p>
-          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:16px;">${labels.note}: ${order.note}</p>` : ''}
+          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:18px;"><strong>${labels.note}:</strong> ${order.note}</p>` : ''}
           ${acceptanceHtml}
           ${order.shipping_address ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <div style="text-align:center; margin:8px 0;">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="180" height="180" />
           </div>
-          <p style="text-align:center; font-size:11px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
+          <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <p style="text-align:center; font-size:11px; color:#999; margin:4px 0;">Powered by: foodup.ch</p>
+          <p style="text-align:center; font-size:14px; color:#999; margin:4px 0;">Powered by: foodup.ch</p>
         </body>
       </html>
     `;
