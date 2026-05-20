@@ -19,7 +19,8 @@ const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [step, setStep] = useState<'restaurant' | 'role' | 'pin' | 'delivery_login'>('restaurant');
+  const [step, setStep] = useState<'restaurant' | 'role' | 'pin' | 'ios_pin' | 'delivery_login'>('restaurant');
+  const [iosPin, setIosPin] = useState('');
   const [restaurantCode, setRestaurantCode] = useState('');
 
   useEffect(() => {
@@ -74,12 +75,41 @@ export default function OnboardingScreen() {
       });
       const result = await response.json();
       if (result.success) {
-        await AsyncStorage.setItem('user_role', 'owner');
         await AsyncStorage.setItem('owner_pin', pin);
-        router.replace('/(tabs)');
+        if (Platform.OS === 'ios') {
+          setStep('ios_pin');
+          setError('');
+        } else {
+          await AsyncStorage.setItem('user_role', 'owner');
+          router.replace('/(tabs)');
+        }
       } else {
         setError(t.incorrectPin);
         setPin('');
+      }
+    } catch (e) {
+      setError(t.connectionError);
+    }
+    setLoading(false);
+  };
+
+  const handleIosPinSubmit = async () => {
+    if (iosPin.length < 4) { setError(t.enterPinError); return; }
+    setLoading(true);
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const response = await fetch(`${BACKEND_URL}/verify-ios-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ios_pin: iosPin, restaurant_code: code }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        await AsyncStorage.setItem('user_role', 'owner');
+        router.replace('/(tabs)');
+      } else {
+        setError(result.message || t.incorrectPin);
+        setIosPin('');
       }
     } catch (e) {
       setError(t.connectionError);
@@ -114,6 +144,7 @@ export default function OnboardingScreen() {
   const goBack = () => {
     if (step === 'role') setStep('restaurant');
     else if (step === 'pin' || step === 'delivery_login') setStep('role');
+    else if (step === 'ios_pin') { setStep('pin'); setIosPin(''); }
     setError('');
     setPin('');
     setUsername('');
@@ -202,6 +233,28 @@ export default function OnboardingScreen() {
           </View>
         )}
 
+        {step === 'ios_pin' && (
+          <View style={styles.section}>
+            <Text style={styles.title}>iOS App PIN</Text>
+            <Text style={styles.subtitle}>Enter your iOS app PIN to continue</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t.pin}
+              placeholderTextColor="#C0C0C0"
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={6}
+              value={iosPin}
+              onChangeText={setIosPin}
+              autoFocus
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <TouchableOpacity style={styles.submitBtn} onPress={handleIosPinSubmit} disabled={loading}>
+              <Text style={styles.submitBtnText}>{loading ? t.verifying : t.continue}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
         {step === 'delivery_login' && (
           <View style={styles.section}>
             <Text style={styles.title}>{t.courierLogin}</Text>
