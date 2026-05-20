@@ -1418,7 +1418,59 @@ const sections = groupOrdersByDate(filteredOrders, t);
         <View style={styles.headerPlaceholder} />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
-        
+        <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[
+              { key: 'all', label: t.all, color: '#111' },
+              { key: 'new', label: t.newOrder, color: '#f39c12' },
+              { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
+              { key: 'in_bag', label: t.inBag, color: '#2980b9' },
+              { key: 'delivering', label: t.delivering, color: '#16a085' },
+              { key: 'delivered', label: t.delivered, color: '#2fc053' },
+              { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
+              { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
+            ]}
+            keyExtractor={item => item.key}
+            contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
+            renderItem={({ item: f }) => (
+              <TouchableOpacity
+                onPress={() => setFilter(f.key)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 20,
+                  backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Text style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color,
+                }} numberOfLines={1}>
+                  {f.label}
+                </Text>
+                <View style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
+                    {filterCounts[f.key as keyof typeof filterCounts]}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
         <SectionList
             ref={listRef}
             sections={sections}
@@ -1431,94 +1483,16 @@ const sections = groupOrdersByDate(filteredOrders, t);
             ListHeaderComponent={
               <View>
                 {storeIsOpen !== null && (
-                  <Animated.View style={{ 
-                    backgroundColor: storeIsOpen ? '#05694A' : '#E31E24',
-                    paddingVertical: 6,
-                    alignItems: 'center',
-                    opacity: pulseAnim,
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
-                      {storeIsOpen ? t.storeOpen : t.storeClosed}
-                    </Text>
+                  <Animated.View style={{ backgroundColor: storeIsOpen ? '#05694A' : '#E31E24', paddingVertical: 6, alignItems: 'center', opacity: pulseAnim }}>
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{storeIsOpen ? t.storeOpen : t.storeClosed}</Text>
                   </Animated.View>
                 )}
-                <View style={{ 
-                  backgroundColor: '#fff', 
-                  paddingHorizontal: 16, 
-                  paddingVertical: Platform.OS === 'ios' ? 8 : 1,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#F0F0F0',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 10,
-                }}>
+                <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 8 : 1, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <Ionicons name="search-outline" size={18} color="#999" />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }}
-                    placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
-                    placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
-                    value={search}
-                    onChangeText={setSearch}
-                  />
-                  {search.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearch('')}>
-                      <Ionicons name="close-circle" size={18} color="#C0C0C0" />
-                    </TouchableOpacity>
-                  )}
+                  <TextInput style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }} placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'} placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'} value={search} onChangeText={setSearch} />
+                  {search.length > 0 && (<TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#C0C0C0" /></TouchableOpacity>)}
                 </View>
-                <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
-                  <FlatList
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    data={[
-                      { key: 'all', label: t.all, color: '#111' },
-                      { key: 'new', label: t.newOrder, color: '#f39c12' },
-                      { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
-                      { key: 'in_bag', label: t.inBag, color: '#2980b9' },
-                      { key: 'delivering', label: t.delivering, color: '#16a085' },
-                      { key: 'delivered', label: t.delivered, color: '#2fc053' },
-                      { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
-                      { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
-                    ]}
-                    keyExtractor={item => item.key}
-                    contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
-                    renderItem={({ item: f }) => (
-                      <TouchableOpacity
-                        onPress={() => setFilter(f.key)}
-                        style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 20,
-                          backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        <Text style={{
-                          fontSize: 11,
-                          fontWeight: '600',
-                          color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color,
-                        }} numberOfLines={1}>
-                          {f.label}
-                        </Text>
-                        <View style={{
-                          backgroundColor: '#fff',
-                          borderRadius: 10,
-                          minWidth: 18,
-                          height: 18,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          paddingHorizontal: 4,
-                        }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>
-                            {filterCounts[f.key as keyof typeof filterCounts]}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
+                
                 {orders.length === 0 && (
                   <View style={styles.empty}>
                     <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
@@ -1652,7 +1626,7 @@ const styles = StyleSheet.create({
   headerPlaceholder: { width: 36 },
   backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center' },
   backArrow: { fontSize: 24, color: '#111', lineHeight: 24, textAlignVertical: 'center', includeFontPadding: false },
-  scrollContent: { paddingBottom: 40, paddingTop: 8 },
+  scrollContent: { paddingBottom: 40, paddingTop: 0 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#333', marginTop: 8 },
   emptySubText: { fontSize: 14, color: '#999' },
