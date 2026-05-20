@@ -4,7 +4,6 @@ import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   AppState,
   BackHandler,
@@ -24,6 +23,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import CustomAlert from '../../components/CustomAlert';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -789,6 +789,7 @@ const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
 const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boolean}>({});
 const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
+const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[]; icon?: string; iconColor?: string }>({ visible: false, title: '', message: '', buttons: [] });
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -1304,16 +1305,20 @@ const sections = groupOrdersByDate(filteredOrders, t);
                       const isPickupOrder = isPickupMethod(selectedOrder.shipping_method);
 
                       if (isPickupOrder && !isPickupReady) {
-                        Alert.alert(
-                          t.readyForPickup || 'Ready for Pickup',
-                          t.readyForPickupMsg || 'Send an email to the customer that their order is ready?',
-                          [
+                        setAlertConfig({
+                          visible: true,
+                          title: t.readyForPickup || 'Ready for Pickup',
+                          message: t.readyForPickupMsg || 'Send an email to the customer that their order is ready?',
+                          icon: 'bag-check-outline',
+                          iconColor: '#2ecc71',
+                          buttons: [
                             {
                               text: t.cancel || 'Cancel',
                               style: 'cancel',
                             },
                             {
                               text: t.skipEmail || 'Skip Email',
+                              style: 'default',
                               onPress: async () => {
                                 const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
                                 setPickupReadyOrders(updated);
@@ -1339,8 +1344,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
                                 await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
                               },
                             },
-                          ]
-                        );
+                          ],
+                        });
                         return;
                       }
 
@@ -1391,6 +1396,15 @@ const sections = groupOrdersByDate(filteredOrders, t);
             })()}
           </ScrollView>
         </SafeAreaView>
+        <CustomAlert
+          visible={alertConfig.visible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          icon={alertConfig.icon}
+          iconColor={alertConfig.iconColor}
+          onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        />
       </View>
     );
   }
@@ -1428,7 +1442,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
           }}>
             <Ionicons name="search-outline" size={18} color="#999" />
             <TextInput
-              style={{ flex: 1, fontSize: 13, color: '#111' }}
+              style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }}
               placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
               placeholderTextColor="#C0C0C0"
               value={search}

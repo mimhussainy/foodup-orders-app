@@ -3,11 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, AppState, Image, Linking, Platform,
+  AppState, Image, Linking, Platform,
   RefreshControl, SafeAreaView, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
 } from 'react-native';
 
+import CustomAlert from '../../components/CustomAlert';
 import { useLanguage } from '../../lib/useLanguage';
 function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: string }) {
   const [now, setNow] = useState(Date.now());
@@ -185,6 +186,7 @@ export default function BagScreen() {
   const [deliveryName, setDeliveryName] = useState('');
   const [expandedOrders, setExpandedOrders] = useState<number[]>([]);
 const [refreshing, setRefreshing] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[] }>({ visible: false, title: '', message: '', buttons: [] });
   const { t } = useLanguage();
 
   useFocusEffect(
@@ -249,11 +251,12 @@ const [refreshing, setRefreshing] = useState(false);
   const handleStartDelivering = async (order: BagOrder) => {
     const alreadyDelivering = bag.find(o => o.status === 'delivering');
     if (alreadyDelivering) {
-      Alert.alert(
-        t.cannotStartDelivery,
-        t.cannotStartDeliveryMsg,
-        [{ text: 'OK' }]
-      );
+      setAlertConfig({
+        visible: true,
+        title: t.cannotStartDelivery,
+        message: t.cannotStartDeliveryMsg,
+        buttons: [{ text: 'OK', style: 'cancel' }],
+      });
       return;
     }
 
@@ -796,6 +799,15 @@ const [refreshing, setRefreshing] = useState(false);
           ))}
         </ScrollView>
       </SafeAreaView>
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        icon="warning-outline"
+        iconColor="#f39c12"
+      />
     </View>
   );
 }
