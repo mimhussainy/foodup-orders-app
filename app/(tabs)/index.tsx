@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   AppState,
   FlatList,
   Image,
@@ -785,6 +786,17 @@ const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
 const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boolean}>({});
+const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
+const pulseAnim = useRef(new Animated.Value(1)).current;
+
+useEffect(() => {
+  Animated.loop(
+    Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+    ])
+  ).start();
+}, []);
   const { t } = useLanguage();
   const router = useRouter();
   const listRef = useRef<any>(null);
@@ -817,11 +829,13 @@ const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boole
     });
     fetchOrdersFromBackend();
     fetchClaims();
+    fetchStoreStatus();
 
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         fetchOrdersFromBackend();
         fetchClaims();
+        fetchStoreStatus();
       }
     });
 
@@ -882,6 +896,15 @@ const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boole
     };
   }, []);
 
+  const fetchStoreStatus = async () => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      if (!code) return;
+      const response = await fetch(`${BACKEND_URL}/store-status/${code}`);
+      const result = await response.json();
+      if (result.success) setStoreIsOpen(result.is_open);
+    } catch (e) {}
+  };
   const fetchClaims = async () => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -1385,6 +1408,18 @@ const sections = groupOrdersByDate(filteredOrders, t);
               </TouchableOpacity>
             )}
           </View>
+          {storeIsOpen !== null && (
+            <Animated.View style={{ 
+              backgroundColor: storeIsOpen ? '#05694A' : '#E31E24',
+              paddingVertical: 6,
+              alignItems: 'center',
+              opacity: pulseAnim,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                {storeIsOpen ? (t.storeOpen || 'Store is Open') : (t.storeClosed || 'Store is Closed')}
+              </Text>
+            </Animated.View>
+          )}
           <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
           <FlatList
             horizontal
