@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { printOrder } from '../lib/printer';
@@ -507,6 +507,13 @@ export default function RootLayout() {
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const orderSoundRef = useRef<any>(null);
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      return true;
+    });
+    return () => backHandler.remove();
+  }, []);
 
   const checkUserRole = async () => {
     try {
