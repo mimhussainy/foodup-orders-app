@@ -1108,7 +1108,7 @@ const flatData: FlatItem[] = sections.flatMap(section => [
   ...section.data.map(item => ({ type: 'order' as const, item })),
 ]);
 
-const stickyIndex = storeIsOpen !== null ? 2 : 1;
+
 
   const filterCounts = {
     new: orders.filter(o => getDeliveryStatus(o) === 'new').length,
@@ -1431,7 +1431,7 @@ const stickyIndex = storeIsOpen !== null ? 2 : 1;
           data={flatData}
           keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
           contentContainerStyle={styles.scrollContent}
-          stickyHeaderIndices={[stickyIndex]}
+          
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
           }
