@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   AppState,
+  BackHandler,
   FlatList,
   Image,
   InteractionManager,
@@ -61,6 +62,7 @@ interface Order {
 }
 function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: string }) {
   const [now, setNow] = useState(Date.now());
+  const { t } = useLanguage();
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -76,7 +78,7 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
   const showBar = isOverdue || remainingMs <= 3600000;
   const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
-  const { t } = useLanguage();
+  
   const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
 
   return (
@@ -790,16 +792,27 @@ const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
-  Animated.loop(
+  const animation = Animated.loop(
     Animated.sequence([
       Animated.timing(pulseAnim, { toValue: 0.8, duration: 800, useNativeDriver: true }),
       Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
     ])
-  ).start();
-}, []);
+  );
+  animation.start();
+  return () => animation.stop();
+}, [selectedOrder]);
   const { t } = useLanguage();
   const router = useRouter();
   const listRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedOrder(null);
+      return true;
+    });
+    return () => backHandler.remove();
+  }, [selectedOrder]);
 
   useFocusEffect(
     useCallback(() => {

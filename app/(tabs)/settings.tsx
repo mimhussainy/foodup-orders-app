@@ -80,6 +80,8 @@ export default function SettingsScreen() {
   const [showAbout, setShowAbout] = useState(false);
   const [showSound, setShowSound] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
+  const [showAddCourier, setShowAddCourier] = useState(false);
+  const [showAcceptanceTimes, setShowAcceptanceTimes] = useState(false);
   const [deliveryName, setDeliveryName] = useState('');
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [newResetPassword, setNewResetPassword] = useState('');
@@ -420,7 +422,21 @@ export default function SettingsScreen() {
 
     router.replace('/onboarding');
   };
+const stopPreviewSound = async () => {
+    if (previewSoundRef) {
+      await previewSoundRef.stopAsync().catch(() => {});
+      await previewSoundRef.unloadAsync().catch(() => {});
+      previewSoundRef = null;
+    }
+  };
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopPreviewSound();
+      };
+    }, [])
+  );
   const currentSoundLabel =
     SOUNDS.find(s => s.key === notificationSound)?.label || t.default;
 
@@ -497,37 +513,99 @@ export default function SettingsScreen() {
             </>
           )}
 
+          {role === 'owner' && storeIsOpen !== null && (
+            <>
+              <Text style={styles.groupLabel}>{t.storeStatus}</Text>
+              <View style={styles.section}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>
+                      {storeIsOpen ? t.storeOpen : t.storeClosed}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#999', marginTop: 2 }}>
+                      {storeIsOpen ? t.storeOpenSub : t.storeClosedSub}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (storeLoading) return;
+                      setStoreLoading(true);
+                      try {
+                        const pin = await AsyncStorage.getItem('owner_pin') || '';
+                        const code = await AsyncStorage.getItem('restaurant_code') || '';
+                        const response = await fetch(`${BACKEND_URL}/store-status`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ restaurant_code: code, is_open: !storeIsOpen }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          const newIsOpen = result.is_open;
+                          setStoreIsOpen(newIsOpen);
+                          if(restaurantWebsite) {
+                            const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
+                            fetch(`${website}/foodup-store-status.php`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ secret: 'foodup2026', action: 'set', is_open: newIsOpen, restaurant_code: code }),
+                            }).catch(() => {});
+                          }
+                        }
+                      } catch (e) {}
+                      setStoreLoading(false);
+                    }}
+                    style={{ backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                      {storeLoading ? '...' : storeIsOpen ? t.closeStore : t.openStore}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+
           {role === 'owner' && (
             <>
               <Text style={styles.groupLabel}>{t.addCourierAccount}</Text>
 
-              <View style={[styles.section, { paddingTop: 20, paddingBottom: 20 }]}>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TextInput
-                    style={[styles.input, { flex: 1, marginTop: 0 }]}
-                    placeholder={t.username}
-                    placeholderTextColor="#C0C0C0"
-                    value={newUsername}
-                    onChangeText={setNewUsername}
-                    autoCapitalize="none"
-                  />
-
-                  <TextInput
-                    style={[styles.input, { flex: 1, marginTop: 0 }]}
-                    placeholder={t.password}
-                    placeholderTextColor="#C0C0C0"
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    secureTextEntry
-                  />
-                </View>
-
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-                {success ? <Text style={styles.successText}>{success}</Text> : null}
-
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleAddAccount} disabled={loading}>
-                  <Text style={styles.primaryBtnText}>{loading ? t.adding : t.addAccount}</Text>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showAddCourier ? 1 : 0 }]}
+                  onPress={() => setShowAddCourier(!showAddCourier)}
+                >
+                  <Ionicons name="person-add-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{t.addCourierAccount}</Text>
+                  <Text style={styles.chevron}>{showAddCourier ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
+
+                {showAddCourier && (
+                  <View style={{ paddingVertical: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TextInput
+                        style={[styles.input, { flex: 1, marginTop: 0 }]}
+                        placeholder={t.username}
+                        placeholderTextColor="#C0C0C0"
+                        value={newUsername}
+                        onChangeText={setNewUsername}
+                        autoCapitalize="none"
+                      />
+                      <TextInput
+                        style={[styles.input, { flex: 1, marginTop: 0 }]}
+                        placeholder={t.password}
+                        placeholderTextColor="#C0C0C0"
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        secureTextEntry
+                      />
+                    </View>
+                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                    {success ? <Text style={styles.successText}>{success}</Text> : null}
+                    <TouchableOpacity style={styles.primaryBtn} onPress={handleAddAccount} disabled={loading}>
+                      <Text style={styles.primaryBtnText}>{loading ? t.adding : t.addAccount}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </>
           )}
@@ -613,70 +691,6 @@ export default function SettingsScreen() {
             </>
           )}
 
-          {role === 'owner' && storeIsOpen !== null && (
-            <>
-              <Text style={styles.groupLabel}>{t.storeStatus}</Text>
-              <View style={styles.section}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>
-                      {storeIsOpen ? t.storeOpen : t.storeClosed}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: '#999', marginTop: 2 }}>
-                      {storeIsOpen ? t.storeOpenSub : t.storeClosedSub}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      if (storeLoading) return;
-                      setStoreLoading(true);
-                      try {
-                        const pin = await AsyncStorage.getItem('owner_pin') || '';
-                        const code = await AsyncStorage.getItem('restaurant_code') || '';
-                        const response = await fetch(`${BACKEND_URL}/store-status`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ 
-                            restaurant_code: code,
-                            is_open: !storeIsOpen,
-                          }),
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                          const newIsOpen = result.is_open;
-                          setStoreIsOpen(newIsOpen);
-                          if(restaurantWebsite) {
-                            const website = restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
-                            fetch(`${website}/foodup-store-status.php`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ 
-                                secret: 'foodup2026', 
-                                action: 'set', 
-                                is_open: newIsOpen,
-                                restaurant_code: code,
-                              }),
-                            }).catch(() => {});
-                          }
-                        }
-                      } catch (e) {}
-                      setStoreLoading(false);
-                    }}
-                    style={{
-                      backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
-                      borderRadius: 20,
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                      {storeLoading ? '...' : storeIsOpen ? t.closeStore : t.openStore}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
-          )}
           {role === 'owner' && restaurantWebsite ? (
             <>
               <Text style={styles.groupLabel}>Product Management</Text>
@@ -749,7 +763,7 @@ export default function SettingsScreen() {
               <View style={styles.section}>
                 <TouchableOpacity
                   style={[styles.row, { borderBottomWidth: showSound ? 1 : 0 }]}
-                  onPress={() => setShowSound(!showSound)}
+                  onPress={() => { setShowSound(!showSound); if (showSound) stopPreviewSound(); }}
                 >
                   <Ionicons name="musical-notes-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>{currentSoundLabel}</Text>
@@ -975,7 +989,15 @@ export default function SettingsScreen() {
             <>
               <Text style={styles.groupLabel}>Acceptance Times</Text>
               <View style={styles.section}>
-                <View style={{ paddingVertical: 14 }}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showAcceptanceTimes ? 1 : 0 }]}
+                  onPress={() => setShowAcceptanceTimes(!showAcceptanceTimes)}
+                >
+                  <Ionicons name="time-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>Acceptance Times</Text>
+                  <Text style={styles.chevron}>{showAcceptanceTimes ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {showAcceptanceTimes && <View style={{ paddingVertical: 14 }}>
                   <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
                     Set the time options shown when accepting orders
                   </Text>
@@ -1024,7 +1046,7 @@ export default function SettingsScreen() {
                       <Text style={{ color: '#fff', fontWeight: '600' }}>Add</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </View>}
               </View>
             </>
           )}
