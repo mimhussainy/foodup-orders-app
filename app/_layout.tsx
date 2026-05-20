@@ -510,10 +510,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      return true;
+      if (showOrderModal) {
+        return true;
+      }
+      return false;
     });
     return () => backHandler.remove();
-  }, []);
+  }, [showOrderModal]);
 
   const checkUserRole = async () => {
     try {

@@ -537,7 +537,16 @@ export default function SettingsScreen() {
               <Text style={styles.groupLabel}>{t.courierAccounts}</Text>
 
               <View style={styles.section}>
-                {(showAllCouriers ? accounts : accounts.slice(0, 3)).map((account, i, arr) => (
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: showAllCouriers ? 1 : 0 }]}
+                  onPress={() => setShowAllCouriers(!showAllCouriers)}
+                >
+                  <Ionicons name="people-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{accounts.length} {t.courierAccounts}</Text>
+                  <Text style={styles.chevron}>{showAllCouriers ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showAllCouriers && accounts.map((account, i, arr) => (
                   <View key={i}>
                     <View
                       style={[
@@ -600,17 +609,7 @@ export default function SettingsScreen() {
                   </View>
                 ))}
 
-                {accounts.length > 3 && (
-                  <TouchableOpacity
-                    style={[styles.row, { borderBottomWidth: 0, justifyContent: 'center' }]}
-                    onPress={() => setShowAllCouriers(!showAllCouriers)}
-                  >
-                    <Text style={styles.resetText}>
-                      {showAllCouriers ? 'Show Less' : `Show All (${accounts.length})`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                </View>
             </>
           )}
 

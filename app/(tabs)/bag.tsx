@@ -460,7 +460,14 @@ const [refreshing, setRefreshing] = useState(false);
                           <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
                         </View>
 
-                        <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
+                          <Text style={{ fontSize: 13, color: '#8B38CB', fontWeight: '600' }}>
+                            {order.accepted_time && (order.accepted_time.includes('—') || (order.accepted_time.includes(':') && !order.accepted_time.includes('Minutes')))
+                              ? order.accepted_time.split('—')[0].trim()
+                              : 'ASAP'}
+                          </Text>
+                        </View>
                         {order.note && !isExpanded ? (
                           <View style={{ 
                             flexDirection: 'row', 

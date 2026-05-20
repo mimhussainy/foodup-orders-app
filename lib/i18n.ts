@@ -160,6 +160,7 @@ export const translations = {
     scheduledOrder: 'Scheduled Order',
     scheduledConfirm: 'Confirm this scheduled order for',
     confirmAccept: 'Confirm & Print',
+    scheduledFor: 'Scheduled for',
   },
 
 
@@ -283,7 +284,7 @@ export const translations = {
     storeOpenSub: 'Kunden können Bestellungen aufgeben',
     storeClosedSub: 'Bestellung ist deaktiviert',
     openStore: 'Öffnen',
-    closeStore: 'Schließen',
+    closeStore: 'Schliessen',
     dangerZone: 'Gefahrenzone',
     clearOrders: 'Alle Bestellungen löschen',
     clearOrdersConfirm: 'Dies löscht alle Bestellungen dauerhaft. Sind Sie sicher?',
@@ -324,6 +325,7 @@ export const translations = {
     scheduledOrder: 'Geplante Bestellung',
     scheduledConfirm: 'Diese geplante Bestellung bestätigen für',
     confirmAccept: 'Bestätigen & Drucken',
+    scheduledFor: 'Geplant für',
   },
 };
 

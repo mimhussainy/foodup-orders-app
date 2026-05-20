@@ -1081,7 +1081,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setSelectedOrder(null)} style={styles.backCircle}>
-            <Text style={styles.backArrow}>‹</Text>
+            <Ionicons name="chevron-back" size={20} color="#111" />
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
           {Platform.OS !== 'ios' ? (
@@ -1089,7 +1089,15 @@ const sections = groupOrdersByDate(filteredOrders, t);
               <Ionicons name="print-outline" size={20} color="#111" />
             </TouchableOpacity>
           ) : (
-            <View style={styles.backCircle} />
+            <TouchableOpacity onPress={() => {
+              const { Share } = require('react-native');
+              Share.share({
+                title: `Order #${selectedOrder.order_id}`,
+                message: `Order #${selectedOrder.order_id}\nCustomer: ${selectedOrder.customer_name}\nPhone: ${selectedOrder.customer_phone}\nAddress: ${selectedOrder.shipping_address}\nTotal: ${selectedOrder.currency} ${selectedOrder.total}\nPayment: ${selectedOrder.payment_method}\nItems: ${selectedOrder.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}${selectedOrder.note ? `\nNote: ${selectedOrder.note}` : ''}`,
+              });
+            }} style={styles.backCircle}>
+              <Ionicons name="share-outline" size={20} color="#111" />
+            </TouchableOpacity>
           )}
         </View>
 
@@ -1103,7 +1111,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                 </Text>
               </View>
             </View>
-            <Text style={styles.detailDate}>{selectedOrder.date}</Text>
+            <Text style={styles.detailDate}><Text style={{ fontWeight: '700' }}>Created: </Text>{selectedOrder.date}</Text>
             {(() => {
               const claim = claims[String(selectedOrder.order_id)];
               if (claim && claim.status === 'delivered' && claim.delivered_at) {
@@ -1112,8 +1120,11 @@ const sections = groupOrdersByDate(filteredOrders, t);
               return null;
             })()}
             {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
-              <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8, fontWeight: '600' }}>
-                🕐 {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? t.asap || 'ASAP' : (selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}
+              <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8 }}>
+                {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') || (selectedOrder as any).orderable_order_time?.includes('(')
+                  ? <Text style={{ fontWeight: '700' }}>{t.asap || 'ASAP'}</Text>
+                  : <><Text style={{ fontWeight: '700' }}>{t.scheduledFor || 'Scheduled for'}: </Text>{(selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}</>
+                }
               </Text>
             ) : null}
 
@@ -1496,6 +1507,13 @@ const sections = groupOrdersByDate(filteredOrders, t);
                       <Ionicons name={item.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                       <Text style={styles.orderShipping}>
                         {item.shipping_method === 'Abholung' ? t.pickupLabel : item.shipping_method === 'Lieferung' ? t.deliveryLabel : item.shipping_method}
+                        {item.orderable_order_time ? ` • ${
+                          item.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                          item.orderable_order_time.toLowerCase().includes('asap') ||
+                          item.orderable_order_time.includes('(')
+                            ? 'ASAP'
+                            : `${t.scheduledFor || 'Scheduled for'} ${item.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${item.orderable_order_date}`
+                        }` : ''}
                       </Text>
                     </View>
                   ) : <View />}

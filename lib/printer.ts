@@ -93,11 +93,12 @@ const resolvedMinutes = resolvedScheduledStr ? undefined : acceptedMinutes;
 
 const acceptanceHtml = resolvedScheduledStr ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
-      <p style="text-align:left; font-size:18px; margin:2px 0;">${resolvedScheduledStr}</p>
+      <p style="text-align:center; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
+      <p style="text-align:center; font-size:20px; font-weight:900; margin:2px 0;">${resolvedScheduledStr}</p>
     ` : resolvedMinutes ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:left; font-size:18px; margin:2px 0;">${labels.acceptedFor}: ${resolvedMinutes} ${labels.minutes}</p>
+      <p style="text-align:center; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
+      <p style="text-align:center; font-size:20px; font-weight:900; margin:2px 0;">${resolvedMinutes} ${labels.minutes}</p>
     ` : rejected ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
       <p style="text-align:left; font-size:16px; color:#333; margin:4px 0;">${labels.rejected}:</p>
@@ -162,7 +163,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <p style="text-align:center; font-size:14px; color:#999; margin:4px 0;">Powered by: foodup.ch</p>
+          <p style="text-align:center; font-size:13px; color:#999; margin:4px 0; width:100%; display:block;">Powered by: foodup.ch</p>
         </body>
       </html>
     `;
