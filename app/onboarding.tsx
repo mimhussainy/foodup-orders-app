@@ -68,21 +68,20 @@ export default function OnboardingScreen() {
     setLoading(true);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
-      const response = await fetch(`${BACKEND_URL}/verify-pin`, {
+      const endpoint = Platform.OS === 'ios' ? '/verify-ios-pin' : '/verify-pin';
+      const body = Platform.OS === 'ios' 
+        ? { ios_pin: pin, restaurant_code: code }
+        : { pin, restaurant_code: code };
+      const response = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin, restaurant_code: code }),
+        body: JSON.stringify(body),
       });
       const result = await response.json();
       if (result.success) {
+        await AsyncStorage.setItem('user_role', 'owner');
         await AsyncStorage.setItem('owner_pin', pin);
-        if (Platform.OS === 'ios') {
-          setStep('ios_pin');
-          setError('');
-        } else {
-          await AsyncStorage.setItem('user_role', 'owner');
-          router.replace('/(tabs)');
-        }
+        router.replace('/(tabs)');
       } else {
         setError(t.incorrectPin);
         setPin('');
