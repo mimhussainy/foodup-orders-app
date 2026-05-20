@@ -16,7 +16,6 @@ import {
   RefreshControl,
   SafeAreaView,
   ScrollView,
-  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -1101,6 +1100,14 @@ useEffect(() => {
       );
     });
 const sections = groupOrdersByDate(filteredOrders, t);
+
+type FlatItem = { type: 'header'; title: string } | { type: 'order'; item: Order };
+
+const flatData: FlatItem[] = sections.flatMap(section => [
+  { type: 'header', title: section.title },
+  ...section.data.map(item => ({ type: 'order' as const, item })),
+]);
+
 const stickyIndex = storeIsOpen !== null ? 2 : 1;
 
   const filterCounts = {
@@ -1419,99 +1426,97 @@ const stickyIndex = storeIsOpen !== null ? 2 : 1;
         <View style={styles.headerPlaceholder} />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={[
-              { key: 'all', label: t.all, color: '#111' },
-              { key: 'new', label: t.newOrder, color: '#f39c12' },
-              { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
-              { key: 'in_bag', label: t.inBag, color: '#2980b9' },
-              { key: 'delivering', label: t.delivering, color: '#16a085' },
-              { key: 'delivered', label: t.delivered, color: '#2fc053' },
-              { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
-              { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
-            ]}
-            keyExtractor={item => item.key}
-            contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
-            renderItem={({ item: f }) => (
-              <TouchableOpacity
-                onPress={() => setFilter(f.key)}
-                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
-                <View style={{ backgroundColor: '#fff', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>{filterCounts[f.key as keyof typeof filterCounts]}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-        <SectionList
-            ref={listRef}
-            sections={sections}
-            keyExtractor={(item) => String(item.order_id)}
-            contentContainerStyle={styles.scrollContent}
-            stickySectionHeadersEnabled={false}
-            
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
-            }
-            ListHeaderComponent={
-              <View>
-                {storeIsOpen !== null && (
-                  <Animated.View style={{ backgroundColor: storeIsOpen ? '#05694A' : '#E31E24', paddingVertical: 6, alignItems: 'center', opacity: pulseAnim }}>
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{storeIsOpen ? t.storeOpen : t.storeClosed}</Text>
-                  </Animated.View>
-                )}
-                <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 8 : 1, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="search-outline" size={18} color="#999" />
-                  <TextInput style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }} placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'} placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'} value={search} onChangeText={setSearch} />
-                  {search.length > 0 && (<TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#C0C0C0" /></TouchableOpacity>)}
-                </View>
-                
-                
-                {orders.length === 0 && (
-                  <View style={styles.empty}>
-                    <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
-                    <Text style={styles.emptyText}>{t.noOrders}</Text>
-                    <Text style={styles.emptySubText}>{t.noOrdersSub}</Text>
-                  </View>
-                )}
-                {orders.length > 0 && filteredOrders.length === 0 && (
-                  <View style={styles.empty}>
-                    <Ionicons name="filter-outline" size={48} color="#D0D0D0" />
-                    <Text style={styles.emptyText}>{t.noOrdersFilter}</Text>
-                  </View>
-                )}
+        <FlatList
+          ref={listRef}
+          data={flatData}
+          keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
+          contentContainerStyle={styles.scrollContent}
+          stickyHeaderIndices={[stickyIndex]}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
+          }
+          ListHeaderComponent={
+            <View>
+              {storeIsOpen !== null && (
+                <Animated.View style={{ backgroundColor: storeIsOpen ? '#05694A' : '#E31E24', paddingVertical: 6, alignItems: 'center', opacity: pulseAnim }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{storeIsOpen ? t.storeOpen : t.storeClosed}</Text>
+                </Animated.View>
+              )}
+              <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 8 : 1, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="search-outline" size={18} color="#999" />
+                <TextInput style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }} placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'} placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'} value={search} onChangeText={setSearch} />
+                {search.length > 0 && (<TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#C0C0C0" /></TouchableOpacity>)}
               </View>
+              <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={[
+                    { key: 'all', label: t.all, color: '#111' },
+                    { key: 'new', label: t.newOrder, color: '#f39c12' },
+                    { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
+                    { key: 'in_bag', label: t.inBag, color: '#2980b9' },
+                    { key: 'delivering', label: t.delivering, color: '#16a085' },
+                    { key: 'delivered', label: t.delivered, color: '#2fc053' },
+                    { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
+                    { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
+                  ]}
+                  keyExtractor={item => item.key}
+                  contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
+                  renderItem={({ item: f }) => (
+                    <TouchableOpacity
+                      onPress={() => setFilter(f.key)}
+                      style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
+                      <View style={{ backgroundColor: '#fff', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>{filterCounts[f.key as keyof typeof filterCounts]}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+              {orders.length === 0 && (
+                <View style={styles.empty}>
+                  <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
+                  <Text style={styles.emptyText}>{t.noOrders}</Text>
+                  <Text style={styles.emptySubText}>{t.noOrdersSub}</Text>
+                </View>
+              )}
+              {orders.length > 0 && filteredOrders.length === 0 && (
+                <View style={styles.empty}>
+                  <Ionicons name="filter-outline" size={48} color="#D0D0D0" />
+                  <Text style={styles.emptyText}>{t.noOrdersFilter}</Text>
+                </View>
+              )}
+            </View>
+          }
+          renderItem={({ item }) => {
+            if (item.type === 'header') {
+              return <Text style={styles.groupLabel}>{item.title}</Text>;
             }
-            renderSectionHeader={({ section: { title } }) => (
-              <Text style={styles.groupLabel}>{title}</Text>
-            )}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]} onPress={() => setSelectedOrder(item)}>
+            const order = item.item;
+            return (
+              <TouchableOpacity style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]} onPress={() => setSelectedOrder(order)}>
                 <View style={styles.orderTopRow}>
-                  <Text style={styles.orderId}>Order #{item.order_id}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(item.order_id)]) + '20' }]}>
-                    <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(item.order_id)]) }]}>
-                      {getDeliveryStatusLabel(claims[String(item.order_id)], item, t)}
+                  <Text style={styles.orderId}>Order #{order.order_id}</Text>
+                  <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
+                    <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
+                      {getDeliveryStatusLabel(claims[String(order.order_id)], order, t)}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.divider} />
-                <Text style={styles.orderCustomer}>{item.customer_name}</Text>
-              
+                <Text style={styles.orderCustomer}>{order.customer_name}</Text>
                 <View style={styles.orderMeta}>
                   <Ionicons name="cash-outline" size={14} color="#999" />
-                  <Text style={styles.orderTotal}>{item.currency} {item.total}</Text>
+                  <Text style={styles.orderTotal}>{order.currency} {order.total}</Text>
                 </View>
-                {acceptedTimes[String(item.order_id)] && 
+                {acceptedTimes[String(order.order_id)] &&
                   (() => {
-                    const claim = claims[String(item.order_id)];
+                    const claim = claims[String(order.order_id)];
                     const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
-                    const at = acceptedTimes[String(item.order_id)].accepted_time || '';
+                    const at = acceptedTimes[String(order.order_id)].accepted_time || '';
                     const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                     if (status === 'delivered') return null;
                     if (isItemScheduled) {
@@ -1524,43 +1529,43 @@ const stickyIndex = storeIsOpen !== null ? 2 : 1;
                     }
                     return (
                       <OrderCountdown
-                        accepted_at={acceptedTimes[String(item.order_id)].accepted_at}
+                        accepted_at={acceptedTimes[String(order.order_id)].accepted_at}
                         accepted_time={at}
                       />
                     );
                   })()}
-                  <View style={styles.orderBottomRow}>
-                  {item.shipping_method ? (
+                <View style={styles.orderBottomRow}>
+                  {order.shipping_method ? (
                     <View style={styles.orderMeta}>
-                      <Ionicons name={item.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                      <Ionicons name={order.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                       <Text style={styles.orderShipping}>
-                        {item.shipping_method === 'Abholung' ? t.pickupLabel : item.shipping_method === 'Lieferung' ? t.deliveryLabel : item.shipping_method}
-                        {item.orderable_order_time ? ` • ${
-                          item.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                          item.orderable_order_time.toLowerCase().includes('asap') ||
-                          item.orderable_order_time.includes('(')
+                        {order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}
+                        {order.orderable_order_time ? ` • ${
+                          order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                          order.orderable_order_time.toLowerCase().includes('asap') ||
+                          order.orderable_order_time.includes('(')
                             ? (t.asapShort || 'ASAP')
                             : t.scheduled || 'Scheduled'
                         }` : ''}
                       </Text>
                     </View>
                   ) : <View />}
-                  {claims[String(item.order_id)] ? (
+                  {claims[String(order.order_id)] ? (
                     <View style={styles.orderMeta}>
                       {(() => {
-                        const claim = claims[String(item.order_id)];
+                        const claim = claims[String(order.order_id)];
                         const name = typeof claim === 'string' ? claim : claim.name;
                         const status = typeof claim === 'string' ? 'delivering' : claim.status;
                         const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
                         return (
                           <>
-                            <Ionicons 
+                            <Ionicons
                               name={
-                                status === 'delivered' ? 'checkmark-circle-outline' : 
-                                status === 'delivering' ? 'car-outline' : 
+                                status === 'delivered' ? 'checkmark-circle-outline' :
+                                status === 'delivering' ? 'car-outline' :
                                 'bag-outline'
-                              } 
-                              size={20} 
+                              }
+                              size={20}
                               color={color}
                             />
                             <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
@@ -1571,8 +1576,9 @@ const stickyIndex = storeIsOpen !== null ? 2 : 1;
                   ) : null}
                 </View>
               </TouchableOpacity>
-            )}
-          />
+            );
+          }}
+        />
         </SafeAreaView>
       {Platform.OS !== 'ios' && (
         <AcceptRejectModal
