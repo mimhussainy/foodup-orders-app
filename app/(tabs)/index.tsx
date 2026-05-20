@@ -1305,11 +1305,15 @@ const sections = groupOrdersByDate(filteredOrders, t);
 
                       if (isPickupOrder && !isPickupReady) {
                         Alert.alert(
-                          'Ready for Pickup',
-                          'Send an email to the customer that their order is ready?',
+                          t.readyForPickup || 'Ready for Pickup',
+                          t.readyForPickupMsg || 'Send an email to the customer that their order is ready?',
                           [
                             {
-                              text: 'Skip Email',
+                              text: t.cancel || 'Cancel',
+                              style: 'cancel',
+                            },
+                            {
+                              text: t.skipEmail || 'Skip Email',
                               onPress: async () => {
                                 const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
                                 setPickupReadyOrders(updated);
@@ -1317,7 +1321,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
                               },
                             },
                             {
-                              text: 'Send Email',
+                              text: t.sendEmail || 'Send Email',
                               onPress: async () => {
                                 const code = await AsyncStorage.getItem('restaurant_code') || '';
                                 const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
@@ -1415,7 +1419,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
         <View style={{ 
             backgroundColor: '#fff', 
             paddingHorizontal: 16, 
-            paddingVertical: 1,
+            paddingVertical: Platform.OS === 'ios' ? 8 : 1,
             borderBottomWidth: 1,
             borderBottomColor: '#F0F0F0',
             flexDirection: 'row',
