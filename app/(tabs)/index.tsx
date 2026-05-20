@@ -1554,7 +1554,12 @@ const flatData: FlatItem[] = [
                     <View style={styles.orderMeta}>
                       {(() => {
                         const claim = claims[String(order.order_id)];
-                        const name = typeof claim === 'string' ? claim : claim.name;
+                        const name = (() => {
+                        const raw = typeof claim === 'string' ? claim : claim.name;
+                        if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp;
+                        if (raw === 'Owner' || raw === '__owner__') return t.pickedUp;
+                        return raw;
+                      })();
                         const status = typeof claim === 'string' ? 'delivering' : claim.status;
                         const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
                         return (
