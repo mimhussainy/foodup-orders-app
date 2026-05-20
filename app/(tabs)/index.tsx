@@ -1313,20 +1313,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
                           iconColor: '#2ecc71',
                           buttons: [
                             {
-                              text: t.cancel || 'Cancel',
-                              style: 'cancel',
-                            },
-                            {
-                              text: t.skipEmail || 'Skip Email',
-                              style: 'default',
-                              onPress: async () => {
-                                const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
-                                setPickupReadyOrders(updated);
-                                await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
-                              },
-                            },
-                            {
                               text: t.sendEmail || 'Send Email',
+                              color: '#2ecc71',
                               onPress: async () => {
                                 const code = await AsyncStorage.getItem('restaurant_code') || '';
                                 const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
@@ -1343,6 +1331,19 @@ const sections = groupOrdersByDate(filteredOrders, t);
                                 setPickupReadyOrders(updated);
                                 await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
                               },
+                            },
+                            {
+                              text: t.skipEmail || 'Skip Email',
+                              color: '#e74c3c',
+                              onPress: async () => {
+                                const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                                setPickupReadyOrders(updated);
+                                await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                              },
+                            },
+                            {
+                              text: t.cancel || 'Cancel',
+                              style: 'cancel',
                             },
                           ],
                         });

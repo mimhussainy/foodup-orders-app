@@ -5,6 +5,7 @@ interface AlertButton {
   text: string;
   onPress?: () => void;
   style?: 'default' | 'cancel' | 'destructive';
+  color?: string;
 }
 
 interface CustomAlertProps {
@@ -40,7 +41,7 @@ export default function CustomAlert({ visible, title, message, buttons, onClose,
                   borderRadius: 14,
                   padding: 14,
                   alignItems: 'center',
-                  backgroundColor: btn.style === 'destructive' ? '#e74c3c' : btn.style === 'cancel' ? '#F5F5F5' : '#111',
+                  backgroundColor: btn.color ? btn.color : btn.style === 'destructive' ? '#e74c3c' : btn.style === 'cancel' ? '#F5F5F5' : '#111',
                 }}
               >
                 <Text style={{
