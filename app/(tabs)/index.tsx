@@ -1386,31 +1386,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
         <View style={styles.headerPlaceholder} />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ 
-            backgroundColor: '#fff', 
-            paddingHorizontal: 16, 
-            paddingVertical: 3,
-            borderBottomWidth: 1,
-            borderBottomColor: '#F0F0F0',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <Ionicons name="search-outline" size={18} color="#999" />
-            <TextInput
-              style={{ flex: 1, fontSize: 15, color: '#111' }}
-              placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
-              placeholderTextColor="#C0C0C0"
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color="#C0C0C0" />
-              </TouchableOpacity>
-            )}
-          </View>
-          {storeIsOpen !== null && (
+        
+        {storeIsOpen !== null && (
             <Animated.View style={{ 
               backgroundColor: storeIsOpen ? '#05694A' : '#E31E24',
               paddingVertical: 6,
@@ -1422,6 +1399,30 @@ const sections = groupOrdersByDate(filteredOrders, t);
               </Text>
             </Animated.View>
           )}
+        <View style={{ 
+            backgroundColor: '#fff', 
+            paddingHorizontal: 16, 
+            paddingVertical: 1,
+            borderBottomWidth: 1,
+            borderBottomColor: '#F0F0F0',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <Ionicons name="search-outline" size={18} color="#999" />
+            <TextInput
+              style={{ flex: 1, fontSize: 13, color: '#111' }}
+              placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
+              placeholderTextColor="#C0C0C0"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color="#C0C0C0" />
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={{ height: 48, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
           <FlatList
             horizontal
