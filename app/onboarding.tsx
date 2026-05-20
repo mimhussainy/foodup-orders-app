@@ -176,7 +176,7 @@ export default function OnboardingScreen() {
             <TextInput
               style={styles.input}
               placeholder="Restaurant Code"
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               value={restaurantCode}
               onChangeText={setRestaurantCode}
               autoCapitalize="none"
@@ -218,7 +218,7 @@ export default function OnboardingScreen() {
             <TextInput
               style={styles.input}
               placeholder={t.pin}
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               keyboardType="numeric"
               secureTextEntry
               maxLength={6}
@@ -240,7 +240,7 @@ export default function OnboardingScreen() {
             <TextInput
               style={styles.input}
               placeholder={t.pin}
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               keyboardType="numeric"
               secureTextEntry
               maxLength={6}
@@ -254,7 +254,7 @@ export default function OnboardingScreen() {
             </TouchableOpacity>
           </View>
         )}
-        
+
         {step === 'delivery_login' && (
           <View style={styles.section}>
             <Text style={styles.title}>{t.courierLogin}</Text>
@@ -262,7 +262,7 @@ export default function OnboardingScreen() {
             <TextInput
               style={styles.input}
               placeholder={t.username}
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               value={username}
               onChangeText={setUsername}
               autoFocus
@@ -271,7 +271,7 @@ export default function OnboardingScreen() {
             <TextInput
               style={[styles.input, { marginTop: 12 }]}
               placeholder={t.password}
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               secureTextEntry
               value={password}
               onChangeText={setPassword}

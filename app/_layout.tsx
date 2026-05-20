@@ -481,7 +481,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                 <TextInput
                   style={{ borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, padding: 14, fontSize: 15, color: '#111', marginBottom: 16 }}
                   placeholder={t.enterReason}
-                  placeholderTextColor="#C0C0C0"
+                  placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                   value={customReason}
                   onChangeText={setCustomReason}
                 />

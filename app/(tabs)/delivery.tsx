@@ -219,7 +219,7 @@ export default function AddOrderScreen() {
               <TextInput
                 style={styles.input}
                 placeholder={t.orderIdPlaceholder}
-                placeholderTextColor="#C0C0C0"
+                placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                 keyboardType="numeric"
                 value={orderId}
                 onChangeText={text => {

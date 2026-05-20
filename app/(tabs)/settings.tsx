@@ -585,7 +585,7 @@ const stopPreviewSound = async () => {
                       <TextInput
                         style={[styles.input, { flex: 1, marginTop: 0 }]}
                         placeholder={t.username}
-                        placeholderTextColor="#C0C0C0"
+                        placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                         value={newUsername}
                         onChangeText={setNewUsername}
                         autoCapitalize="none"
@@ -593,7 +593,7 @@ const stopPreviewSound = async () => {
                       <TextInput
                         style={[styles.input, { flex: 1, marginTop: 0 }]}
                         placeholder={t.password}
-                        placeholderTextColor="#C0C0C0"
+                        placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                         value={newPassword}
                         onChangeText={setNewPassword}
                         secureTextEntry
@@ -663,7 +663,7 @@ const stopPreviewSound = async () => {
                         <TextInput
                           style={styles.resetInput}
                           placeholder={t.newPassword}
-                          placeholderTextColor="#C0C0C0"
+                          placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                           value={newResetPassword}
                           onChangeText={setNewResetPassword}
                           secureTextEntry
@@ -828,7 +828,7 @@ const stopPreviewSound = async () => {
                     <TextInput
                       style={styles.input}
                       placeholder={t.restaurantName}
-                      placeholderTextColor="#C0C0C0"
+                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       value={restaurantName}
                       onChangeText={setRestaurantName}
                     />
@@ -836,7 +836,7 @@ const stopPreviewSound = async () => {
                     <TextInput
                       style={[styles.input, { marginTop: 10 }]}
                       placeholder={t.phone}
-                      placeholderTextColor="#C0C0C0"
+                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       value={restaurantPhone}
                       onChangeText={setRestaurantPhone}
                       keyboardType="phone-pad"
@@ -845,7 +845,7 @@ const stopPreviewSound = async () => {
                     <TextInput
                       style={[styles.input, { marginTop: 10 }]}
                       placeholder={t.address}
-                      placeholderTextColor="#C0C0C0"
+                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       value={restaurantAddress}
                       onChangeText={setRestaurantAddress}
                     />
@@ -853,7 +853,7 @@ const stopPreviewSound = async () => {
                     <TextInput
                       style={[styles.input, { marginTop: 10 }]}
                       placeholder={t.website}
-                      placeholderTextColor="#C0C0C0"
+                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       value={restaurantWebsite}
                       onChangeText={setRestaurantWebsite}
                       autoCapitalize="none"
@@ -1018,7 +1018,7 @@ const stopPreviewSound = async () => {
                     <TextInput
                       style={[styles.input, { flex: 1, marginTop: 0 }]}
                       placeholder="Add time (e.g. 20)"
-                      placeholderTextColor="#C0C0C0"
+                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       keyboardType="numeric"
                       value={newAcceptanceTime}
                       onChangeText={setNewAcceptanceTime}

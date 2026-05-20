@@ -1445,7 +1445,7 @@ const sections = groupOrdersByDate(filteredOrders, t);
             <TextInput
               style={{ flex: 1, fontSize: 13, color: '#111', height: Platform.OS === 'ios' ? 36 : undefined }}
               placeholder={t.searchPlaceholder || 'Search by name, phone or order ID'}
-              placeholderTextColor="#C0C0C0"
+              placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
               value={search}
               onChangeText={setSearch}
             />
