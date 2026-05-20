@@ -52,7 +52,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
                      order.orderable_order_time.toLowerCase().includes('soon') ||
                      order.orderable_order_time.includes('(');
       if (isAsap) {
-        requestedStr = lang === 'de' ? `So schnell wie möglich — ${order.orderable_order_date}` : `As soon as possible — ${order.orderable_order_date}`;
+        requestedStr = lang === 'de' ? 'So schnell wie möglich' : 'As soon as possible';
       } else {
         const rawTime = order.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim();
         requestedStr = `${rawTime}  ${order.orderable_order_date}`;
@@ -145,13 +145,6 @@ const acceptanceHtml = resolvedScheduledStr ? `
           ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${order.customer_phone}</p>` : ''}
           <div class="divider"></div>
           <table>${itemsHtml}</table>
-          <div class="divider-dashed"></div>
-          <table>
-            <tr>
-              <td style="font-size:18px;">${labels.subtotal}</td>
-              <td style="text-align:right; font-size:18px;">${order.total}</td>
-            </tr>
-          </table>
           <div class="divider"></div>
           <table>
             <tr>
@@ -165,10 +158,12 @@ const acceptanceHtml = resolvedScheduledStr ? `
           ${order.shipping_address ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <div style="text-align:center; margin:8px 0;">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="150" height="150" />
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="180" height="180" />
           </div>
           <p style="text-align:center; font-size:11px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
+          <div style="border-top:1px dashed #000; margin:12px 0;"></div>
+          <p style="text-align:center; font-size:11px; color:#999; margin:4px 0;">Powered by: foodup.ch</p>
         </body>
       </html>
     `;
