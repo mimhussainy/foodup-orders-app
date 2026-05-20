@@ -137,7 +137,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   }, [countdown]);
 
   const handleAutoAction = async () => {
-    if (!order || !autoSettings) return;
+    if (!order || !autoSettings || step !== 'main') return;
     if (autoSettings.auto_action === 'accept') {
       const acceptTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time;
       await handleConfirmAcceptWithTime(acceptTime);
@@ -375,7 +375,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+        <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 80 }}>
           {step === 'main' && (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>

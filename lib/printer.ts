@@ -109,7 +109,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
         <head>
           <meta charset="utf-8">
           <style>
-            body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px; width: 280px; }
+            body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px; width: 280px; } * { -webkit-print-color-adjust: exact; } @page { margin: 0; size: 80mm auto; }
             .center { text-align: center; margin: 2px 0; }
             .divider { border-top: 1px solid #000; margin: 8px 0; }
             .divider-dashed { border-top: 1px dashed #000; margin: 8px 0; }
@@ -167,7 +167,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
       </html>
     `;
 
-    await Print.printAsync({ html });
+    await Print.printAsync({ html, width: 280 });
     return true;
 
   } catch (e: any) {
