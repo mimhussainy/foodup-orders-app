@@ -1511,8 +1511,8 @@ const sections = groupOrdersByDate(filteredOrders, t);
                           item.orderable_order_time.toLowerCase().includes('as soon as possible') ||
                           item.orderable_order_time.toLowerCase().includes('asap') ||
                           item.orderable_order_time.includes('(')
-                            ? 'ASAP'
-                            : `${t.scheduledFor || 'Scheduled for'} ${item.orderable_order_time.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${item.orderable_order_date}`
+                            ? (t.asapShort || 'ASAP')
+                            : t.scheduled || 'Scheduled'
                         }` : ''}
                       </Text>
                     </View>
@@ -1589,7 +1589,7 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: 12, fontWeight: '600' },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
-  orderCustomer: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 8 },
+  orderCustomer: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 5 },
   orderFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   orderTotal: { fontSize: 14, fontWeight: '600', color: '#111' },
   orderShipping: { fontSize: 14, color: '#666' },

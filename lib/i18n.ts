@@ -111,7 +111,8 @@ export const translations = {
     enterUsernamePassword: 'Bitte Benutzername und Passwort eingeben',
     courierPerformance: 'Courier Performance',
     newOrder: 'New',
-    scheduled: 'Scheduled',
+    scheduled: 'Pre-order',
+    scheduledFor: 'Pre-order',
     all: 'All',
     printOrder: 'Print Order',
     storeStatus: 'Store Status',
@@ -160,7 +161,7 @@ export const translations = {
     scheduledOrder: 'Scheduled Order',
     scheduledConfirm: 'Confirm this scheduled order for',
     confirmAccept: 'Confirm & Print',
-    scheduledFor: 'Scheduled for',
+    
   },
 
 
@@ -275,7 +276,8 @@ export const translations = {
     enterUsernamePassword: 'Bitte Benutzername und Passwort eingeben',
     courierPerformance: 'Kurier Leistung',
     newOrder: 'Neu',
-    scheduled: 'Geplant',
+    scheduled: 'Vorbestellung',
+    scheduledFor: 'Vorbestellung',
     all: 'Alle',
     printOrder: 'Bestellung drucken',
     storeStatus: 'Shop-Status',
@@ -321,11 +323,12 @@ export const translations = {
     untilScheduled: 'bis zur geplanten Zeit',
     remaining: 'verbleibend',
     asap: 'So schnell wie möglich',
+    asapShort: 'Sofort',
     searchPlaceholder: 'Nach Name, Telefon oder Bestellnummer suchen',
     scheduledOrder: 'Geplante Bestellung',
     scheduledConfirm: 'Diese geplante Bestellung bestätigen für',
     confirmAccept: 'Bestätigen & Drucken',
-    scheduledFor: 'Geplant für',
+    
   },
 };
 
