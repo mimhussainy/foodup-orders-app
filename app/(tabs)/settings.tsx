@@ -565,11 +565,32 @@ const stopPreviewSound = async () => {
                       } catch (e) {}
                       setStoreLoading(false);
                     }}
-                    style={{ backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 }}
+                    style={{ opacity: storeLoading ? 0.6 : 1 }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                      {storeLoading ? '...' : storeIsOpen ? t.closeStore : t.openStore}
-                    </Text>
+                    <View style={{
+                      width: 51,
+                      height: 31,
+                      borderRadius: 16,
+                      backgroundColor: storeIsOpen ? '#F97316' : '#ddd',
+                      justifyContent: 'center',
+                      paddingHorizontal: 2,
+                    }}>
+                      <View style={{
+                        width: 27,
+                        height: 27,
+                        borderRadius: 14,
+                        backgroundColor: '#fff',
+                        alignSelf: storeIsOpen ? 'flex-end' : 'flex-start',
+                        shadowColor: '#000',
+                        shadowOpacity: 0.15,
+                        shadowRadius: 2,
+                        elevation: 2,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        {storeIsOpen && <Ionicons name="checkmark" size={16} color="#F97316" />}
+                      </View>
+                    </View>
                   </TouchableOpacity>
                 </View>
               </View>
