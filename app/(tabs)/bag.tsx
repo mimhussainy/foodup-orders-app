@@ -215,7 +215,50 @@ const [refreshing, setRefreshing] = useState(false);
 
   const loadBag = async (name?: string) => {
     const bagName = name || await AsyncStorage.getItem('delivery_name') || '';
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
     const stored = await AsyncStorage.getItem(`delivery_bag_${bagName}`);
+
+    // If bag is empty locally, try to rebuild from backend claims
+    if (!stored || JSON.parse(stored).length === 0) {
+      try {
+        const claimsRes = await fetch(`${BACKEND_URL}/claims/${code}`);
+        const claimsResult = await claimsRes.json();
+        if (claimsResult.success) {
+          const myClaims = Object.entries(claimsResult.claims).filter(
+            ([_, claim]: any) => claim.name === bagName && claim.status !== 'delivered'
+          );
+          if (myClaims.length > 0) {
+            const ordersRes = await fetch(`${BACKEND_URL}/orders/${code}`);
+            const ordersResult = await ordersRes.json();
+            if (ordersResult.success) {
+              const rebuiltBag: BagOrder[] = myClaims.map(([orderId, claim]: any) => {
+                const order = ordersResult.orders.find((o: any) => String(o.order_id) === String(orderId));
+                if (!order) return null;
+                return {
+                  order_id: parseInt(orderId),
+                  customer_name: order.customer_name || '',
+                  customer_phone: order.customer_phone || '',
+                  address: order.shipping?.address || '',
+                  total: String(order.total || ''),
+                  currency: order.currency || 'CHF',
+                  items: order.items || [],
+                  payment_method: order.payment_method || '',
+                  status: claim.status === 'delivering' ? 'delivering' : 'pending',
+                  added_at: new Date().toLocaleString(),
+                  note: order.note || '',
+                };
+              }).filter(Boolean) as BagOrder[];
+              if (rebuiltBag.length > 0) {
+                setBag(rebuiltBag);
+                await AsyncStorage.setItem(`delivery_bag_${bagName}`, JSON.stringify(rebuiltBag));
+                return;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
     if (stored) {
       const parsedBag = JSON.parse(stored);
       setBag(parsedBag);
