@@ -91,7 +91,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [times, setTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
+  const [times, setTimes] = useState<number[]>([]);
   const [autoSettings, setAutoSettings] = useState<any>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const { t } = useLanguage();

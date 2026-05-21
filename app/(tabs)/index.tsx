@@ -893,8 +893,6 @@ useEffect(() => {
                 orderable_order_time: latestOrder.orderable_order_time || '',
                 date_created: latestOrder.date_created || '',
               };
-              setAcceptRejectOrder(newOrder);
-              setShowAcceptReject(true);
               router.replace('/(tabs)');
             }
           }
