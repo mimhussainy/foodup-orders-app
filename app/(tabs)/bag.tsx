@@ -501,15 +501,24 @@ const [refreshing, setRefreshing] = useState(false);
                       activeOpacity={0.7}
                     >
                       <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <View style={styles.queueBadge}>
-                            <Text style={styles.queueBadgeText}>#{index + 1}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={styles.queueBadge}>
+                              <Text style={styles.queueBadgeText}>#{index + 1}</Text>
+                            </View>
+                            <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
                           </View>
-                          <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
-                          <View style={[styles.statusBadge, order.status === 'delivering' && styles.statusBadgeDelivering]}>
-                            <Text style={[styles.statusBadgeText, order.status === 'delivering' && { color: '#f39c12' }]}>
-                              {order.status === 'delivering' ? t.delivering : t.pending || 'Pending'}
-                            </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={[styles.statusBadge, order.status === 'delivering' && styles.statusBadgeDelivering]}>
+                              <Text style={[styles.statusBadgeText, order.status === 'delivering' && { color: '#f39c12' }]}>
+                                {order.status === 'delivering' ? t.delivering : t.pending || 'Pending'}
+                              </Text>
+                            </View>
+                            <Ionicons
+                              name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
+                              size={16}
+                              color="#ccc"
+                            />
                           </View>
                         </View>
 
@@ -533,32 +542,23 @@ const [refreshing, setRefreshing] = useState(false);
                         ) : null}
                       </View>
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={styles.arrowsCol}>
-                          {index > 0 && (
-                            <TouchableOpacity
-                              onPress={() => moveOrder(index, 'up')}
-                              style={styles.arrowBtn}
-                            >
-                              <Ionicons name="chevron-up-outline" size={22} color="#000000" />
-                            </TouchableOpacity>
-                          )}
-
-                          {index < pendingOrders.length - 1 && (
-                            <TouchableOpacity
-                              onPress={() => moveOrder(index, 'down')}
-                              style={styles.arrowBtn}
-                            >
-                              <Ionicons name="chevron-down-outline" size={22} color="#000000" />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-
-                        <Ionicons
-                          name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
-                          size={16}
-                          color="#ccc"
-                        />
+                      <View style={styles.arrowsCol}>
+                        {index > 0 && (
+                          <TouchableOpacity
+                            onPress={() => moveOrder(index, 'up')}
+                            style={styles.arrowBtn}
+                          >
+                            <Ionicons name="chevron-up-outline" size={22} color="#000000" />
+                          </TouchableOpacity>
+                        )}
+                        {index < pendingOrders.length - 1 && (
+                          <TouchableOpacity
+                            onPress={() => moveOrder(index, 'down')}
+                            style={styles.arrowBtn}
+                          >
+                            <Ionicons name="chevron-down-outline" size={22} color="#000000" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </TouchableOpacity>
 
