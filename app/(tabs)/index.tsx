@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -789,6 +790,7 @@ const [showAcceptReject, setShowAcceptReject] = useState(false);
 const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boolean}>({});
 const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[]; icon?: string; iconColor?: string }>({ visible: false, title: '', message: '', buttons: [] });
+const [canPrint, setCanPrint] = useState(false);
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -843,6 +845,7 @@ useEffect(() => {
     fetchOrdersFromBackend();
     fetchClaims();
     fetchStoreStatus();
+    checkPrintPermission();
 
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
@@ -908,6 +911,23 @@ useEffect(() => {
       clearInterval(newOrderInterval);
     };
   }, []);
+
+  const checkPrintPermission = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const deviceId = Application.getAndroidId() || '';
+      const stored = await AsyncStorage.getItem('can_print');
+      if (stored !== null) {
+        setCanPrint(stored === 'true');
+      }
+      const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
+      const result = await res.json();
+      const allowed = result.success && result.device_id && result.device_id === deviceId;
+      setCanPrint(allowed);
+      await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
+    } catch (e) {}
+  };
 
   const fetchStoreStatus = async () => {
     try {
@@ -1134,7 +1154,7 @@ const flatData: FlatItem[] = [
             <Ionicons name="chevron-back" size={20} color="#111" />
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          {Platform.OS !== 'ios' ? (
+          {Platform.OS === 'android' && canPrint ? (
             <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
               <Ionicons name="print-outline" size={20} color="#111" />
             </TouchableOpacity>

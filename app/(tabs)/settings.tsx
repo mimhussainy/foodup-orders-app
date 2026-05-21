@@ -114,6 +114,7 @@ export default function SettingsScreen() {
   const [showProducts, setShowProducts] = useState(false);
   const [togglingProduct, setTogglingProduct] = useState<number | null>(null);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(c => {
@@ -141,6 +142,10 @@ export default function SettingsScreen() {
 
     AsyncStorage.getItem('delivery_name').then(n => setDeliveryName(n || ''));
     AsyncStorage.getItem('notification_sound').then(s => setNotificationSound(s || 'default'));
+    if (Platform.OS === 'android') {
+      const Application = require('expo-application');
+      Application.getAndroidIdAsync().then((id: string) => setDeviceId(id || ''));
+    }
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;
       try {
@@ -1090,7 +1095,12 @@ const stopPreviewSound = async () => {
             </>
           )}
 
-          <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 8 }}>v1.0.0 — build bc20cba</Text>
+          {Platform.OS === 'android' && deviceId ? (
+            <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 8 }}>
+              Device ID: {deviceId}
+            </Text>
+          ) : null}
+          <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 4 }}>v1.0.0 — build bc20cba</Text>
           <Text style={styles.groupLabel}>{t.account}</Text>
 
           <View style={styles.section}>

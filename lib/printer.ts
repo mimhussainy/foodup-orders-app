@@ -163,7 +163,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <p style="text-align:center; font-size:13px; color:#999; margin:4px 0; width:100%; display:block; font-weight:700;">Powered by: foodup.ch</p>
+          <table width="100%"><tr><td style="text-align:center; font-size:13px; color:#999; font-weight:700;">Powered by: foodup.ch</td></tr></table>
         </body>
       </html>
     `;

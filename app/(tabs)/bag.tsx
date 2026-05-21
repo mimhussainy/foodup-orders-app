@@ -31,14 +31,14 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
 
   return (
-    <View style={{ marginTop: 8 }}>
+    <View style={{ marginTop: 7, marginBottom: 5 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
         <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>{t.scheduled || 'Pre-order'} — {at.split('—')[0].trim()}</Text>
       </View>
       {showBar && (
-        <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-          <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
+        <View style={{ height: 5, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
+          <View style={{ height: 5, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
         </View>
       )}
     </View>
@@ -87,7 +87,7 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
   const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
 
   return (
-    <View style={{ marginTop: 10 }}>
+    <View style={{ marginTop: 7, marginBottom: 5 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="time-outline" size={14} color={color} />
@@ -99,9 +99,9 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
         </View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: '#8B38CB' }}>{t.asapShort || 'ASAP'}</Text>
       </View>
-      <View style={{ height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' }}>
+      <View style={{ height: 5, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden', marginBottom: 5 }}>
         <View style={{
-          height: 6,
+          height: 5,
           width: `${progress * 100}%`,
           backgroundColor: color,
           borderRadius: 3,
