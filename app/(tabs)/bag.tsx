@@ -505,8 +505,12 @@ const [refreshing, setRefreshing] = useState(false);
                           <View style={styles.queueBadge}>
                             <Text style={styles.queueBadgeText}>#{index + 1}</Text>
                           </View>
-
                           <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
+                          <View style={[styles.statusBadge, order.status === 'delivering' && styles.statusBadgeDelivering]}>
+                            <Text style={[styles.statusBadgeText, order.status === 'delivering' && { color: '#f39c12' }]}>
+                              {order.status === 'delivering' ? t.delivering : t.pending || 'Pending'}
+                            </Text>
+                          </View>
                         </View>
 
                         <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
@@ -548,22 +552,6 @@ const [refreshing, setRefreshing] = useState(false);
                               <Ionicons name="chevron-down-outline" size={22} color="#000000" />
                             </TouchableOpacity>
                           )}
-                        </View>
-
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            order.status === 'delivering' && styles.statusBadgeDelivering,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              order.status === 'delivering' && { color: '#f39c12' },
-                            ]}
-                          >
-                            {order.status === 'delivering' ? t.delivering : t.pending || 'Pending'}
-                          </Text>
                         </View>
 
                         <Ionicons
