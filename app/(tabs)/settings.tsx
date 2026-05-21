@@ -571,7 +571,7 @@ const stopPreviewSound = async () => {
                       width: 51,
                       height: 31,
                       borderRadius: 16,
-                      backgroundColor: storeIsOpen ? '#F97316' : '#ddd',
+                      backgroundColor: storeIsOpen ? '#8B38CB' : '#ddd',
                       justifyContent: 'center',
                       paddingHorizontal: 2,
                     }}>
