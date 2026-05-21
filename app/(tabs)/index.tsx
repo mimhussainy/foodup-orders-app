@@ -1289,7 +1289,18 @@ const flatData: FlatItem[] = [
               const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
               const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
               const isOverdue = acceptedData ? (() => {
-                const minutes = parseInt(acceptedData.accepted_time?.replace(/[^0-9]/g, '') || '0');
+                const at = acceptedData.accepted_time || '';
+                const isScheduledTime = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                if (isScheduledTime) {
+                  const parts = at.split('—');
+                  if (parts.length < 2) return false;
+                  const timePart = parts[0].trim();
+                  const datePart = parts[1].trim().split('/');
+                  if (datePart.length < 3) return false;
+                  const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
+                  return Date.now() > scheduledMs;
+                }
+                const minutes = parseInt(at.replace(/[^0-9]/g, '') || '0');
                 const acceptedAt = new Date(acceptedData.accepted_at).getTime();
                 const deadline = acceptedAt + minutes * 60 * 1000;
                 return Date.now() > deadline;
