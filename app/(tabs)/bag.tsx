@@ -34,7 +34,7 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>{t.scheduled || 'Pre-order'} — {at.split('—')[0].trim()}</Text>
       </View>
       {showBar && (
         <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
