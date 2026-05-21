@@ -88,13 +88,16 @@ function CountdownTimer({ accepted_at, accepted_time }: { accepted_at: string; a
 
   return (
     <View style={{ marginTop: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <Ionicons name="time-outline" size={14} color={color} />
-        <Text style={{ fontSize: 13, fontWeight: '700', color }}>
-          {isLate
-            ? `${mins}m ${secs}s ${t.overdue || 'overdue'}`
-            : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="time-outline" size={14} color={color} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color }}>
+            {isLate
+              ? `${mins}m ${secs}s ${t.overdue || 'overdue'}`
+              : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
+          </Text>
+        </View>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: '#8B38CB' }}>{t.asapShort || 'ASAP'}</Text>
       </View>
       <View style={{ height: 6, backgroundColor: '#F0F0F0', borderRadius: 3, overflow: 'hidden' }}>
         <View style={{
@@ -506,14 +509,7 @@ const [refreshing, setRefreshing] = useState(false);
                           <Text style={styles.cardTitle}>Order #{order.order_id}</Text>
                         </View>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
-                          <Text style={{ fontSize: 13, color: '#8B38CB', fontWeight: '600' }}>
-                            {order.accepted_time && (order.accepted_time.includes('—') || (order.accepted_time.includes(':') && !order.accepted_time.includes('Minutes')))
-                              ? order.accepted_time.split('—')[0].trim()
-                              : 'ASAP'}
-                          </Text>
-                        </View>
+                        <Text style={styles.cardSubtitle}>{order.customer_name}</Text>
                         {order.note && !isExpanded ? (
                           <View style={{ 
                             flexDirection: 'row', 
@@ -660,28 +656,30 @@ const [refreshing, setRefreshing] = useState(false);
                       </>
                     )}
 
-                    {order.accepted_time && order.accepted_at ? (
-                      (() => {
-                        const at = order.accepted_time;
-                        const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                        if (isItemScheduled) {
-                          const scheduledStr = at.split('—')[0].trim();
-                          const scheduledDateStr = at.split('—')[1]?.trim();
-                          const parts = scheduledDateStr?.split('/');
-                          const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
-                          if (!scheduledMs) return null;
-                          return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
-                        }
-                        return (
-                          <CountdownTimer
-                            accepted_at={order.accepted_at}
-                            accepted_time={at}
-                          />
-                        );
-                      })()
-                    ) : null}
-
                     <View style={styles.divider} />
+
+                    {order.accepted_time && order.accepted_at ? (
+                      <View style={{ marginBottom: 12 }}>
+                        {(() => {
+                          const at = order.accepted_time;
+                          const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                          if (isItemScheduled) {
+                            const scheduledStr = at.split('—')[0].trim();
+                            const scheduledDateStr = at.split('—')[1]?.trim();
+                            const parts = scheduledDateStr?.split('/');
+                            const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                            if (!scheduledMs) return null;
+                            return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
+                          }
+                          return (
+                            <CountdownTimer
+                              accepted_at={order.accepted_at}
+                              accepted_time={at}
+                            />
+                          );
+                        })()}
+                      </View>
+                    ) : null}
 
                     {order.status === 'pending' && (
                       <View style={styles.btnRow}>
