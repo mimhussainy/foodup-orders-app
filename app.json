@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FoodUp Orders",
-    "slug": "foodup-orders",
+    "slug": "FoodUpOrderAlerts",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
