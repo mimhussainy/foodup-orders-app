@@ -657,7 +657,7 @@ const [refreshing, setRefreshing] = useState(false);
                     )}
 
                     {order.accepted_time && order.accepted_at ? (
-                      <View style={{ marginTop: 12, marginBottom: 12 }}>
+                      <View style={{ marginTop: 12, marginBottom: 5 }}>
                         {(() => {
                           const at = order.accepted_time;
                           const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));

@@ -128,8 +128,10 @@ export default function OnboardingScreen() {
       });
       const result = await response.json();
       if (result.success) {
+        const code = await AsyncStorage.getItem('restaurant_code') || '';
         await AsyncStorage.setItem('user_role', 'delivery');
         await AsyncStorage.setItem('delivery_name', result.username);
+        await AsyncStorage.setItem('restaurant_code', code);
         router.replace('/(tabs)');
       } else {
         setError(t.invalidCredentials);
