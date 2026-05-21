@@ -588,7 +588,7 @@ const stopPreviewSound = async () => {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}>
-                        {storeIsOpen && <Ionicons name="checkmark" size={16} color="#F97316" />}
+                        {storeIsOpen && <Ionicons name="checkmark" size={16} color="#8B38CB" />}
                       </View>
                     </View>
                   </TouchableOpacity>
