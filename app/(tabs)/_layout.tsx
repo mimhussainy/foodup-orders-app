@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import React from 'react';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -23,144 +22,47 @@ function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
 }
 
 const TabLayout = React.memo(function TabLayout() {
-  const [role, setRole] = useState<string | null>(null);
-  const [roleLoaded, setRoleLoaded] = useState(false);
-  const [bagCount, setBagCount] = useState(0);
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    const loadBagCount = async () => {
-      const bagName = await AsyncStorage.getItem('delivery_name') || '';
-      const stored = await AsyncStorage.getItem(`delivery_bag_${bagName}`);
-      if (stored) {
-        const bag = JSON.parse(stored);
-        const active = bag.filter((o: any) => o.status === 'pending' || o.status === 'delivering');
-        setBagCount(active.length);
-      }
-    };
-    loadBagCount();
-    const interval = setInterval(loadBagCount, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const loadRole = async () => {
-      const r = await AsyncStorage.getItem('user_role');
-      setRole(r);
-      setRoleLoaded(true);
-    };
-    loadRole();
-  }, []);
-
-  if (!roleLoaded) return null;
-  if (!role) return null;
-
-  if (role === 'owner') {
-    return (
-      <Tabs
-        initialRouteName="index"
-        screenOptions={{
-          headerShown: false,
-          animation: 'none',
-          tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? insets.bottom + 15 : 30, height: Platform.OS === 'android' ? insets.bottom + 65 : 90 },
-          tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
-          tabBarItemStyle: { flex: 1 },
-          tabBarHideOnKeyboard: true,
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Orders',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="receipt-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="stats"
-          options={{
-            title: 'Statistics',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="bar-chart-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: 'Settings',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="settings-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen name="delivery" options={{ href: null }} />
-        <Tabs.Screen name="bag" options={{ href: null }} />
-        <Tabs.Screen name="explore" options={{ href: null }} />
-      </Tabs>
-    );
-  }
 
   return (
     <Tabs
-      initialRouteName="delivery"
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         animation: 'none',
         tabBarStyle: { paddingTop: 10, paddingBottom: Platform.OS === 'android' ? insets.bottom + 15 : 30, height: Platform.OS === 'android' ? insets.bottom + 65 : 90 },
         tabBarLabelStyle: { fontSize: 12, marginTop: 2 },
         tabBarItemStyle: { flex: 1 },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
-        name="delivery"
+        name="index"
         options={{
-          title: 'Add Order',
+          title: 'Orders',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
+            <Ionicons name="receipt-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="bag"
+        name="stats"
         options={{
-          title: 'Bag',
+          title: 'Statistics',
           tabBarIcon: ({ color, size }) => (
-            <View>
-              <Ionicons name="bag-outline" size={size} color={color} />
-              {bagCount > 0 && (
-                <View style={{
-                  position: 'absolute',
-                  right: -6,
-                  top: -4,
-                  backgroundColor: '#e74c3c',
-                  borderRadius: 8,
-                  minWidth: 16,
-                  height: 16,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  paddingHorizontal: 3,
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{bagCount}</Text>
-                </View>
-              )}
-            </View>
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Profile',
+          title: 'Settings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />
-      <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="explore" options={{ href: null }} />
-      <Tabs.Screen name="stats" options={{ href: null }} />
     </Tabs>
   );
 });

@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "FoodUp Courier",
-    "slug": "FoodUpOrderAlerts",
+    "name": "FoodUp Orders",
+    "slug": "foodup-orders",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fooduporderalerts",
+    "scheme": "fooduporders",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.foodup.orderalerts",
+      "bundleIdentifier": "com.foodup.orders",
       "buildNumber": "6",
       "supportsTablet": false,
       "infoPlist": {
@@ -27,7 +27,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.foodup.orderalerts",
+      "package": "com.foodup.orders",
       "versionCode": 2,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
