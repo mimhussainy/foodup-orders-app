@@ -144,7 +144,8 @@ export default function SettingsScreen() {
     AsyncStorage.getItem('notification_sound').then(s => setNotificationSound(s || 'default'));
     if (Platform.OS === 'android') {
       const Application = require('expo-application');
-      Application.getAndroidIdAsync().then((id: string) => setDeviceId(id || ''));
+      const id = Application.getAndroidId();
+      setDeviceId(id || '');
     }
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;

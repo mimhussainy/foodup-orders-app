@@ -917,6 +917,8 @@ useEffect(() => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       const deviceId = Application.getAndroidId() || '';
+      console.log('=== DEVICE ID:', deviceId);
+      console.log('=== CODE:', code);
       const stored = await AsyncStorage.getItem('can_print');
       if (stored !== null) {
         setCanPrint(stored === 'true');
