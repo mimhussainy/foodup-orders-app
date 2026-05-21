@@ -82,6 +82,11 @@ export default function SettingsScreen() {
   const [showAllCouriers, setShowAllCouriers] = useState(false);
   const [showAddCourier, setShowAddCourier] = useState(false);
   const [showAcceptanceTimes, setShowAcceptanceTimes] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
+  const toggleSection = (section: string) => {
+    setOpenSection(prev => prev === section ? null : section);
+  };
   const [deliveryName, setDeliveryName] = useState('');
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [newResetPassword, setNewResetPassword] = useState('');
@@ -571,15 +576,15 @@ const stopPreviewSound = async () => {
 
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showAddCourier ? 1 : 0 }]}
-                  onPress={() => setShowAddCourier(!showAddCourier)}
+                  style={[styles.row, { borderBottomWidth: openSection === 'addCourier' ? 1 : 0 }]}
+                  onPress={() => toggleSection('addCourier')}
                 >
                   <Ionicons name="person-add-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>{t.addCourierAccount}</Text>
-                  <Text style={styles.chevron}>{showAddCourier ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'addCourier' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showAddCourier && (
+                {openSection === 'addCourier' && (
                   <View style={{ paddingVertical: 12 }}>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                       <TextInput
@@ -616,15 +621,15 @@ const stopPreviewSound = async () => {
 
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showAllCouriers ? 1 : 0 }]}
-                  onPress={() => setShowAllCouriers(!showAllCouriers)}
+                  style={[styles.row, { borderBottomWidth: openSection === 'couriers' ? 1 : 0 }]}
+                  onPress={() => toggleSection('couriers')}
                 >
                   <Ionicons name="people-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>{accounts.length} {t.courierAccounts}</Text>
-                  <Text style={styles.chevron}>{showAllCouriers ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'couriers' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showAllCouriers && accounts.map((account, i, arr) => (
+                {openSection === 'couriers' && accounts.map((account, i, arr) => (
                   <View key={i}>
                     <View
                       style={[
@@ -696,19 +701,19 @@ const stopPreviewSound = async () => {
               <Text style={styles.groupLabel}>Product Management</Text>
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showProducts ? 1 : 0 }]}
+                  style={[styles.row, { borderBottomWidth: openSection === 'products' ? 1 : 0 }]}
                   onPress={() => {
-                    setShowProducts(!showProducts);
-                    if (!showProducts && products.length === 0) loadProducts();
+                    toggleSection('products');
+                    if (openSection !== 'products' && products.length === 0) loadProducts();
                   }}
                 >
                   <Ionicons name="fast-food-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>Manage Products</Text>
                   {productsLoading && <Text style={{ color: '#999', fontSize: 13 }}>Loading...</Text>}
-                  <Text style={styles.chevron}>{showProducts ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'products' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showProducts && (() => {
+                {openSection === 'products' && (() => {
                   const categories = [...new Set(products.map(p => p.category || 'Other'))];
                   return categories.map((cat, ci) => {
                     const catProducts = products.filter(p => (p.category || 'Other') === cat);
@@ -762,15 +767,15 @@ const stopPreviewSound = async () => {
 
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showSound ? 1 : 0 }]}
-                  onPress={() => { setShowSound(!showSound); if (showSound) stopPreviewSound(); }}
+                  style={[styles.row, { borderBottomWidth: openSection === 'sound' ? 1 : 0 }]}
+                  onPress={() => { toggleSection('sound'); if (openSection === 'sound') stopPreviewSound(); }}
                 >
                   <Ionicons name="musical-notes-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>{currentSoundLabel}</Text>
-                  <Text style={styles.chevron}>{showSound ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'sound' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showSound && SOUNDS.map((sound, i) => (
+                {openSection === 'sound' && SOUNDS.map((sound, i) => (
                   <TouchableOpacity
                     key={sound.key}
                     style={[styles.row, i === SOUNDS.length - 1 && { borderBottomWidth: 0 }]}
@@ -807,8 +812,8 @@ const stopPreviewSound = async () => {
 
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showRestaurantForm ? 1 : 0 }]}
-                  onPress={() => setShowRestaurantForm(!showRestaurantForm)}
+                  style={[styles.row, { borderBottomWidth: openSection === 'restaurantForm' ? 1 : 0 }]}
+                  onPress={() => toggleSection('restaurantForm')}
                 >
                   <Ionicons name="storefront-outline" size={18} color="#999" />
 
@@ -820,10 +825,10 @@ const stopPreviewSound = async () => {
                     <Text style={{ color: '#2ecc71', fontSize: 13 }}>{profileSuccess}</Text>
                   ) : null}
 
-                  <Text style={styles.chevron}>{showRestaurantForm ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'restaurantForm' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {showRestaurantForm && (
+                {openSection === 'restaurantForm' && (
                   <>
                     <TextInput
                       style={styles.input}
@@ -880,8 +885,8 @@ const stopPreviewSound = async () => {
 
           <View style={styles.section}>
             <TouchableOpacity
-              style={[styles.row, { borderBottomWidth: showAbout ? 1 : 0 }]}
-              onPress={() => setShowAbout(!showAbout)}
+              style={[styles.row, { borderBottomWidth: openSection === 'about' ? 1 : 0 }]}
+              onPress={() => toggleSection('about')}
             >
               <Image
                 source={require('../../assets/images/foodup-icon.png')}
@@ -889,10 +894,10 @@ const stopPreviewSound = async () => {
                 resizeMode="contain"
               />
               <Text style={[styles.rowValue, { flex: 1 }]}>FoodUp</Text>
-              <Text style={styles.chevron}>{showAbout ? '▲' : '▼'}</Text>
+              <Text style={styles.chevron}>{openSection === 'about' ? '▲' : '▼'}</Text>
             </TouchableOpacity>
 
-            {showAbout && (
+            {openSection === 'about' && (
               <>
                 <Text style={styles.aboutTagline}>Online-Bestellsystem für Restaurants</Text>
 
@@ -926,17 +931,17 @@ const stopPreviewSound = async () => {
 
           <View style={styles.section}>
             <TouchableOpacity
-              style={[styles.row, { borderBottomWidth: showLanguage ? 1 : 0 }]}
-              onPress={() => setShowLanguage(!showLanguage)}
+              style={[styles.row, { borderBottomWidth: openSection === 'language' ? 1 : 0 }]}
+              onPress={() => toggleSection('language')}
             >
               <Text style={styles.flagText}>{language === 'de' ? '🇩🇪' : '🇬🇧'}</Text>
               <Text style={[styles.rowValue, { flex: 1 }]}>
                 {language === 'de' ? 'Deutsch' : 'English'}
               </Text>
-              <Text style={styles.chevron}>{showLanguage ? '▲' : '▼'}</Text>
+              <Text style={styles.chevron}>{openSection === 'language' ? '▲' : '▼'}</Text>
             </TouchableOpacity>
 
-            {showLanguage && (
+            {openSection === 'language' && (
               <>
                 <TouchableOpacity
                   style={[styles.row, { borderBottomWidth: 1 }]}
@@ -985,19 +990,17 @@ const stopPreviewSound = async () => {
 
 {role === 'owner' && (
             <>
-              {role === 'owner' && (
-            <>
               <Text style={styles.groupLabel}>Acceptance Times</Text>
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={[styles.row, { borderBottomWidth: showAcceptanceTimes ? 1 : 0 }]}
-                  onPress={() => setShowAcceptanceTimes(!showAcceptanceTimes)}
+                  style={[styles.row, { borderBottomWidth: openSection === 'acceptanceTimes' ? 1 : 0 }]}
+                  onPress={() => toggleSection('acceptanceTimes')}
                 >
                   <Ionicons name="time-outline" size={18} color="#999" />
                   <Text style={[styles.rowValue, { flex: 1 }]}>Acceptance Times</Text>
-                  <Text style={styles.chevron}>{showAcceptanceTimes ? '▲' : '▼'}</Text>
+                  <Text style={styles.chevron}>{openSection === 'acceptanceTimes' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
-                {showAcceptanceTimes && <View style={{ paddingVertical: 14 }}>
+                {openSection === 'acceptanceTimes' && <View style={{ paddingVertical: 14 }}>
                   <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
                     Set the time options shown when accepting orders
                   </Text>
@@ -1048,10 +1051,7 @@ const stopPreviewSound = async () => {
                   </View>
                 </View>}
               </View>
-            </>
-          )}
-              
-              <Text style={styles.groupLabel}>{t.dangerZone}</Text>
+            <Text style={styles.groupLabel}>{t.dangerZone}</Text>
               <View style={styles.section}>
                 <TouchableOpacity
                   onPress={async () => {
