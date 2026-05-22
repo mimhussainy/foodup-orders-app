@@ -895,10 +895,6 @@ useEffect(() => {
                 orderable_order_time: latestOrder.orderable_order_time || '',
                 date_created: latestOrder.date_created || '',
               };
-              setAcceptRejectOrder(newOrder);
-              checkPrintPermission().then(allowed => {
-                if (allowed) setShowAcceptReject(true);
-              });
               router.replace('/(tabs)');
             }
           }
@@ -1065,12 +1061,7 @@ useEffect(() => {
             }
             return [newOrder, ...prev];
           });
-          setAcceptRejectOrder(newOrder);
-          if (Platform.OS === 'android') {
-            checkPrintPermission().then(allowed => {
-              if (allowed) setShowAcceptReject(true);
-            });
-          }
+          
         }
       });
       return () => subscription.remove();
@@ -1621,17 +1612,7 @@ const flatData: FlatItem[] = [
           }}
         />
         </SafeAreaView>
-      {Platform.OS !== 'ios' && (
-        <AcceptRejectModal
-          order={acceptRejectOrder}
-          visible={showAcceptReject}
-          onClose={() => {
-            setShowAcceptReject(false);
-            setAcceptRejectOrder(null);
-            setTimeout(() => fetchAcceptedTimes(orders), 1500);
-          }}
-        />
-      )}
+      
     </View>
   );
 }
