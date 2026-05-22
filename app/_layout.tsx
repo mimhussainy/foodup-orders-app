@@ -129,7 +129,8 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
   useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
-      handleAutoAction();
+      setCountdown(null);
+      onClose();
       return;
     }
     const timer = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
@@ -582,6 +583,45 @@ export default function RootLayout() {
 
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
       const data = notification.request.content.data as any;
+
+      if (data.event_type === 'auto_accepted') {
+        try {
+          const code = await AsyncStorage.getItem('restaurant_code') || '';
+          const deviceId = await AsyncStorage.getItem('device_id') || '';
+          const printerRes = await fetch(`${BACKEND_URL}/printer-device/${code}`);
+          const printerData = await printerRes.json();
+          if (printerData.device_id && printerData.device_id === deviceId) {
+            const order = {
+              order_id: parseInt(data.order_id),
+              customer_name: data.customer_name || '',
+              customer_email: data.customer_email || '',
+              customer_phone: data.customer_phone || '',
+              total: data.total || '',
+              currency: data.currency || 'CHF',
+              payment_method: data.payment_method || '',
+              note: data.note || '',
+              shipping_method: data.shipping_method || '',
+              shipping_address: data.shipping_address || '',
+              orderable_order_time: data.orderable_order_time || '',
+              orderable_order_date: data.orderable_order_date || '',
+              date_created: data.date_created || '',
+              items: JSON.parse(data.items || '[]'),
+            };
+            const acceptedTime = data.accepted_time || '';
+            const mins = parseInt(acceptedTime);
+            const isScheduled = acceptedTime.includes('—') || acceptedTime.includes(':');
+            setTimeout(() => {
+              if (isScheduled) {
+                printOrder(order, undefined, false, '', acceptedTime).catch(() => {});
+              } else {
+                printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
+              }
+            }, 700);
+          }
+        } catch(e) {}
+        return;
+      }
+
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
         if (role === 'owner') {
