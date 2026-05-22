@@ -840,7 +840,6 @@ useEffect(() => {
   useEffect(() => {
     AsyncStorage.getItem('user_role').then(r => {
       setRole(r);
-      if (r === 'delivery') router.replace('/(tabs)/delivery');
     });
     fetchOrdersFromBackend();
     fetchClaims();
@@ -912,23 +911,20 @@ useEffect(() => {
     };
   }, []);
 
-  const checkPrintPermission = async () => {
-    if (Platform.OS !== 'android') return;
+  const checkPrintPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') return false;
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       const deviceId = Application.getAndroidId() || '';
-      console.log('=== DEVICE ID:', deviceId);
-      console.log('=== CODE:', code);
-      const stored = await AsyncStorage.getItem('can_print');
-      if (stored !== null) {
-        setCanPrint(stored === 'true');
-      }
       const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
       const result = await res.json();
       const allowed = result.success && result.device_id && result.device_id === deviceId;
       setCanPrint(allowed);
       await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
-    } catch (e) {}
+      return allowed;
+    } catch (e) {
+      return false;
+    }
   };
 
   const fetchStoreStatus = async () => {
@@ -1066,6 +1062,11 @@ useEffect(() => {
             return [newOrder, ...prev];
           });
           setAcceptRejectOrder(newOrder);
+          if (Platform.OS === 'android') {
+            checkPrintPermission().then(allowed => {
+              if (allowed) setShowAcceptReject(true);
+            });
+          }
         }
       });
       return () => subscription.remove();
