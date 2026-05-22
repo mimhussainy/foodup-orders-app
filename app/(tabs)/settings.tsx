@@ -146,6 +146,7 @@ export default function SettingsScreen() {
       const Application = require('expo-application');
       const id = Application.getAndroidId();
       setDeviceId(id || '');
+      if (id) AsyncStorage.setItem('device_id', id);
     }
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;

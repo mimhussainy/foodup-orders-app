@@ -550,11 +550,8 @@ export default function RootLayout() {
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
-              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
-              const acceptedResult = await acceptedRes.json();
-              if (acceptedResult.success && acceptedResult.accepted_time) return;
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
-              setNewOrderModal({
+            setNewOrderModal({
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
                 customer_email: latestOrder.customer_email || '',
@@ -575,9 +572,18 @@ export default function RootLayout() {
                 orderable_order_time: latestOrder.orderable_order_time || '',
               });
               setShowOrderModal(true);
-            }
+            // Check in background if already accepted, close modal if so
+            fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
+              .then(r => r.json())
+              .then(result => {
+                if (result.success && result.accepted_time) {
+                  setShowOrderModal(false);
+                  setNewOrderModal(null);
+                }
+              }).catch(() => {});
           }
-        } catch (e) {}
+        }
+      } catch (e) {}
       }
     });
 
