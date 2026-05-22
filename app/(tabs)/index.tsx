@@ -1455,7 +1455,20 @@ const flatData: FlatItem[] = [
       <View style={styles.header}>
         <View style={styles.headerPlaceholder} />
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-        <View style={styles.headerPlaceholder} />
+        {storeIsOpen !== null ? (
+          <View style={{
+            backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
+            borderRadius: 12,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+          }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+              {storeIsOpen ? 'OPEN' : 'CLOSED'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.headerPlaceholder} />
+        )}
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <FlatList
@@ -1470,10 +1483,7 @@ const flatData: FlatItem[] = [
           ListHeaderComponent={null}
           renderItem={({ item }) => {
             if (item.type === 'storeStatus') {
-              if (storeIsOpen === null) return null;
-              return (
-                <Animated.View style={{ height: 5, backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c', opacity: pulseAnim }} />
-              );
+              return null;
             }
             if (item.type === 'searchBar') {
               return (
