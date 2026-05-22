@@ -556,20 +556,34 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
                   <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
                 </View>
-                {countdown !== null && autoSettings && (
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 11, color: '#999' }}>
-                      {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
-                    </Text>
-                    <Text style={{ fontSize: 11, color: '#999' }}>
-                      {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
-                    </Text>
-                  </View>
-                )}
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  {order.orderable_order_time ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons
+                        name={isScheduled ? 'calendar-outline' : 'flash-outline'}
+                        size={13}
+                        color={isScheduled ? '#8B38CB' : '#f39c12'}
+                      />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isScheduled ? '#8B38CB' : '#f39c12' }}>
+                        {isScheduled ? t.scheduled : t.asapShort}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {countdown !== null && autoSettings && (
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 11, color: '#999' }}>
+                        {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#999' }}>
+                        {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-              {(order as any).orderable_order_date || (order as any).orderable_order_time ? (
-                <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
-                  🕐 {(order as any).orderable_order_time?.toLowerCase().includes('as soon as possible') ? t.asap || 'ASAP' : (order as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(order as any).orderable_order_date}
+              {isScheduled && order.orderable_order_date ? (
+                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 4 }}>
+                  🕐 {scheduledTime} — {scheduledDate}
                 </Text>
               ) : null}
               {order.shipping_address ? (
