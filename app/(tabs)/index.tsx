@@ -1456,16 +1456,17 @@ const flatData: FlatItem[] = [
         <View style={styles.headerPlaceholder} />
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         {storeIsOpen !== null ? (
-          <View style={{
+          <Animated.View style={{
             backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
             borderRadius: 12,
             paddingHorizontal: 8,
             paddingVertical: 4,
+            opacity: pulseAnim,
           }}>
             <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-              {storeIsOpen ? 'OPEN' : 'CLOSED'}
+              {storeIsOpen ? t.openStore.toUpperCase() : t.closeStore.toUpperCase()}
             </Text>
-          </View>
+          </Animated.View>
         ) : (
           <View style={styles.headerPlaceholder} />
         )}
@@ -1569,6 +1570,11 @@ const flatData: FlatItem[] = [
                       />
                     );
                   })()}
+                {!(acceptedTimes[String(order.order_id)] && (() => {
+                    const claim = claims[String(order.order_id)];
+                    const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                    return status !== 'delivered';
+                  })()) && <View style={styles.divider} />}
                 <View style={styles.orderBottomRow}>
                   {order.shipping_method ? (
                     <View style={styles.orderMeta}>
