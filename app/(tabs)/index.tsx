@@ -1628,6 +1628,7 @@ const flatData: FlatItem[] = [
           onClose={() => {
             setShowAcceptReject(false);
             setAcceptRejectOrder(null);
+            setTimeout(() => fetchAcceptedTimes(orders), 1500);
           }}
         />
       )}

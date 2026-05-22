@@ -527,11 +527,7 @@ export default function RootLayout() {
         registerForPushNotifications();
       }
       setTimeout(() => {
-        if (role === 'delivery') {
-          router.replace('/(tabs)/delivery');
-        } else {
-          router.replace('/(tabs)');
-        }
+        router.replace('/(tabs)');
       }, 100);
     } catch (e) {
       router.replace('/onboarding');
