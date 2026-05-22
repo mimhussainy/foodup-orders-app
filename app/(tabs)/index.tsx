@@ -1472,7 +1472,7 @@ const flatData: FlatItem[] = [
             if (item.type === 'storeStatus') {
               if (storeIsOpen === null) return null;
               return (
-                <View style={{ height: 5, backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c' }} />
+                <Animated.View style={{ height: 5, backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c', opacity: pulseAnim }} />
               );
             }
             if (item.type === 'searchBar') {
