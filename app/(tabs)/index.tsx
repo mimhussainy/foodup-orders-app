@@ -791,6 +791,7 @@ const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boole
 const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[]; icon?: string; iconColor?: string }>({ visible: false, title: '', message: '', buttons: [] });
 const [canPrint, setCanPrint] = useState(false);
+const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -851,6 +852,7 @@ useEffect(() => {
         fetchOrdersFromBackend();
         fetchClaims();
         fetchStoreStatus();
+        loadAutoPrintOrders();
       }
     });
 
@@ -1078,9 +1080,23 @@ useEffect(() => {
     const stored = await AsyncStorage.getItem('pickup_ready_orders');
     if (stored) setPickupReadyOrders(JSON.parse(stored));
   };
+  const loadAutoPrintOrders = async () => {
+    const keys = await AsyncStorage.getAllKeys();
+    const printKeys = keys.filter(k => k.startsWith('auto_print_'));
+    const result: {[key: string]: any} = {};
+    for (const key of printKeys) {
+      const val = await AsyncStorage.getItem(key);
+      if (val) {
+        const orderId = key.replace('auto_print_', '');
+        result[orderId] = JSON.parse(val);
+      }
+    }
+    setAutoPrintOrders(result);
+  };
 
   useEffect(() => {
     loadPickupReadyOrders();
+    loadAutoPrintOrders();
   }, []);
 
   const getDeliveryStatus = (order: Order) => {
@@ -1179,7 +1195,11 @@ const flatData: FlatItem[] = [
                 </Text>
               </View>
             </View>
-            <Text style={styles.detailDate}><Text style={{ fontWeight: '700' }}>Created: </Text>{selectedOrder.date}</Text>
+            {autoPrintOrders[String(selectedOrder.order_id)] && (
+              <Text style={{ fontSize: 13, color: '#8B38CB', marginHorizontal: 16, marginBottom: 4 }}>
+                ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
+              </Text>
+            )}
             {(() => {
               const claim = claims[String(selectedOrder.order_id)];
               if (claim && claim.status === 'delivered' && claim.delivered_at) {
@@ -1536,10 +1556,43 @@ const flatData: FlatItem[] = [
               <TouchableOpacity style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]} onPress={() => setSelectedOrder(order)}>
                 <View style={styles.orderTopRow}>
                   <Text style={styles.orderId}>Order #{order.order_id}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
-                    <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
-                      {getDeliveryStatusLabel(claims[String(order.order_id)], order, t)}
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {canPrint && autoPrintOrders[String(order.order_id)] && (
+                      <TouchableOpacity
+                        onPress={async (e) => {
+                          e.stopPropagation();
+                          const printData = autoPrintOrders[String(order.order_id)];
+                          const orderObj = {
+                            ...order,
+                            items: typeof printData.items === 'string' ? JSON.parse(printData.items) : printData.items,
+                          };
+                          const acceptedTime = printData.accepted_time || '';
+                          const mins = parseInt(acceptedTime);
+                          const isScheduledTime = acceptedTime.includes('—') || acceptedTime.includes(':');
+                          const success = await (isScheduledTime
+                            ? printOrder(orderObj, undefined, false, '', acceptedTime)
+                            : printOrder(orderObj, isNaN(mins) ? 30 : mins)
+                          ).catch(() => false);
+                          if (success) {
+                            await AsyncStorage.removeItem(`auto_print_${order.order_id}`);
+                            setAutoPrintOrders(prev => {
+                              const updated = { ...prev };
+                              delete updated[String(order.order_id)];
+                              return updated;
+                            });
+                          }
+                        }}
+                        style={{ backgroundColor: '#8B38CB', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      >
+                        <Ionicons name="print-outline" size={14} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Auto</Text>
+                      </TouchableOpacity>
+                    )}
+                    <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
+                      <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
+                        {getDeliveryStatusLabel(claims[String(order.order_id)], order, t)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.divider} />
@@ -1549,16 +1602,17 @@ const flatData: FlatItem[] = [
                     <Ionicons name="cash-outline" size={14} color="#999" />
                     <Text style={styles.orderTotal}>{order.currency} {order.total}</Text>
                   </View>
-                  <View style={styles.orderMeta}>
-                    <Ionicons 
-                      name={order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? 'cash-outline' : 'card-outline'} 
-                      size={14} 
-                      color={order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71'} 
-                    />
-                    <Text style={[styles.orderTotal, { color: order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71' }]}>
-                      {order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? t.cash : t.online}
-                    </Text>
-                  </View>
+                  {(() => {
+                    const isCash = order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash');
+                    return (
+                      <View style={styles.orderMeta}>
+                        <Ionicons name={isCash ? 'cash-outline' : 'card-outline'} size={14} color={isCash ? '#e74c3c' : '#2ecc71'} />
+                        <Text style={[styles.orderTotal, { color: isCash ? '#e74c3c' : '#2ecc71' }]}>
+                          {isCash ? t.notPaid : t.paidOnline}
+                        </Text>
+                      </View>
+                    );
+                  })()}
                 </View>
                 {acceptedTimes[String(order.order_id)] &&
                   (() => {
@@ -1593,30 +1647,43 @@ const flatData: FlatItem[] = [
                       <Ionicons name={order.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                       <Text style={styles.orderShipping}>
                         {order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}
-                        {order.orderable_order_time ? ` • ` : ''}
                       </Text>
                       {order.orderable_order_time ? (
-                        <Ionicons 
-                          name={
-                            order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                        <>
+                          <Text style={styles.orderShipping}> • </Text>
+                          <Ionicons
+                            name={
+                              order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                              order.orderable_order_time.toLowerCase().includes('asap') ||
+                              order.orderable_order_time.includes('(')
+                                ? 'flash-outline'
+                                : 'calendar-outline'
+                            }
+                            size={13}
+                            color={
+                              order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                              order.orderable_order_time.toLowerCase().includes('asap') ||
+                              order.orderable_order_time.includes('(')
+                                ? '#f39c12'
+                                : '#8B38CB'
+                            }
+                          />
+                          <Text style={[styles.orderShipping, {
+                            color: order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                              order.orderable_order_time.toLowerCase().includes('asap') ||
+                              order.orderable_order_time.includes('(')
+                                ? '#f39c12'
+                                : '#8B38CB',
+                            fontWeight: '600',
+                          }]}>
+                            {order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
                             order.orderable_order_time.toLowerCase().includes('asap') ||
                             order.orderable_order_time.includes('(')
-                              ? 'timer-outline'
-                              : 'calendar-outline'
-                          }
-                          size={13} 
-                          color="#999" 
-                        />
-                      ) : null}
-                      {order.orderable_order_time ? (
-                        <Text style={styles.orderShipping}>
-                          {order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                          order.orderable_order_time.toLowerCase().includes('asap') ||
-                          order.orderable_order_time.includes('(')
-                            ? (t.asapShort || 'ASAP')
-                            : t.scheduled || 'Scheduled'
-                          }
-                        </Text>
+                              ? t.asapShort
+                              : t.scheduled
+                            }
+                          </Text>
+                        </>
                       ) : null}
                     </View>
                   ) : <View />}

@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler, Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AppState, BackHandler, Modal, Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { printOrder } from '../lib/printer';
@@ -387,7 +387,7 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                   </Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                 <View>
                   <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
                   <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
@@ -398,10 +398,32 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                       {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
                     </Text>
                     <Text style={{ fontSize: 11, color: '#999' }}>
-                      {autoSettings.auto_action === 'accept' ? autoSettings.accept_time : autoSettings.reject_reason}
+                      {autoSettings.auto_action === 'accept' ? (isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time) : autoSettings.reject_reason}
                     </Text>
                   </View>
                 )}
+              </View>
+              {order.orderable_order_date || order.orderable_order_time ? (
+                <Text style={{ fontSize: 13, color: '#2ecc71', marginBottom: 4 }}>
+                  🕐 {order.orderable_order_time?.toLowerCase().includes('as soon as possible') || order.orderable_order_time?.includes('(')
+                    ? t.asap
+                    : order.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {order.orderable_order_date}
+                </Text>
+              ) : null}
+              {order.shipping_address ? (
+                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 12 }}>📍 {order.shipping_address}</Text>
+              ) : null}
+              <View style={{ backgroundColor: '#F7F7F7', borderRadius: 12, padding: 12, marginBottom: 16, maxHeight: 160 }}>
+                <ScrollView nestedScrollEnabled>
+                  {(order.items || []).map((item: any, i: number) => (
+                    <View key={i} style={{ marginBottom: 6 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111' }}>{item.quantity}x {item.name}</Text>
+                      {item.addons && item.addons.length > 0 && item.addons.map((addon: any, j: number) => (
+                        <Text key={j} style={{ fontSize: 13, color: '#666', paddingLeft: 8 }}>↳ {addon.value}</Text>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: '#2ecc71', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
@@ -417,7 +439,6 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.rejectOrder}</Text>
               </TouchableOpacity>
-              
             </>
           )}
           {step === 'accept' && (
@@ -425,36 +446,54 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
               <TouchableOpacity onPress={() => setStep('main')} style={{ marginBottom: 16 }}>
                 <Text style={{ color: '#007AFF', fontSize: 14 }}>{t.back}</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>{t.selectPreparationTime}</Text>
-              <View style={{ marginBottom: 24 }}>
-                {times.map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    onPress={() => setSelectedTime(time)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      borderRadius: 12,
-                      backgroundColor: selectedTime === time ? '#f0fdf4' : '#F5F5F5',
-                      marginBottom: 8,
-                      borderWidth: selectedTime === time ? 1.5 : 0,
-                      borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
-                    }}
-                  >
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>{time} {t.minutes}</Text>
-                    {selectedTime === time && (
-                      <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {isScheduled ? (
+                <>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.scheduledOrder}</Text>
+                  <View style={{ backgroundColor: '#f5eeff', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                    <Text style={{ fontSize: 14, color: '#8B38CB', fontWeight: '600', marginBottom: 4 }}>🕐 {t.scheduledConfirm}</Text>
+                    <Text style={{ fontSize: 22, fontWeight: '900', color: '#8B38CB' }}>{scheduledTime} — {scheduledDate}</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 16 }}>{t.selectPreparationTime}</Text>
+                  <View style={{ marginBottom: 24 }}>
+                    {times.map((time) => (
+                      <TouchableOpacity
+                        key={time}
+                        onPress={() => setSelectedTime(time)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingVertical: 14,
+                          paddingHorizontal: 16,
+                          borderRadius: 12,
+                          backgroundColor: selectedTime === time ? '#f0fdf4' : '#F5F5F5',
+                          marginBottom: 8,
+                          borderWidth: selectedTime === time ? 1.5 : 0,
+                          borderColor: selectedTime === time ? '#2ecc71' : 'transparent',
+                        }}
+                      >
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>{time} {t.minutes}</Text>
+                        {selectedTime === time && (
+                          <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
               <TouchableOpacity
-                style={{ backgroundColor: selectedTime ? '#111' : '#ccc', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                onPress={handleConfirmAccept}
-                disabled={!selectedTime || loading}
+                style={{ backgroundColor: (isScheduled || selectedTime) ? '#111' : '#ccc', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                onPress={() => {
+                  if (isScheduled) {
+                    handleConfirmAcceptWithTime(`${scheduledTime} — ${scheduledDate}`);
+                  } else {
+                    handleConfirmAccept();
+                  }
+                }}
+                disabled={(!isScheduled && !selectedTime) || loading}
               >
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{loading ? t.printing : t.confirmAndPrint}</Text>
@@ -597,8 +636,10 @@ export default function RootLayout() {
           const printerRes = await fetch(`${BACKEND_URL}/printer-device/${code}`);
           const printerData = await printerRes.json();
           if (printerData.device_id && printerData.device_id === deviceId) {
-            const order = {
-              order_id: parseInt(data.order_id),
+            // Save flag so order card shows print button
+            await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
+              accepted_time: data.accepted_time || '',
+              order_id: data.order_id,
               customer_name: data.customer_name || '',
               customer_email: data.customer_email || '',
               customer_phone: data.customer_phone || '',
@@ -611,18 +652,8 @@ export default function RootLayout() {
               orderable_order_time: data.orderable_order_time || '',
               orderable_order_date: data.orderable_order_date || '',
               date_created: data.date_created || '',
-              items: JSON.parse(data.items || '[]'),
-            };
-            const acceptedTime = data.accepted_time || '';
-            const mins = parseInt(acceptedTime);
-            const isScheduled = acceptedTime.includes('—') || acceptedTime.includes(':');
-            setTimeout(() => {
-              if (isScheduled) {
-                printOrder(order, undefined, false, '', acceptedTime).catch(() => {});
-              } else {
-                printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
-              }
-            }, 700);
+              items: data.items || '[]',
+            }));
           }
         } catch(e) {}
         return;
