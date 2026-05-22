@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AppState, BackHandler, Modal, Platform, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { printOrder } from '../lib/printer';
@@ -537,6 +537,49 @@ export default function RootLayout() {
   useEffect(() => {
     checkUserRole();
 
+    const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const code = await AsyncStorage.getItem('restaurant_code') || '';
+        const role = await AsyncStorage.getItem('user_role') || '';
+        if (!code || role !== 'owner') return;
+        try {
+          const response = await fetch(`${BACKEND_URL}/orders/${code}`);
+          const result = await response.json();
+          if (result.success && result.orders && result.orders.length > 0) {
+            const latestOrder = result.orders[0];
+            const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
+            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
+              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
+              const acceptedResult = await acceptedRes.json();
+              if (acceptedResult.success && acceptedResult.accepted_time) return;
+              await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
+              setNewOrderModal({
+                order_id: parseInt(latestOrder.order_id),
+                customer_name: latestOrder.customer_name || '',
+                customer_email: latestOrder.customer_email || '',
+                customer_phone: latestOrder.customer_phone || '',
+                total: String(latestOrder.total || ''),
+                currency: latestOrder.currency || 'CHF',
+                status: latestOrder.status || '',
+                event_type: 'new_order',
+                items: latestOrder.items || [],
+                payment_method: latestOrder.payment_method || '',
+                note: latestOrder.note || '',
+                date: latestOrder.date_created ? new Date(latestOrder.date_created).toLocaleString() : new Date().toLocaleString(),
+                timestamp: latestOrder.date_created ? new Date(latestOrder.date_created).getTime() : Date.now(),
+                shipping_method: latestOrder.shipping?.method || '',
+                shipping_address: latestOrder.shipping?.address || '',
+                restaurant_code: latestOrder.restaurant_code || '',
+                orderable_order_date: latestOrder.orderable_order_date || '',
+                orderable_order_time: latestOrder.orderable_order_time || '',
+              });
+              setShowOrderModal(true);
+            }
+          }
+        } catch (e) {}
+      }
+    });
+
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
       const data = notification.request.content.data as any;
       if (data.event_type === 'new_order') {
@@ -620,6 +663,7 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
       tapSubscription.remove();
+      appStateSubscription.remove();
     };
   }, []);
 
