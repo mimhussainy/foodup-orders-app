@@ -1544,9 +1544,21 @@ const flatData: FlatItem[] = [
                 </View>
                 <View style={styles.divider} />
                 <Text style={styles.orderCustomer}>{order.customer_name}</Text>
-                <View style={styles.orderMeta}>
-                  <Ionicons name="cash-outline" size={14} color="#999" />
-                  <Text style={styles.orderTotal}>{order.currency} {order.total}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                  <View style={styles.orderMeta}>
+                    <Ionicons name="cash-outline" size={14} color="#999" />
+                    <Text style={styles.orderTotal}>{order.currency} {order.total}</Text>
+                  </View>
+                  <View style={styles.orderMeta}>
+                    <Ionicons 
+                      name={order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? 'cash-outline' : 'card-outline'} 
+                      size={14} 
+                      color={order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71'} 
+                    />
+                    <Text style={[styles.orderTotal, { color: order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71' }]}>
+                      {order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash') ? t.cash : t.online}
+                    </Text>
+                  </View>
                 </View>
                 {acceptedTimes[String(order.order_id)] &&
                   (() => {
@@ -1574,21 +1586,38 @@ const flatData: FlatItem[] = [
                     const claim = claims[String(order.order_id)];
                     const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                     return status !== 'delivered';
-                  })()) && <View style={styles.divider} />}
+                  })()) && <View style={[styles.divider, { marginBottom: 0 }]} />}
                 <View style={styles.orderBottomRow}>
                   {order.shipping_method ? (
                     <View style={styles.orderMeta}>
                       <Ionicons name={order.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                       <Text style={styles.orderShipping}>
                         {order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}
-                        {order.orderable_order_time ? ` • ${
-                          order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                        {order.orderable_order_time ? ` • ` : ''}
+                      </Text>
+                      {order.orderable_order_time ? (
+                        <Ionicons 
+                          name={
+                            order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
+                            order.orderable_order_time.toLowerCase().includes('asap') ||
+                            order.orderable_order_time.includes('(')
+                              ? 'timer-outline'
+                              : 'calendar-outline'
+                          }
+                          size={13} 
+                          color="#999" 
+                        />
+                      ) : null}
+                      {order.orderable_order_time ? (
+                        <Text style={styles.orderShipping}>
+                          {order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
                           order.orderable_order_time.toLowerCase().includes('asap') ||
                           order.orderable_order_time.includes('(')
                             ? (t.asapShort || 'ASAP')
                             : t.scheduled || 'Scheduled'
-                        }` : ''}
-                      </Text>
+                          }
+                        </Text>
+                      ) : null}
                     </View>
                   ) : <View />}
                   {claims[String(order.order_id)] ? (
