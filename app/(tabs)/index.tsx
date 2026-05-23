@@ -1464,7 +1464,8 @@ const flatData: FlatItem[] = [
                 return Date.now() > deadline;
               })() : false;
               const isPickup = isPickupMethod(selectedOrder.shipping_method);
-              if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isOverdue || isPickup)) {
+              const hasCourier = !!claim && (typeof claim === 'string' ? true : claim.name && claim.name !== 'Owner');
+              if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isPickup || (isOverdue && !hasCourier))) {
                 return (
                   <TouchableOpacity
                     style={{ backgroundColor: isPickup ? '#2ecc71' : '#3498db', borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
