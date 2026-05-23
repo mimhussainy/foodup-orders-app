@@ -845,10 +845,8 @@ const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({})
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
 const toggleExpanded = (order_id: number) => {
   setExpandedOrders(prev => {
-    const next = new Set(prev);
-    if (next.has(order_id)) next.delete(order_id);
-    else next.add(order_id);
-    return next;
+    if (prev.has(order_id)) return new Set();
+    return new Set([order_id]);
   });
 };
 const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -1435,7 +1433,9 @@ return (
 
                     {/* Order info */}
                     {order.date_created ? (
-                      <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 8 }}>{new Date(order.date_created).toLocaleString()}</Text>
+                      <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 8 }}>
+                        {t.createdAt || 'Created'}: {new Date(order.date_created).toLocaleString()}
+                      </Text>
                     ) : null}
 
                     
@@ -1470,13 +1470,13 @@ return (
                       </TouchableOpacity>
                     ) : null}
                     {order.shipping_address ? (
-                      <TouchableOpacity style={styles.row} onPress={() => { const encoded = encodeURIComponent(order.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
+                      <TouchableOpacity style={[styles.row, !order.note && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(order.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
                         <Ionicons name="location-outline" size={14} color="#999" />
                         <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{order.shipping_address}</Text>
                       </TouchableOpacity>
                     ) : null}
                     {order.note ? (
-                      <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                      <View style={[styles.row, { borderBottomWidth: 0, marginTop: 4 }]}>
                         <View style={{ backgroundColor: '#fffbeb', borderRadius: 8, padding: 10, flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
                           <Ionicons name="alert-circle-outline" size={14} color="#f39c12" style={{ marginTop: 1 }} />
                           <Text style={{ fontSize: 13, color: '#111', fontWeight: '600', flex: 1 }}>{order.note}</Text>
