@@ -844,18 +844,20 @@ const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
 const itemRefs = useRef<{[key: number]: any}>({});
+const currentScrollOffset = useRef(0);
 const toggleExpanded = (order_id: number) => {
   setExpandedOrders(prev => {
     if (prev.has(order_id)) return new Set();
     setTimeout(() => {
       try {
-        itemRefs.current[order_id]?.measureLayout(
-          listRef.current?.getScrollableNode?.() || listRef.current,
-          (x: number, y: number) => {
-            listRef.current?.scrollToOffset({ offset: y - 48, animated: true });
-          },
-          () => {}
-        );
+        itemRefs.current[order_id]?.measureInWindow((x: number, y: number) => {
+          const headerHeight = Platform.OS === 'android' ? 40 + 14 + 12 : 65 + 14 + 12;
+          const searchBarHeight = Platform.OS === 'ios' ? 52 : 34;
+          const filterTabHeight = 48;
+          const topOffset = headerHeight + searchBarHeight + filterTabHeight;
+          const scrollTarget = currentScrollOffset.current + y - topOffset;
+          listRef.current?.scrollToOffset({ offset: Math.max(0, scrollTarget), animated: true });
+        });
       } catch (e) {}
     }, 100);
     return new Set([order_id]);
@@ -1258,6 +1260,8 @@ return (
           keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
           contentContainerStyle={styles.scrollContent}
           stickyHeaderIndices={[2]}
+          onScroll={(e) => { currentScrollOffset.current = e.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
           }
