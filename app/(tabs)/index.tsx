@@ -1341,50 +1341,68 @@ const flatData: FlatItem[] = [
               <>
                 <Text style={styles.groupLabel}>{t.customer}</Text>
                 <View style={styles.section}>
-                  {selectedOrder.date_created ? (
-                    <View style={styles.row}>
-                      <Ionicons name="time-outline" size={14} color="#999" />
-                      <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}</Text>
-                    </View>
-                  ) : null}
                   {autoPrintOrders[String(selectedOrder.order_id)] ? (
-                    <View style={styles.row}>
-                      <Ionicons name="flash-outline" size={14} color="#8B38CB" />
-                      <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB' }]}>Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}</Text>
-                    </View>
+                    <>
+                      <View style={styles.row}>
+                        <Ionicons name="flash-outline" size={14} color="#8B38CB" />
+                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB' }]}>Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}</Text>
+                      </View>
+                      <View style={styles.divider} />
+                    </>
                   ) : null}
                   {(() => {
                     const claim = claims[String(selectedOrder.order_id)];
                     if (claim && claim.status === 'delivered' && claim.delivered_at) {
                       return (
-                        <View style={styles.row}>
-                          <Ionicons name="checkmark-circle-outline" size={14} color="#3498db" />
-                          <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#3498db' }]}>{t.deliveredAt} {claim.delivered_at}</Text>
-                        </View>
+                        <>
+                          <View style={styles.row}>
+                            <Ionicons name="checkmark-circle-outline" size={14} color="#3498db" />
+                            <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#3498db' }]}>{t.deliveredAt} {claim.delivered_at}</Text>
+                          </View>
+                          <View style={styles.divider} />
+                        </>
                       );
                     }
                     return null;
                   })()}
                   {selectedOrder.customer_email ? (
-                    <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`mailto:${selectedOrder.customer_email}`)}>
-                      <Ionicons name="mail-outline" size={14} color="#999" />
-                      <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_email}</Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`mailto:${selectedOrder.customer_email}`)}>
+                        <Ionicons name="mail-outline" size={14} color="#999" />
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_email}</Text>
+                      </TouchableOpacity>
+                      <View style={styles.divider} />
+                    </>
                   ) : null}
                   {selectedOrder.customer_phone ? (
-                    <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${selectedOrder.customer_phone}`)}>
-                      <Ionicons name="call-outline" size={14} color="#999" />
-                      <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_phone}</Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${selectedOrder.customer_phone}`)}>
+                        <Ionicons name="call-outline" size={14} color="#999" />
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_phone}</Text>
+                      </TouchableOpacity>
+                      <View style={styles.divider} />
+                    </>
                   ) : null}
                   {selectedOrder.shipping_address ? (
-                    <TouchableOpacity style={[styles.row, !selectedOrder.note && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
-                      <Ionicons name="location-outline" size={14} color="#999" />
-                      <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.shipping_address}</Text>
-                    </TouchableOpacity>
+                    <>
+                      <TouchableOpacity style={styles.row} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
+                        <Ionicons name="location-outline" size={14} color="#999" />
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.shipping_address}</Text>
+                      </TouchableOpacity>
+                      {selectedOrder.date_created || selectedOrder.note ? <View style={styles.divider} /> : null}
+                    </>
+                  ) : null}
+                  {selectedOrder.date_created ? (
+                    <>
+                      <View style={styles.row}>
+                        <Ionicons name="time-outline" size={14} color="#999" />
+                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}</Text>
+                      </View>
+                      {selectedOrder.note ? <View style={styles.divider} /> : null}
+                    </>
                   ) : null}
                   {selectedOrder.note ? (
-                    <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                    <View style={styles.row}>
                       <View style={{ backgroundColor: '#fffbeb', borderRadius: 8, padding: 10, flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
                         <Ionicons name="alert-circle-outline" size={14} color="#f39c12" style={{ marginTop: 1 }} />
                         <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, color: '#111', fontWeight: '600', flex: 1 }}>{selectedOrder.note}</Text>
@@ -1777,7 +1795,7 @@ const styles = StyleSheet.create({
   detailDate: { fontSize: 13, color: '#999', marginHorizontal: 16, marginBottom: 8 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   statusBadgeText: { fontSize: 13, fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   rowValue: { fontSize: 14, color: '#111', fontWeight: '500', flex: 1 },
   linkValue: { color: '#007AFF' },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
