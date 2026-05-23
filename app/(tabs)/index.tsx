@@ -84,12 +84,12 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   return (
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="time-outline" size={12} color={barColor} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="time-outline" size={14} color={barColor} />
           <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>{label}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="calendar-outline" size={13} color="#8B38CB" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={14} color="#8B38CB" />
           <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
           {(() => {
             const parts = at.split('—');
@@ -152,13 +152,13 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="hourglass-outline" size={13} color={color} />
+          <Ionicons name="hourglass-outline" size={14} color={color} />
           <Text style={{ fontSize: 12, fontWeight: '700', color }}>
             {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="checkmark-circle-outline" size={13} color="#8B38CB" />
+          <Ionicons name="checkmark-circle-outline" size={14} color="#8B38CB" />
           <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
             {accepted_time.replace('Minutes', 'mins')}
           </Text>
@@ -169,7 +169,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
               const minutes = String(deadlineDate.getMinutes()).padStart(2, '0');
               return (
                 <>
-                  <Ionicons name="flash-outline" size={13} color="#8B38CB" />
+                  <Ionicons name="flash-outline" size={14} color="#8B38CB" />
                   <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>{hours}:{minutes}</Text>
                 </>
               );
@@ -1656,12 +1656,12 @@ const flatData: FlatItem[] = [
                 <View style={styles.divider} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="person-outline" size={16} color="#999" />
+                    <Ionicons name="person-outline" size={14} color="#999" />
                     <Text style={styles.orderCustomer}>{order.customer_name}</Text>
                   </View>
                   {order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name={isScheduledOrder(order) ? 'calendar-outline' : 'flash-outline'} size={13} color={isScheduledOrder(order) ? '#8B38CB' : '#f39c12'} />
+                      <Ionicons name={isScheduledOrder(order) ? 'calendar-outline' : 'flash-outline'} size={14} color={isScheduledOrder(order) ? '#8B38CB' : '#f39c12'} />
                       <Text style={{ fontSize: 13, fontWeight: '700', color: isScheduledOrder(order) ? '#8B38CB' : '#f39c12' }}>
                         {isScheduledOrder(order) ? t.scheduled : t.asapShort}
                       </Text>
@@ -1795,7 +1795,7 @@ const styles = StyleSheet.create({
   detailDate: { fontSize: 13, color: '#999', marginHorizontal: 16, marginBottom: 8 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 12 },
   statusBadgeText: { fontSize: 13, fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6, },
   rowValue: { fontSize: 14, color: '#111', fontWeight: '500', flex: 1 },
   linkValue: { color: '#007AFF' },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
