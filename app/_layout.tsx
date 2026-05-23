@@ -641,12 +641,8 @@ export default function RootLayout() {
       if (data.event_type === 'auto_accepted') {
         try {
           const code = await AsyncStorage.getItem('restaurant_code') || '';
-          const deviceId = await AsyncStorage.getItem('device_id') || '';
-          const printerRes = await fetch(`${BACKEND_URL}/printer-device/${code}`);
-          const printerData = await printerRes.json();
-          if (printerData.device_id && printerData.device_id === deviceId) {
-            // Save flag so order card shows print button
-            await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
+          // Save flag so order card shows print button (canPrint in index.tsx controls visibility)
+          await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
               accepted_time: data.accepted_time || '',
               order_id: data.order_id,
               customer_name: data.customer_name || '',
@@ -663,7 +659,6 @@ export default function RootLayout() {
               date_created: data.date_created || '',
               items: data.items || '[]',
             }));
-          }
         } catch(e) {}
         return;
       }

@@ -1069,6 +1069,8 @@ useEffect(() => {
         shipping_method: data.shipping_method || '',
         shipping_address: data.shipping_address || '',
         restaurant_code: data.restaurant_code || '',
+        orderable_order_time: data.orderable_order_time || '',
+        orderable_order_date: data.orderable_order_date || '',
         };
 
         if (data.event_type === 'status_update') {
