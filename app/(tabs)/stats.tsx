@@ -64,6 +64,49 @@ export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const fetchAllStats = useCallback(async () => {
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+    if (!code) return;
+    const [ordersResult, deliveredResult, claimsResult, ordersForClaims] = await Promise.all([
+      fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
+      fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`).then(r => r.json()).catch(() => ({})),
+      fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()).catch(() => ({})),
+      fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
+    ]);
+    if (ordersResult.success) {
+      const validOrders = ordersResult.orders.filter((o: any) => o.date_created).map((o: any) => ({
+        order_id: parseInt(o.order_id),
+        total: String(o.total || ''),
+        currency: o.currency || 'CHF',
+        status: o.status || '',
+        payment_method: o.payment_method || '',
+        timestamp: new Date(o.date_created).getTime(),
+        shipping_method: o.shipping?.method || '',
+      }));
+      setOrders(validOrders);
+    }
+    if (deliveredResult.success) setCourierDelivered(deliveredResult.couriers);
+    if (claimsResult.success && ordersForClaims.success) {
+      setAllOrders(ordersForClaims.orders);
+      const grouped: { [key: string]: any[] } = {};
+      Object.entries(claimsResult.claims).forEach(([orderId, claim]: any) => {
+        if (claim.status === 'delivered') return;
+        const name = claim.name;
+        if (!name) return;
+        const order = ordersForClaims.orders.find((o: any) => String(o.order_id) === String(orderId));
+        if (!order) return;
+        if (!grouped[name]) grouped[name] = [];
+        grouped[name].push({
+          order_id: parseInt(orderId),
+          total: String(order.total || ''),
+          currency: order.currency || 'CHF',
+          payment_method: order.payment_method || '',
+          status: claim.status,
+        });
+      });
+      setCourierClaims(grouped);
+    }
+  }, []);
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
   const [courierClaims, setCourierClaims] = useState<{ [key: string]: any[] }>({});
@@ -79,75 +122,11 @@ useFocusEffect(
       setTimeout(() => {
         try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
       }, 300);
-      AsyncStorage.getItem('restaurant_code').then(code => {
-        if (code) {
-          fetch(`https://foodup-order-alerts-backend.onrender.com/orders/${code}`)
-            .then(r => r.json())
-            .then(result => {
-              if (result.success) {
-                const validOrders = result.orders
-                  .filter((o: any) => o.date_created)
-                  .map((o: any) => ({
-                    order_id: parseInt(o.order_id),
-                    total: String(o.total || ''),
-                    currency: o.currency || 'CHF',
-                    status: o.status || '',
-                    payment_method: o.payment_method || '',
-                    timestamp: new Date(o.date_created).getTime(),
-                    shipping_method: o.shipping?.method || '',
-                  }));
-                setOrders(validOrders);
-              }
-            })
-            .catch(() => {});
-        }
-      });
-      AsyncStorage.getItem('restaurant_code').then(code => {
-        if (code) {
-          fetch(`${BACKEND_URL}/courier-stats/${code}`)
-            .then(r => r.json())
-            .then(result => {
-              if (result.success) setCourierStats(result.stats);
-            })
-            .catch(() => {});
-          fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`)
-            .then(r => r.json())
-            .then(result => {
-              if (result.success) setCourierDelivered(result.couriers);
-            })
-            .catch(() => {});
-          // Fetch claims and orders for in-progress tracking
-          Promise.all([
-            fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()),
-            fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()),
-          ]).then(([claimsResult, ordersResult]) => {
-            if (claimsResult.success && ordersResult.success) {
-              setAllOrders(ordersResult.orders);
-              // Group claims by courier name
-              const grouped: { [key: string]: any[] } = {};
-              Object.entries(claimsResult.claims).forEach(([orderId, claim]: any) => {
-                if (claim.status === 'delivered') return;
-                const name = claim.name;
-                if (!name) return;
-                const order = ordersResult.orders.find((o: any) => String(o.order_id) === String(orderId));
-                if (!order) return;
-                if (!grouped[name]) grouped[name] = [];
-                grouped[name].push({
-                  order_id: parseInt(orderId),
-                  total: String(order.total || ''),
-                  currency: order.currency || 'CHF',
-                  payment_method: order.payment_method || '',
-                  status: claim.status,
-                });
-              });
-              setCourierClaims(grouped);
-            }
-          }).catch(() => {});
-        }
-      });
-    }, [])
+      fetchAllStats();
+      const interval = setInterval(fetchAllStats, 15000);
+      return () => clearInterval(interval);
+    }, [fetchAllStats])
   );
-
   const toggleExpand = (key: string) => {
     setExpanded(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
@@ -247,55 +226,7 @@ useFocusEffect(
               refreshing={refreshing}
               onRefresh={async () => {
                 setRefreshing(true);
-                const code = await AsyncStorage.getItem('restaurant_code') || '';
-                if (code) {
-                  await Promise.all([
-                    fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).then(result => {
-                      if (result.success) {
-                        const validOrders = result.orders
-                          .filter((o: any) => o.date_created)
-                          .map((o: any) => ({
-                            order_id: parseInt(o.order_id),
-                            total: String(o.total || ''),
-                            currency: o.currency || 'CHF',
-                            status: o.status || '',
-                            payment_method: o.payment_method || '',
-                            timestamp: new Date(o.date_created).getTime(),
-                            shipping_method: o.shipping?.method || '',
-                          }));
-                        setOrders(validOrders);
-                      }
-                    }).catch(() => {}),
-                    fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`).then(r => r.json()).then(result => {
-                      if (result.success) setCourierDelivered(result.couriers);
-                    }).catch(() => {}),
-                    Promise.all([
-                      fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()),
-                      fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()),
-                    ]).then(([claimsResult, ordersResult]) => {
-                      if (claimsResult.success && ordersResult.success) {
-                        setAllOrders(ordersResult.orders);
-                        const grouped: { [key: string]: any[] } = {};
-                        Object.entries(claimsResult.claims).forEach(([orderId, claim]: any) => {
-                          if (claim.status === 'delivered') return;
-                          const name = claim.name;
-                          if (!name) return;
-                          const order = ordersResult.orders.find((o: any) => String(o.order_id) === String(orderId));
-                          if (!order) return;
-                          if (!grouped[name]) grouped[name] = [];
-                          grouped[name].push({
-                            order_id: parseInt(orderId),
-                            total: String(order.total || ''),
-                            currency: order.currency || 'CHF',
-                            payment_method: order.payment_method || '',
-                            status: claim.status,
-                          });
-                        });
-                        setCourierClaims(grouped);
-                      }
-                    }).catch(() => {}),
-                  ]);
-                }
+                await fetchAllStats();
                 setRefreshing(false);
               }}
               tintColor="#111"
