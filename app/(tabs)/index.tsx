@@ -1241,11 +1241,11 @@ const flatData: FlatItem[] = [
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={[styles.section, { marginTop: 16, paddingTop: 14, paddingBottom: 14 }]}>
 
-              {/* Order ID + status */}
+              {/* TOP ROW - same as card */}
               <View style={styles.orderTopRow}>
-                <Text style={styles.detailOrderId}>Order #{selectedOrder.order_id}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
-                  <Text style={[styles.statusBadgeText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
+                <Text style={styles.orderId}>Order #{selectedOrder.order_id}</Text>
+                <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
+                  <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
                     {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
                   </Text>
                 </View>
@@ -1253,71 +1253,40 @@ const flatData: FlatItem[] = [
 
               <View style={styles.divider} />
 
-              {/* Created at */}
-              {selectedOrder.date_created ? (
-                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 6 }}>
-                  {t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}
-                </Text>
-              ) : null}
-
-              {/* Auto accepted */}
-              {autoPrintOrders[String(selectedOrder.order_id)] && (
-                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#8B38CB', marginBottom: 4 }}>
-                  ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
-                </Text>
-              )}
-
-              {/* Delivered at */}
-              {(() => {
-                const claim = claims[String(selectedOrder.order_id)];
-                if (claim && claim.status === 'delivered' && claim.delivered_at) {
-                  return <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#3498db', marginBottom: 6 }}>✓ {t.deliveredAt} {claim.delivered_at}</Text>;
-                }
-                return null;
-              })()}
-
-              {/* ASAP / Pre-order */}
-              {selectedOrder.orderable_order_date || selectedOrder.orderable_order_time ? (() => {
-                const isAsap = selectedOrder.orderable_order_time?.toLowerCase().includes('as soon as possible') || selectedOrder.orderable_order_time?.includes('(');
-                return (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <Ionicons name={isAsap ? 'flash-outline' : 'calendar-outline'} size={14} color={isAsap ? '#f39c12' : '#8B38CB'} />
-                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, color: isAsap ? '#f39c12' : '#8B38CB', fontWeight: '700' }}>
-                      {isAsap ? (t.asapShort || 'ASAP') : `${t.scheduledFor || 'Scheduled for'}: ${selectedOrder.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${selectedOrder.orderable_order_date}`}
-                    </Text>
-                  </View>
-                );
-              })() : null}
-
-              {/* Customer name */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              {/* CUSTOMER + ORDER TYPE - same as card collapsed */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="person-outline" size={Platform.OS === 'android' ? 13 : 14} color="#999" />
+                  <Ionicons name="person-outline" size={16} color="#999" />
                   <Text style={styles.orderCustomer}>{selectedOrder.customer_name}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name={selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? 'cash-outline' : 'card-outline'} size={14} color={selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71'} />
-                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71' }}>
-                    {selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? t.notPaid : t.paidOnline}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Price + shipping */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="cash-outline" size={14} color="#999" />
-                  <Text style={styles.orderTotal}>{selectedOrder.currency} {selectedOrder.total}</Text>
-                </View>
-                {selectedOrder.shipping_method ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name={selectedOrder.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
-                    <Text style={styles.orderShipping}>{selectedOrder.shipping_method === 'Abholung' ? t.pickupLabel : selectedOrder.shipping_method === 'Lieferung' ? t.deliveryLabel : selectedOrder.shipping_method}</Text>
+                {selectedOrder.orderable_order_time ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name={isScheduledOrder(selectedOrder) ? 'calendar-outline' : 'flash-outline'} size={13} color={isScheduledOrder(selectedOrder) ? '#8B38CB' : '#f39c12'} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isScheduledOrder(selectedOrder) ? '#8B38CB' : '#f39c12' }}>
+                      {isScheduledOrder(selectedOrder) ? t.scheduled : t.asapShort}
+                    </Text>
                   </View>
                 ) : null}
               </View>
 
-              {/* Countdown */}
+              {/* PRICE + PAYMENT - same as card collapsed */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <View style={styles.orderMeta}>
+                  <Ionicons name="cash-outline" size={14} color="#999" />
+                  <Text style={styles.orderTotal}>{selectedOrder.currency} {selectedOrder.total}</Text>
+                </View>
+                {(() => {
+                  const isCash = selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash');
+                  return (
+                    <View style={styles.orderMeta}>
+                      <Ionicons name={isCash ? 'cash-outline' : 'card-outline'} size={14} color={isCash ? '#e74c3c' : '#2ecc71'} />
+                      <Text style={[styles.orderTotal, { color: isCash ? '#e74c3c' : '#2ecc71' }]}>{isCash ? t.notPaid : t.paidOnline}</Text>
+                    </View>
+                  );
+                })()}
+              </View>
+
+              {/* COUNTDOWN - same as card collapsed */}
               {acceptedTimes[String(selectedOrder.order_id)] && (() => {
                 const claim = claims[String(selectedOrder.order_id)];
                 const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
@@ -1335,7 +1304,62 @@ const flatData: FlatItem[] = [
                 return <OrderCountdown accepted_at={acceptedTimes[String(selectedOrder.order_id)].accepted_at} accepted_time={at} />;
               })()}
 
+              {/* BOTTOM ROW - same as card collapsed */}
+              {!(acceptedTimes[String(selectedOrder.order_id)] && (() => {
+                const claim = claims[String(selectedOrder.order_id)];
+                const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                return status !== 'delivered';
+              })()) && <View style={[styles.divider, { marginBottom: 0 }]} />}
+              <View style={styles.orderBottomRow}>
+                {selectedOrder.shipping_method ? (
+                  <View style={styles.orderMeta}>
+                    <Ionicons name={selectedOrder.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                    <Text style={styles.orderShipping}>{selectedOrder.shipping_method === 'Abholung' ? t.pickupLabel : selectedOrder.shipping_method === 'Lieferung' ? t.deliveryLabel : selectedOrder.shipping_method}</Text>
+                  </View>
+                ) : <View />}
+                {claims[String(selectedOrder.order_id)] ? (
+                  <View style={styles.orderMeta}>
+                    {(() => {
+                      const claim = claims[String(selectedOrder.order_id)];
+                      const name = (() => { const raw = typeof claim === 'string' ? claim : claim.name; if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; if (raw === 'Owner' || raw === '__owner__') return t.pickedUp; return raw; })();
+                      const status = typeof claim === 'string' ? 'delivering' : claim.status;
+                      const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
+                      return (
+                        <>
+                          <Ionicons name={status === 'delivered' ? 'checkmark-circle-outline' : status === 'delivering' ? 'car-outline' : 'bag-outline'} size={14} color={color} />
+                          <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
+                        </>
+                      );
+                    })()}
+                  </View>
+                ) : null}
+              </View>
+
+              {/* EXPANDED DETAILS - exactly like expanded card */}
               <View style={[styles.divider, { marginTop: 8 }]} />
+
+              {/* Created at */}
+              {selectedOrder.date_created ? (
+                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 8 }}>
+                  {t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}
+                </Text>
+              ) : null}
+
+              {/* Auto accepted */}
+              {autoPrintOrders[String(selectedOrder.order_id)] && (
+                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#8B38CB', marginBottom: 4 }}>
+                  ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
+                </Text>
+              )}
+
+              {/* Delivered at */}
+              {(() => {
+                const claim = claims[String(selectedOrder.order_id)];
+                if (claim && claim.status === 'delivered' && claim.delivered_at) {
+                  return <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#3498db', marginBottom: 8 }}>✓ {t.deliveredAt} {claim.delivered_at}</Text>;
+                }
+                return null;
+              })()}
 
               {/* Email */}
               {selectedOrder.customer_email ? (
@@ -1355,7 +1379,7 @@ const flatData: FlatItem[] = [
 
               {/* Address */}
               {selectedOrder.shipping_address ? (
-                <TouchableOpacity style={[styles.row, !selectedOrder.note && !selectedOrder.items?.length && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
+                <TouchableOpacity style={[styles.row, !selectedOrder.note && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
                   <Ionicons name="location-outline" size={14} color="#999" />
                   <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.shipping_address}</Text>
                 </TouchableOpacity>
@@ -1363,7 +1387,7 @@ const flatData: FlatItem[] = [
 
               {/* Note */}
               {selectedOrder.note ? (
-                <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                <View style={[styles.row, { borderBottomWidth: 0, marginTop: 4 }]}>
                   <View style={{ backgroundColor: '#fffbeb', borderRadius: 8, padding: 10, flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
                     <Ionicons name="alert-circle-outline" size={14} color="#f39c12" style={{ marginTop: 1 }} />
                     <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, color: '#111', fontWeight: '600', flex: 1 }}>{selectedOrder.note}</Text>
@@ -1386,10 +1410,6 @@ const flatData: FlatItem[] = [
                       ))}
                     </View>
                   ))}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F0F0', marginTop: 4 }}>
-                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{t.total}</Text>
-                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{selectedOrder.currency} {selectedOrder.total}</Text>
-                  </View>
                 </>
               )}
 
