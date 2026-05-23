@@ -843,17 +843,17 @@ const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string
 const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
-const toggleExpanded = (order_id: number, index?: number) => {
+const toggleExpanded = (order_id: number, flatIndex?: number) => {
   setExpandedOrders(prev => {
     if (prev.has(order_id)) return new Set();
     return new Set([order_id]);
   });
-  if (index !== undefined) {
+  if (flatIndex !== undefined) {
     setTimeout(() => {
       try {
-        listRef.current?.scrollToIndex({ index: index + 3, animated: true, viewPosition: 0 });
+        listRef.current?.scrollToIndex({ index: flatIndex, animated: true, viewPosition: 0 });
       } catch (e) {}
-    }, 100);
+    }, 150);
   }
 };
 const pulseAnim = useRef(new Animated.Value(1)).current;
