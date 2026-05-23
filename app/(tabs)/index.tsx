@@ -158,7 +158,25 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
             {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
         </View>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {accepted_time.replace('Minutes', t.minutes || 'minutes')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="checkmark-circle-outline" size={13} color="#8B38CB" />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
+            {accepted_time.replace('Minutes', 'mins')}
+          </Text>
+          {(() => {
+            try {
+              const deadlineDate = new Date(new Date(accepted_at).getTime() + parseInt(accepted_time.replace(/[^0-9]/g, '')) * 60000);
+              const hours = String(deadlineDate.getHours()).padStart(2, '0');
+              const minutes = String(deadlineDate.getMinutes()).padStart(2, '0');
+              return (
+                <>
+                  <Ionicons name="flash-outline" size={13} color="#8B38CB" />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>{hours}:{minutes}</Text>
+                </>
+              );
+            } catch (e) { return null; }
+          })()}
+        </View>
       </View>
       <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
         <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
@@ -1732,7 +1750,7 @@ const flatData: FlatItem[] = [
                                 status === 'delivering' ? 'car-outline' :
                                 'bag-outline'
                               }
-                              size={20}
+                              size={14}
                               color={color}
                             />
                             <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
