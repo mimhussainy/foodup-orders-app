@@ -1240,8 +1240,9 @@ const flatData: FlatItem[] = [
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
 
+            <Text style={styles.groupLabel}>{t.orderSummary || 'Order Summary'}</Text>
             {/* ── CARD (collapsed style, not tappable) ── */}
-            <View style={[styles.section, { marginTop: 16, paddingTop: 14, paddingBottom: 14 }]}>
+            <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
               <View style={styles.orderTopRow}>
                 <Text style={styles.orderId}>Order #{selectedOrder.order_id}</Text>
                 <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
@@ -1759,12 +1760,12 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, fontWeight: '600', color: '#333', marginTop: 8 },
   emptySubText: { fontSize: 14, color: '#999' },
   groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12, marginBottom: 6, marginHorizontal: 20 },
-  section: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  section: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   orderId: { fontSize: Platform.OS === 'android' ? 15 : 14, color: '#666', fontWeight: '500' },
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: Platform.OS === 'android' ? 11 : 12, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
+  divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 10, marginTop: 3 },
   orderCustomer: { fontSize: Platform.OS === 'android' ? 13 : 15, fontWeight: '700', color: '#111', marginBottom: 2 },
   orderFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   orderTotal: { fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' },
