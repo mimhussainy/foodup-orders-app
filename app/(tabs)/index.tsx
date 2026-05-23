@@ -86,11 +86,11 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="time-outline" size={14} color={barColor} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>{label}</Text>
+          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: barColor }}>{label}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="calendar-outline" size={14} color="#8B38CB" />
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
+          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>
           {(() => {
             const parts = at.split('—');
             if (parts.length < 2) return at;
@@ -153,13 +153,13 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="hourglass-outline" size={14} color={color} />
-          <Text style={{ fontSize: 12, fontWeight: '700', color }}>
+          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color }}>
             {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Ionicons name="checkmark-circle-outline" size={14} color="#8B38CB" />
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
+          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>
             {accepted_time.replace('Minutes', 'mins')}
           </Text>
           {(() => {
@@ -170,7 +170,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
               return (
                 <>
                   <Ionicons name="flash-outline" size={14} color="#8B38CB" />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>{hours}:{minutes}</Text>
+                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>{hours}:{minutes}</Text>
                 </>
               );
             } catch (e) { return null; }
@@ -1662,7 +1662,7 @@ const flatData: FlatItem[] = [
                   {order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons name={isScheduledOrder(order) ? 'calendar-outline' : 'flash-outline'} size={14} color={isScheduledOrder(order) ? '#8B38CB' : '#f39c12'} />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: isScheduledOrder(order) ? '#8B38CB' : '#f39c12' }}>
+                      <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: isScheduledOrder(order) ? '#8B38CB' : '#f39c12' }}>
                         {isScheduledOrder(order) ? t.scheduled : t.asapShort}
                       </Text>
                     </View>
@@ -1796,7 +1796,7 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 8, paddingHorizontal: 12 },
   statusBadgeText: { fontSize: 13, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, },
-  rowValue: { fontSize: 14, color: '#111', fontWeight: '500', flex: 1 },
+  rowValue: { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#111', fontWeight: '500', flex: 1 },
   linkValue: { color: '#007AFF' },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   itemName: { fontSize: 15, fontWeight: '600', color: '#111', flex: 1, marginRight: 8 },
