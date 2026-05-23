@@ -843,17 +843,18 @@ const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string
 const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
-const toggleExpanded = (order_id: number, flatIndex?: number) => {
+const itemOffsets = useRef<{[key: number]: number}>({});
+const toggleExpanded = (order_id: number) => {
   setExpandedOrders(prev => {
-    const isClosing = prev.has(order_id);
-    if (isClosing) return new Set();
-    if (flatIndex !== undefined) {
-      setTimeout(() => {
-        try {
-          listRef.current?.scrollToIndex({ index: flatIndex, animated: true, viewPosition: 0 });
-        } catch (e) {}
-      }, 150);
-    }
+    if (prev.has(order_id)) return new Set();
+    setTimeout(() => {
+      try {
+        const offset = itemOffsets.current[order_id];
+        if (offset !== undefined) {
+          listRef.current?.scrollToOffset({ offset: offset - 48, animated: true });
+        }
+      } catch (e) {}
+    }, 50);
     return new Set([order_id]);
   });
 };
@@ -1314,9 +1315,12 @@ return (
               return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
             };
             return (
-              <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
+              <View
+                style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}
+                onLayout={(e) => { itemOffsets.current[order.order_id] = e.nativeEvent.layout.y; }}
+              >
                 {/* TOP ROW */}
-                <TouchableOpacity onPress={() => toggleExpanded(order.order_id, flatData.findIndex(f => f.type === 'order' && f.item.order_id === order.order_id))} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => toggleExpanded(order.order_id)} activeOpacity={0.7}>
                   <View style={styles.orderTopRow}>
                     <Text style={styles.orderId}>Order #{order.order_id}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
