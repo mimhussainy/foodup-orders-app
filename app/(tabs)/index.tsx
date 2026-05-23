@@ -934,11 +934,13 @@ useEffect(() => {
       const deviceId = Application.getAndroidId() || '';
       const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
       const result = await res.json();
+      console.log('=== PRINT CHECK: deviceId:', deviceId, 'backend:', result.device_id, 'match:', result.device_id === deviceId);
       const allowed = result.success && result.device_id && result.device_id === deviceId;
       setCanPrint(allowed);
       await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
       return allowed;
     } catch (e) {
+      console.log('=== PRINT CHECK ERROR:', e);
       return false;
     }
   };
@@ -1610,7 +1612,21 @@ const flatData: FlatItem[] = [
                   </View>
                 </View>
                 <View style={styles.divider} />
-                <Text style={styles.orderCustomer}>{order.customer_name}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.orderCustomer}>{order.customer_name}</Text>
+                  {order.orderable_order_time ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons
+                        name={isScheduledOrder(order) ? 'calendar-outline' : 'flash-outline'}
+                        size={13}
+                        color={isScheduledOrder(order) ? '#8B38CB' : '#f39c12'}
+                      />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: isScheduledOrder(order) ? '#8B38CB' : '#f39c12' }}>
+                        {isScheduledOrder(order) ? t.scheduled : t.asapShort}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                   <View style={styles.orderMeta}>
                     <Ionicons name="cash-outline" size={14} color="#999" />
