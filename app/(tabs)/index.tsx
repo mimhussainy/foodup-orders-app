@@ -843,18 +843,21 @@ const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string
 const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
-const itemOffsets = useRef<{[key: number]: number}>({});
+const itemRefs = useRef<{[key: number]: any}>({});
 const toggleExpanded = (order_id: number) => {
   setExpandedOrders(prev => {
     if (prev.has(order_id)) return new Set();
     setTimeout(() => {
       try {
-        const offset = itemOffsets.current[order_id];
-        if (offset !== undefined) {
-          listRef.current?.scrollToOffset({ offset: offset - 48, animated: true });
-        }
+        itemRefs.current[order_id]?.measureLayout(
+          listRef.current?.getScrollableNode?.() || listRef.current,
+          (x: number, y: number) => {
+            listRef.current?.scrollToOffset({ offset: y - 48, animated: true });
+          },
+          () => {}
+        );
       } catch (e) {}
-    }, 50);
+    }, 100);
     return new Set([order_id]);
   });
 };
@@ -1317,7 +1320,7 @@ return (
             return (
               <View
                 style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}
-                onLayout={(e) => { itemOffsets.current[order.order_id] = e.nativeEvent.layout.y; }}
+                ref={(ref) => { itemRefs.current[order.order_id] = ref; }}
               >
                 {/* TOP ROW */}
                 <TouchableOpacity onPress={() => toggleExpanded(order.order_id)} activeOpacity={0.7}>
