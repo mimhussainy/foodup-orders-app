@@ -845,16 +845,17 @@ const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({})
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
 const toggleExpanded = (order_id: number, flatIndex?: number) => {
   setExpandedOrders(prev => {
-    if (prev.has(order_id)) return new Set();
+    const isClosing = prev.has(order_id);
+    if (isClosing) return new Set();
+    if (flatIndex !== undefined) {
+      setTimeout(() => {
+        try {
+          listRef.current?.scrollToIndex({ index: flatIndex, animated: true, viewPosition: 0 });
+        } catch (e) {}
+      }, 150);
+    }
     return new Set([order_id]);
   });
-  if (flatIndex !== undefined) {
-    setTimeout(() => {
-      try {
-        listRef.current?.scrollToIndex({ index: flatIndex, animated: true, viewPosition: 0 });
-      } catch (e) {}
-    }, 150);
-  }
 };
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
