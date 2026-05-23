@@ -1410,10 +1410,10 @@ const flatData: FlatItem[] = [
                       ))}
                     </View>
                   ))}
-                </View>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>{t.total}</Text>
-                  <Text style={styles.totalValue}>{selectedOrder.currency} {selectedOrder.total}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, marginTop: 4, borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
+                    <Text style={styles.totalLabel}>{t.total}</Text>
+                    <Text style={styles.totalValue}>{selectedOrder.currency} {selectedOrder.total}</Text>
+                  </View>
                 </View>
               </>
             )}
@@ -1758,10 +1758,10 @@ const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#333', marginTop: 8 },
   emptySubText: { fontSize: 14, color: '#999' },
-  groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },
+  groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 12, marginBottom: 6, marginHorizontal: 20 },
   section: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderId: { fontSize: Platform.OS === 'android' ? 11 : 13, color: '#666', fontWeight: '500' },
+  orderId: { fontSize: Platform.OS === 'android' ? 15 : 14, color: '#666', fontWeight: '500' },
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: Platform.OS === 'android' ? 11 : 12, fontWeight: '600' },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
