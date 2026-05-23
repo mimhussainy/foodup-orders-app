@@ -76,8 +76,9 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const mins = Math.floor((absMs % 3600000) / 60000);
   const secs = Math.floor((absMs % 60000) / 1000);
   const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
-  const showBar = isOverdue || remainingMs <= 3600000;
-  const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
+  const showBar = true;
+  const maxMs = Math.max(remainingMs, 3600000);
+  const countdownProgress = Math.max(0, Math.min(1, remainingMs / maxMs));
   
   const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
 
@@ -85,7 +86,20 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>✓ {at}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
+          ✓ {(() => {
+            const parts = at.split('—');
+            if (parts.length < 2) return at;
+            const timePart = parts[0].trim();
+            const datePart = parts[1].trim();
+            const dateSections = datePart.split('/');
+            if (dateSections.length < 3) return at;
+            const scheduledDate = new Date(`${dateSections[2]}-${dateSections[1]}-${dateSections[0]}`);
+            const today = new Date();
+            const isToday = scheduledDate.toDateString() === today.toDateString();
+            return isToday ? timePart : at;
+          })()}
+        </Text>
       </View>
       {showBar && (
         <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
@@ -1676,7 +1690,6 @@ const flatData: FlatItem[] = [
                       <Text style={styles.orderShipping}>
                         {order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}
                       </Text>
-                      
                     </View>
                   ) : <View />}
                   {claims[String(order.order_id)] ? (

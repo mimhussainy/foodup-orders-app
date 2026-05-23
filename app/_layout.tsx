@@ -619,14 +619,16 @@ export default function RootLayout() {
               });
               setShowOrderModal(true);
             // Check in background if already accepted, close modal if so
-            fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
-              .then(r => r.json())
-              .then(result => {
-                if (result.success && result.accepted_time) {
-                  setShowOrderModal(false);
-                  setNewOrderModal(null);
-                }
-              }).catch(() => {});
+            setTimeout(() => {
+              fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
+                .then(r => r.json())
+                .then(result => {
+                  if (result.success && result.accepted_time) {
+                    setShowOrderModal(false);
+                    setNewOrderModal(null);
+                  }
+                }).catch(() => {});
+            }, 3000);
           }
         }
       } catch (e) {}
@@ -669,6 +671,13 @@ export default function RootLayout() {
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
         if (role === 'owner') {
+          // Check if already accepted before showing modal
+          try {
+            const code = await AsyncStorage.getItem('restaurant_code') || '';
+            const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${data.order_id}`);
+            const acceptedResult = await acceptedRes.json();
+            if (acceptedResult.success && acceptedResult.accepted_time) return;
+          } catch(e) {}
           const newOrder = {
             order_id: parseInt(data.order_id),
             customer_name: data.customer_name || '',
