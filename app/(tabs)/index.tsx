@@ -1239,73 +1239,129 @@ const flatData: FlatItem[] = [
         </View>
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={[styles.section, { marginTop: 16, paddingTop: 14, paddingBottom: 14 }]}>
 
-            {/* Order ID + status */}
-            <View style={styles.detailTitleRow}>
-              <Text style={styles.detailOrderId}>Order #{selectedOrder.order_id}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
-                <Text style={[styles.statusBadgeText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
-                  {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Created at */}
-            {selectedOrder.date_created ? (
-              <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginHorizontal: 16, marginBottom: 8 }}>
-                {t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}
-              </Text>
-            ) : null}
-
-            {/* Auto accepted */}
-            {autoPrintOrders[String(selectedOrder.order_id)] && (
-              <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#8B38CB', marginHorizontal: 16, marginBottom: 4 }}>
-                ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
-              </Text>
-            )}
-
-            {/* Delivered at */}
-            {(() => {
-              const claim = claims[String(selectedOrder.order_id)];
-              if (claim && claim.status === 'delivered' && claim.delivered_at) {
-                return <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#3498db', marginHorizontal: 16, marginBottom: 8 }}>✓ {t.deliveredAt} {claim.delivered_at}</Text>;
-              }
-              return null;
-            })()}
-
-            {/* ASAP / Pre-order */}
-            {selectedOrder.orderable_order_date || selectedOrder.orderable_order_time ? (() => {
-              const isAsap = selectedOrder.orderable_order_time?.toLowerCase().includes('as soon as possible') || selectedOrder.orderable_order_time?.includes('(');
-              return (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginBottom: 8 }}>
-                  <Ionicons name={isAsap ? 'flash-outline' : 'calendar-outline'} size={14} color={isAsap ? '#f39c12' : '#8B38CB'} />
-                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, color: isAsap ? '#f39c12' : '#8B38CB', fontWeight: '700' }}>
-                    {isAsap ? (t.asapShort || 'ASAP') : `${t.scheduledFor || 'Scheduled for'}: ${selectedOrder.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${selectedOrder.orderable_order_date}`}
+              {/* Order ID + status */}
+              <View style={styles.orderTopRow}>
+                <Text style={styles.detailOrderId}>Order #{selectedOrder.order_id}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
+                  <Text style={[styles.statusBadgeText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
+                    {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
                   </Text>
                 </View>
-              );
-            })() : null}
+              </View>
 
-            {/* Customer */}
-            <View style={styles.section}>
+              <View style={styles.divider} />
+
+              {/* Created at */}
+              {selectedOrder.date_created ? (
+                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 6 }}>
+                  {t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}
+                </Text>
+              ) : null}
+
+              {/* Auto accepted */}
+              {autoPrintOrders[String(selectedOrder.order_id)] && (
+                <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#8B38CB', marginBottom: 4 }}>
+                  ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
+                </Text>
+              )}
+
+              {/* Delivered at */}
+              {(() => {
+                const claim = claims[String(selectedOrder.order_id)];
+                if (claim && claim.status === 'delivered' && claim.delivered_at) {
+                  return <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#3498db', marginBottom: 6 }}>✓ {t.deliveredAt} {claim.delivered_at}</Text>;
+                }
+                return null;
+              })()}
+
+              {/* ASAP / Pre-order */}
+              {selectedOrder.orderable_order_date || selectedOrder.orderable_order_time ? (() => {
+                const isAsap = selectedOrder.orderable_order_time?.toLowerCase().includes('as soon as possible') || selectedOrder.orderable_order_time?.includes('(');
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <Ionicons name={isAsap ? 'flash-outline' : 'calendar-outline'} size={14} color={isAsap ? '#f39c12' : '#8B38CB'} />
+                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, color: isAsap ? '#f39c12' : '#8B38CB', fontWeight: '700' }}>
+                      {isAsap ? (t.asapShort || 'ASAP') : `${t.scheduledFor || 'Scheduled for'}: ${selectedOrder.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${selectedOrder.orderable_order_date}`}
+                    </Text>
+                  </View>
+                );
+              })() : null}
+
+              {/* Customer name */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="person-outline" size={Platform.OS === 'android' ? 13 : 14} color="#999" />
+                  <Text style={styles.orderCustomer}>{selectedOrder.customer_name}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name={selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? 'cash-outline' : 'card-outline'} size={14} color={selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71'} />
+                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? '#e74c3c' : '#2ecc71' }}>
+                    {selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash') ? t.notPaid : t.paidOnline}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Price + shipping */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="cash-outline" size={14} color="#999" />
+                  <Text style={styles.orderTotal}>{selectedOrder.currency} {selectedOrder.total}</Text>
+                </View>
+                {selectedOrder.shipping_method ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name={selectedOrder.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                    <Text style={styles.orderShipping}>{selectedOrder.shipping_method === 'Abholung' ? t.pickupLabel : selectedOrder.shipping_method === 'Lieferung' ? t.deliveryLabel : selectedOrder.shipping_method}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Countdown */}
+              {acceptedTimes[String(selectedOrder.order_id)] && (() => {
+                const claim = claims[String(selectedOrder.order_id)];
+                const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                const at = acceptedTimes[String(selectedOrder.order_id)].accepted_time || '';
+                const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                if (status === 'delivered') return null;
+                if (isItemScheduled) {
+                  const scheduledStr = at.split('—')[0].trim();
+                  const scheduledDateStr = at.split('—')[1]?.trim();
+                  const parts = scheduledDateStr?.split('/');
+                  const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                  if (!scheduledMs) return null;
+                  return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
+                }
+                return <OrderCountdown accepted_at={acceptedTimes[String(selectedOrder.order_id)].accepted_at} accepted_time={at} />;
+              })()}
+
+              <View style={[styles.divider, { marginTop: 8 }]} />
+
+              {/* Email */}
               {selectedOrder.customer_email ? (
                 <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`mailto:${selectedOrder.customer_email}`)}>
                   <Ionicons name="mail-outline" size={14} color="#999" />
                   <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_email}</Text>
                 </TouchableOpacity>
               ) : null}
+
+              {/* Phone */}
               {selectedOrder.customer_phone ? (
                 <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${selectedOrder.customer_phone}`)}>
                   <Ionicons name="call-outline" size={14} color="#999" />
                   <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_phone}</Text>
                 </TouchableOpacity>
               ) : null}
+
+              {/* Address */}
               {selectedOrder.shipping_address ? (
-                <TouchableOpacity style={[styles.row, !selectedOrder.note && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
+                <TouchableOpacity style={[styles.row, !selectedOrder.note && !selectedOrder.items?.length && { borderBottomWidth: 0 }]} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
                   <Ionicons name="location-outline" size={14} color="#999" />
                   <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.shipping_address}</Text>
                 </TouchableOpacity>
               ) : null}
+
+              {/* Note */}
               {selectedOrder.note ? (
                 <View style={[styles.row, { borderBottomWidth: 0 }]}>
                   <View style={{ backgroundColor: '#fffbeb', borderRadius: 8, padding: 10, flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
@@ -1314,107 +1370,108 @@ const flatData: FlatItem[] = [
                   </View>
                 </View>
               ) : null}
-            </View>
 
-            {/* Items */}
-            {selectedOrder.items && selectedOrder.items.length > 0 && (
-              <View style={styles.section}>
-                {selectedOrder.items.map((item, i) => (
-                  <View key={i} style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111', flex: 1 }}>{item.quantity}x {item.name}</Text>
-                      <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' }}>{selectedOrder.currency} {item.total}</Text>
+              {/* Items */}
+              {selectedOrder.items && selectedOrder.items.length > 0 && (
+                <>
+                  <View style={[styles.divider, { marginTop: 8 }]} />
+                  {selectedOrder.items.map((item, i) => (
+                    <View key={i} style={{ marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111', flex: 1 }}>{item.quantity}x {item.name}</Text>
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' }}>{selectedOrder.currency} {item.total}</Text>
+                      </View>
+                      {item.addons && item.addons.length > 0 && item.addons.map((addon, j) => (
+                        <Text key={j} style={{ fontSize: Platform.OS === 'android' ? 11 : 12, color: '#666', paddingLeft: 8 }}>↳ {addon.label}: {addon.value}</Text>
+                      ))}
                     </View>
-                    {item.addons && item.addons.length > 0 && item.addons.map((addon, j) => (
-                      <Text key={j} style={{ fontSize: Platform.OS === 'android' ? 11 : 12, color: '#666', paddingLeft: 8 }}>↳ {addon.label}: {addon.value}</Text>
-                    ))}
+                  ))}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F0F0', marginTop: 4 }}>
+                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{t.total}</Text>
+                    <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{selectedOrder.currency} {selectedOrder.total}</Text>
                   </View>
-                ))}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F0F0', marginTop: 4 }}>
-                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{t.total}</Text>
-                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: '#111' }}>{selectedOrder.currency} {selectedOrder.total}</Text>
-                </View>
-              </View>
-            )}
+                </>
+              )}
 
-            {/* Mark delivered / pickup button */}
-            {(() => {
-              const isPickupMethod = (method?: string) => {
-                const m = (method || '').toLowerCase().trim();
-                return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
-              };
-              const claim = claims[String(selectedOrder.order_id)];
-              const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
-              const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
-              const isOverdue = acceptedData ? (() => {
-                const at = acceptedData.accepted_time || '';
-                const isScheduledTime = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                if (isScheduledTime) {
-                  const parts = at.split('—');
-                  if (parts.length < 2) return false;
-                  const timePart = parts[0].trim();
-                  const datePart = parts[1].trim().split('/');
-                  if (datePart.length < 3) return false;
-                  const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
-                  return Date.now() > scheduledMs;
+              {/* Mark delivered / pickup button */}
+              {(() => {
+                const isPickupMethod = (method?: string) => {
+                  const m = (method || '').toLowerCase().trim();
+                  return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
+                };
+                const claim = claims[String(selectedOrder.order_id)];
+                const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
+                const isOverdue = acceptedData ? (() => {
+                  const at = acceptedData.accepted_time || '';
+                  const isScheduledTime = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+                  if (isScheduledTime) {
+                    const parts = at.split('—');
+                    if (parts.length < 2) return false;
+                    const timePart = parts[0].trim();
+                    const datePart = parts[1].trim().split('/');
+                    if (datePart.length < 3) return false;
+                    const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
+                    return Date.now() > scheduledMs;
+                  }
+                  const minutes = parseInt(at.replace(/[^0-9]/g, '') || '0');
+                  const acceptedAt = new Date(acceptedData.accepted_at).getTime();
+                  const deadline = acceptedAt + minutes * 60 * 1000;
+                  return Date.now() > deadline;
+                })() : false;
+                const isPickup = isPickupMethod(selectedOrder.shipping_method);
+                if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isOverdue || isPickup)) {
+                  return (
+                    <TouchableOpacity
+                      style={{ backgroundColor: isPickup ? '#2ecc71' : '#3498db', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                      onPress={async () => {
+                        const isPickupReady = pickupReadyOrders[String(selectedOrder.order_id)];
+                        if (isPickup && !isPickupReady) {
+                          setAlertConfig({
+                            visible: true,
+                            title: t.readyForPickup || 'Ready for Pickup',
+                            message: t.readyForPickupMsg || 'Send an email to the customer that their order is ready?',
+                            icon: 'bag-check-outline',
+                            iconColor: '#2ecc71',
+                            buttons: [
+                              { text: t.sendEmail || 'Send Email', color: '#2ecc71', onPress: async () => {
+                                const code = await AsyncStorage.getItem('restaurant_code') || '';
+                                const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+                                const website = restaurantProfile?.profile?.website;
+                                if (website) { const baseUrl = website.startsWith('http') ? website : `https://${website}`; fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }) }).catch(() => {}); }
+                                const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                                setPickupReadyOrders(updated);
+                                await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                              }},
+                              { text: t.skipEmail || 'Skip Email', color: '#e74c3c', onPress: async () => { const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true }; setPickupReadyOrders(updated); await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated)); }},
+                              { text: t.cancel || 'Cancel', style: 'cancel' },
+                            ],
+                          });
+                          return;
+                        }
+                        const code = await AsyncStorage.getItem('restaurant_code') || '';
+                        const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : (isPickup ? t.pickedUp : 'Owner');
+                        await fetch(`${BACKEND_URL}/mark-delivered`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: selectedOrder.order_id, delivery_name: courierName, restaurant_code: code }) });
+                        await fetch(`${BACKEND_URL}/release-claim`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: selectedOrder.order_id, restaurant_code: code }) });
+                        const updatedReady = { ...pickupReadyOrders };
+                        delete updatedReady[String(selectedOrder.order_id)];
+                        setPickupReadyOrders(updatedReady);
+                        await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updatedReady));
+                        const deliveredAt = new Date().toLocaleString();
+                        setClaims(prev => ({ ...prev, [String(selectedOrder.order_id)]: { name: courierName, status: 'delivered', delivered_at: deliveredAt } }));
+                        setSelectedOrder(null);
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                      <Text style={{ color: '#fff', fontSize: Platform.OS === 'android' ? 13 : 15, fontWeight: '600' }}>
+                        {isPickup ? (pickupReadyOrders[String(selectedOrder.order_id)] ? t.markPickedUp : t.readyForPickup || 'Ready for Pickup') : t.markDelivered}
+                      </Text>
+                    </TouchableOpacity>
+                  );
                 }
-                const minutes = parseInt(at.replace(/[^0-9]/g, '') || '0');
-                const acceptedAt = new Date(acceptedData.accepted_at).getTime();
-                const deadline = acceptedAt + minutes * 60 * 1000;
-                return Date.now() > deadline;
-              })() : false;
-              const isPickup = isPickupMethod(selectedOrder.shipping_method);
-              if (status !== 'delivered' && selectedOrder.status !== 'cancelled' && (isOverdue || isPickup)) {
-                return (
-                  <TouchableOpacity
-                    style={{ backgroundColor: isPickup ? '#2ecc71' : '#3498db', borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginTop: 8, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                    onPress={async () => {
-                      const isPickupReady = pickupReadyOrders[String(selectedOrder.order_id)];
-                      if (isPickup && !isPickupReady) {
-                        setAlertConfig({
-                          visible: true,
-                          title: t.readyForPickup || 'Ready for Pickup',
-                          message: t.readyForPickupMsg || 'Send an email to the customer that their order is ready?',
-                          icon: 'bag-check-outline',
-                          iconColor: '#2ecc71',
-                          buttons: [
-                            { text: t.sendEmail || 'Send Email', color: '#2ecc71', onPress: async () => {
-                              const code = await AsyncStorage.getItem('restaurant_code') || '';
-                              const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-                              const website = restaurantProfile?.profile?.website;
-                              if (website) { const baseUrl = website.startsWith('http') ? website : `https://${website}`; fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }) }).catch(() => {}); }
-                              const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
-                              setPickupReadyOrders(updated);
-                              await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
-                            }},
-                            { text: t.skipEmail || 'Skip Email', color: '#e74c3c', onPress: async () => { const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true }; setPickupReadyOrders(updated); await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated)); }},
-                            { text: t.cancel || 'Cancel', style: 'cancel' },
-                          ],
-                        });
-                        return;
-                      }
-                      const code = await AsyncStorage.getItem('restaurant_code') || '';
-                      const courierName = claim ? (typeof claim === 'string' ? claim : claim.name) : (isPickup ? t.pickedUp : 'Owner');
-                      await fetch(`${BACKEND_URL}/mark-delivered`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: selectedOrder.order_id, delivery_name: courierName, restaurant_code: code }) });
-                      await fetch(`${BACKEND_URL}/release-claim`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: selectedOrder.order_id, restaurant_code: code }) });
-                      const updatedReady = { ...pickupReadyOrders };
-                      delete updatedReady[String(selectedOrder.order_id)];
-                      setPickupReadyOrders(updatedReady);
-                      await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updatedReady));
-                      const deliveredAt = new Date().toLocaleString();
-                      setClaims(prev => ({ ...prev, [String(selectedOrder.order_id)]: { name: courierName, status: 'delivered', delivered_at: deliveredAt } }));
-                      setSelectedOrder(null);
-                    }}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
-                      {isPickup ? (pickupReadyOrders[String(selectedOrder.order_id)] ? t.markPickedUp : t.readyForPickup || 'Ready for Pickup') : t.markDelivered}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-              return null;
-            })()}
+                return null;
+              })()}
+            </View>
           </ScrollView>
         </SafeAreaView>
         <CustomAlert
