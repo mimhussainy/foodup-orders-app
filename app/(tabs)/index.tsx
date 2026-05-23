@@ -934,13 +934,11 @@ useEffect(() => {
       const deviceId = Application.getAndroidId() || '';
       const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
       const result = await res.json();
-      console.log('=== PRINT CHECK: deviceId:', deviceId, 'backend:', result.device_id, 'match:', result.device_id === deviceId);
       const allowed = result.success && result.device_id && result.device_id === deviceId;
       setCanPrint(allowed);
       await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
       return allowed;
     } catch (e) {
-      console.log('=== PRINT CHECK ERROR:', e);
       return false;
     }
   };
@@ -1678,43 +1676,7 @@ const flatData: FlatItem[] = [
                       <Text style={styles.orderShipping}>
                         {order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}
                       </Text>
-                      {order.orderable_order_time ? (
-                        <>
-                          <Text style={styles.orderShipping}> • </Text>
-                          <Ionicons
-                            name={
-                              order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                              order.orderable_order_time.toLowerCase().includes('asap') ||
-                              order.orderable_order_time.includes('(')
-                                ? 'flash-outline'
-                                : 'calendar-outline'
-                            }
-                            size={13}
-                            color={
-                              order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                              order.orderable_order_time.toLowerCase().includes('asap') ||
-                              order.orderable_order_time.includes('(')
-                                ? '#f39c12'
-                                : '#8B38CB'
-                            }
-                          />
-                          <Text style={[styles.orderShipping, {
-                            color: order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                              order.orderable_order_time.toLowerCase().includes('asap') ||
-                              order.orderable_order_time.includes('(')
-                                ? '#f39c12'
-                                : '#8B38CB',
-                            fontWeight: '600',
-                          }]}>
-                            {order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
-                            order.orderable_order_time.toLowerCase().includes('asap') ||
-                            order.orderable_order_time.includes('(')
-                              ? t.asapShort
-                              : t.scheduled
-                            }
-                          </Text>
-                        </>
-                      ) : null}
+                      
                     </View>
                   ) : <View />}
                   {claims[String(order.order_id)] ? (
