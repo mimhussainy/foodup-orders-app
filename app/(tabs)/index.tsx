@@ -843,11 +843,18 @@ const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string
 const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
-const toggleExpanded = (order_id: number) => {
+const toggleExpanded = (order_id: number, index?: number) => {
   setExpandedOrders(prev => {
     if (prev.has(order_id)) return new Set();
     return new Set([order_id]);
   });
+  if (index !== undefined) {
+    setTimeout(() => {
+      try {
+        listRef.current?.scrollToIndex({ index: index + 3, animated: true, viewPosition: 0 });
+      } catch (e) {}
+    }, 100);
+  }
 };
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -1308,7 +1315,7 @@ return (
             return (
               <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
                 {/* TOP ROW */}
-                <TouchableOpacity onPress={() => toggleExpanded(order.order_id)} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => toggleExpanded(order.order_id, flatData.findIndex(f => f.type === 'order' && f.item.order_id === order.order_id))} activeOpacity={0.7}>
                   <View style={styles.orderTopRow}>
                     <Text style={styles.orderId}>Order #{order.order_id}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
