@@ -94,6 +94,9 @@ export default function OnboardingScreen() {
       if (result.success) {
         await AsyncStorage.setItem('user_role', 'owner');
         await AsyncStorage.setItem('owner_pin', pin);
+        if (Platform.OS === 'ios') {
+          await AsyncStorage.setItem('ios_pin', pin);
+        }
         router.replace('/(tabs)');
       } else {
         setError(t.incorrectPin);

@@ -163,15 +163,12 @@ export default function SettingsScreen() {
     const code = await AsyncStorage.getItem('restaurant_code') || '';
 
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/delivery-accounts?owner_pin=${pin}&restaurant_code=${code}`
-      );
-
+      const endpoint = Platform.OS === 'ios'
+        ? `${BACKEND_URL}/delivery-accounts-ios?ios_pin=${pin}&restaurant_code=${code}`
+        : `${BACKEND_URL}/delivery-accounts?owner_pin=${pin}&restaurant_code=${code}`;
+      const response = await fetch(endpoint);
       const result = await response.json();
-
-      if (result.success) {
-        setAccounts(result.accounts);
-      }
+      if (result.success) setAccounts(result.accounts);
     } catch (e) {}
   };
   const loadProducts = async () => {

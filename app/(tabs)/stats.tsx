@@ -66,6 +66,7 @@ export default function StatsScreen() {
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
   const [expandedCourier, setExpandedCourier] = useState<string | null>(null);
+  const [expandedCourierDay, setExpandedCourierDay] = useState<string | null>(null);
   const { t } = useLanguage();
   const scrollRef = useRef<any>(null);
 
@@ -259,7 +260,10 @@ useFocusEffect(
                   <View key={name} style={[styles.section, { marginBottom: 10 }]}>
                     <TouchableOpacity
                       style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
-                      onPress={() => setExpandedCourier(isOpen ? null : name)}
+                      onPress={() => {
+                        setExpandedCourier(isOpen ? null : name);
+                        setExpandedCourierDay(null);
+                      }}
                     >
                       <Ionicons name="bicycle-outline" size={16} color="#999" />
                       <View style={{ flex: 1 }}>
@@ -268,46 +272,61 @@ useFocusEffect(
                       </View>
                       <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#999" />
                     </TouchableOpacity>
-                    {isOpen && groups.map((group, gi) => {
-                      const [dayExpanded, setDayExpanded] = useState(false);
-                      return (
-                        <View key={gi}>
-                          <TouchableOpacity
-                            style={[styles.row, { borderBottomWidth: dayExpanded ? 1 : 0, paddingLeft: 8 }]}
-                            onPress={() => setDayExpanded(!dayExpanded)}
-                          >
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{group.label}</Text>
-                                {group.dateRange && <Text style={{ fontSize: 11, color: '#999' }}>{group.dateRange}</Text>}
-                              </View>
-                              <Text style={{ fontSize: 12, color: '#666' }}>{group.orders.length} orders · {group.cashOrders.length} cash · {group.currency} {group.totalCash.toFixed(2)}</Text>
-                            </View>
-                            <Ionicons name={dayExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#999" />
-                          </TouchableOpacity>
-                          {dayExpanded && (
-                            <View style={{ paddingLeft: 8, paddingBottom: 8 }}>
-                              {group.cashOrders.length === 0 ? (
-                                <Text style={{ fontSize: 13, color: '#999', paddingVertical: 8 }}>No cash orders</Text>
-                              ) : (
-                                <>
-                                  {group.cashOrders.map((order: any) => (
-                                    <View key={order.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }}>
-                                      <Text style={{ fontSize: 13, color: '#666' }}>#{order.order_id}</Text>
-                                      <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{order.currency} {parseFloat(order.total).toFixed(2)}</Text>
+
+                    {isOpen && (
+                      <>
+                        {groups.length === 0 ? (
+                          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 13, color: '#999' }}>No deliveries yet</Text>
+                            <Text style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Total Orders: 0 · Total Cash: {currency} 0.00</Text>
+                          </View>
+                        ) : (
+                          groups.map((group, gi) => {
+                            const dayKey = `${name}-${gi}`;
+                            const isDayOpen = expandedCourierDay === dayKey;
+                            return (
+                              <View key={gi}>
+                                <TouchableOpacity
+                                  style={[styles.row, { borderBottomWidth: isDayOpen ? 1 : 0, paddingLeft: 8 }]}
+                                  onPress={() => setExpandedCourierDay(isDayOpen ? null : dayKey)}
+                                >
+                                  <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{group.label}</Text>
+                                      {group.dateRange && <Text style={{ fontSize: 11, color: '#999' }}>{group.dateRange}</Text>}
                                     </View>
-                                  ))}
-                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1.5, borderTopColor: '#111', marginTop: 4 }}>
-                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Total Cash</Text>
-                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{group.currency} {group.totalCash.toFixed(2)}</Text>
+                                    <Text style={{ fontSize: 12, color: '#666' }}>
+                                      {group.orders.length} orders · {group.cashOrders.length} cash · {group.currency} {group.totalCash.toFixed(2)}
+                                    </Text>
                                   </View>
-                                </>
-                              )}
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
+                                  <Ionicons name={isDayOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#999" />
+                                </TouchableOpacity>
+                                {isDayOpen && (
+                                  <View style={{ paddingLeft: 8, paddingBottom: 8 }}>
+                                    {group.cashOrders.length === 0 ? (
+                                      <Text style={{ fontSize: 13, color: '#999', paddingVertical: 8 }}>No cash orders</Text>
+                                    ) : (
+                                      <>
+                                        {group.cashOrders.map((order: any) => (
+                                          <View key={order.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }}>
+                                            <Text style={{ fontSize: 13, color: '#666' }}>#{order.order_id}</Text>
+                                            <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{order.currency} {parseFloat(order.total).toFixed(2)}</Text>
+                                          </View>
+                                        ))}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1.5, borderTopColor: '#111', marginTop: 4 }}>
+                                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Total Cash</Text>
+                                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{group.currency} {group.totalCash.toFixed(2)}</Text>
+                                        </View>
+                                      </>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })
+                        )}
+                      </>
+                    )}
                   </View>
                 );
               })}
