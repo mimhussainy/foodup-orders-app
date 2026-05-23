@@ -86,8 +86,10 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
-          ✓ {(() => {
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="calendar-outline" size={13} color="#8B38CB" />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
+          {(() => {
             const parts = at.split('—');
             if (parts.length < 2) return at;
             const timePart = parts[0].trim();
@@ -99,7 +101,8 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
             const isToday = scheduledDate.toDateString() === today.toDateString();
             return isToday ? timePart : at;
           })()}
-        </Text>
+          </Text>
+        </View>
       </View>
       {showBar && (
         <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
@@ -147,7 +150,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="time-outline" size={13} color={color} />
+          <Ionicons name="hourglass-outline" size={13} color={color} />
           <Text style={{ fontSize: 12, fontWeight: '700', color }}>
             {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
           </Text>
@@ -1627,7 +1630,10 @@ const flatData: FlatItem[] = [
                 </View>
                 <View style={styles.divider} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={styles.orderCustomer}>{order.customer_name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="person-outline" size={16} color="#999" />
+                    <Text style={styles.orderCustomer}>{order.customer_name}</Text>
+                  </View>
                   {order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons
@@ -1762,7 +1768,7 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: 12, fontWeight: '600' },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
-  orderCustomer: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 5 },
+  orderCustomer: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 2 },
   orderFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   orderTotal: { fontSize: 14, fontWeight: '600', color: '#111' },
   orderShipping: { fontSize: 14, color: '#666' },
