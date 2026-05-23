@@ -235,7 +235,12 @@ useFocusEffect(
 
                 const makeDayGroup = (label: string, from: Date, to?: Date, dateRange?: string) => {
                   const filtered = orders.filter((o: any) => {
-                    const d = new Date(o.delivered_at); d.setHours(0,0,0,0);
+                    let d = new Date(o.delivered_at);
+                    if (isNaN(d.getTime())) {
+                      const parts = (o.delivered_at || '').match(/(\d+)\/(\d+)\/(\d+)/);
+                      if (parts) d = new Date(`${parts[3]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`);
+                    }
+                    d.setHours(0,0,0,0);
                     if (to) return d >= from && d < to;
                     return d.getTime() === from.getTime();
                   });
