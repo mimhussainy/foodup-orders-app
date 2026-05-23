@@ -1435,25 +1435,14 @@ return (
 
                     {/* Order info */}
                     {order.date_created ? (
-                      <Text style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{new Date(order.date_created).toLocaleString()}</Text>
+                      <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#999', marginBottom: 8 }}>{new Date(order.date_created).toLocaleString()}</Text>
                     ) : null}
 
-                    {/* ASAP/Pre-order badge */}
-                    {order.orderable_order_date || order.orderable_order_time ? (() => {
-                      const isAsap = order.orderable_order_time?.toLowerCase().includes('as soon as possible') || order.orderable_order_time?.includes('(');
-                      return (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                          <Ionicons name={isAsap ? 'flash-outline' : 'calendar-outline'} size={14} color={isAsap ? '#f39c12' : '#8B38CB'} />
-                          <Text style={{ fontSize: 13, color: isAsap ? '#f39c12' : '#8B38CB', fontWeight: '700' }}>
-                            {isAsap ? (t.asapShort || 'ASAP') : `${t.scheduledFor || 'Scheduled for'}: ${order.orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${order.orderable_order_date}`}
-                          </Text>
-                        </View>
-                      );
-                    })() : null}
+                    
 
                     {/* Auto accepted */}
                     {autoPrintOrders[String(order.order_id)] && (
-                      <Text style={{ fontSize: 12, color: '#8B38CB', marginBottom: 4 }}>
+                      <Text style={{ fontSize: Platform.OS === 'android' ? 11 : 13, color: '#8B38CB', marginBottom: 4 }}>
                         ⚡ Auto accepted: {autoPrintOrders[String(order.order_id)].accepted_time}
                       </Text>
                     )}
@@ -1471,19 +1460,19 @@ return (
                     {order.customer_email ? (
                       <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`mailto:${order.customer_email}`)}>
                         <Ionicons name="mail-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, styles.linkValue]}>{order.customer_email}</Text>
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{order.customer_email}</Text>
                       </TouchableOpacity>
                     ) : null}
                     {order.customer_phone ? (
                       <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${order.customer_phone}`)}>
                         <Ionicons name="call-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, styles.linkValue]}>{order.customer_phone}</Text>
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{order.customer_phone}</Text>
                       </TouchableOpacity>
                     ) : null}
                     {order.shipping_address ? (
                       <TouchableOpacity style={styles.row} onPress={() => { const encoded = encodeURIComponent(order.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
                         <Ionicons name="location-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, styles.linkValue]}>{order.shipping_address}</Text>
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{order.shipping_address}</Text>
                       </TouchableOpacity>
                     ) : null}
                     {order.note ? (
@@ -1502,18 +1491,15 @@ return (
                         {order.items.map((item, i) => (
                           <View key={i} style={{ marginBottom: 8 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                              <Text style={{ fontSize: 13, fontWeight: '600', color: '#111', flex: 1 }}>{item.quantity}x {item.name}</Text>
-                              <Text style={{ fontSize: 13, fontWeight: '600', color: '#111' }}>{order.currency} {item.total}</Text>
+                              <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111', flex: 1 }}>{item.quantity}x {item.name}</Text>
+                            <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' }}>{order.currency} {item.total}</Text>
                             </View>
                             {item.addons && item.addons.length > 0 && item.addons.map((addon, j) => (
-                              <Text key={j} style={{ fontSize: 12, color: '#666', paddingLeft: 8 }}>↳ {addon.label}: {addon.value}</Text>
+                              <Text key={j} style={{ fontSize: Platform.OS === 'android' ? 11 : 12, color: '#666', paddingLeft: 8 }}>↳ {addon.label}: {addon.value}</Text>
                             ))}
                           </View>
                         ))}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{t.total}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{order.currency} {order.total}</Text>
-                        </View>
+                        
                       </>
                     )}
 
