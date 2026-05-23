@@ -1228,6 +1228,9 @@ const flatData: FlatItem[] = [
                 </Text>
               </View>
             </View>
+            {selectedOrder.date_created ? (
+              <Text style={styles.detailDate}>{new Date(selectedOrder.date_created).toLocaleString()}</Text>
+            ) : null}
             {autoPrintOrders[String(selectedOrder.order_id)] && (
               <Text style={{ fontSize: 13, color: '#8B38CB', marginHorizontal: 16, marginBottom: 4 }}>
                 ⚡ Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}
@@ -1240,14 +1243,20 @@ const flatData: FlatItem[] = [
               }
               return null;
             })()}
-            {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (
-              <Text style={{ fontSize: 14, color: '#2ecc71', marginHorizontal: 16, marginBottom: 8 }}>
-                {(selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') || (selectedOrder as any).orderable_order_time?.includes('(')
-                  ? <Text style={{ fontWeight: '700' }}>{t.asap || 'ASAP'}</Text>
-                  : <><Text style={{ fontWeight: '700' }}>{t.scheduledFor || 'Scheduled for'}: </Text>{(selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — {(selectedOrder as any).orderable_order_date}</>
-                }
-              </Text>
-            ) : null}
+            {(selectedOrder as any).orderable_order_date || (selectedOrder as any).orderable_order_time ? (() => {
+              const isAsap = (selectedOrder as any).orderable_order_time?.toLowerCase().includes('as soon as possible') || (selectedOrder as any).orderable_order_time?.includes('(');
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 16, marginBottom: 8 }}>
+                  <Ionicons name={isAsap ? 'flash-outline' : 'calendar-outline'} size={15} color={isAsap ? '#f39c12' : '#8B38CB'} />
+                  <Text style={{ fontSize: 14, color: isAsap ? '#f39c12' : '#8B38CB', fontWeight: '700' }}>
+                    {isAsap
+                      ? (t.asapShort || 'ASAP')
+                      : `${t.scheduledFor || 'Scheduled for'}: ${(selectedOrder as any).orderable_order_time?.replace(/\s*\(.*?\)\s*/g, '').trim()} — ${(selectedOrder as any).orderable_order_date}`
+                    }
+                  </Text>
+                </View>
+              );
+            })() : null}
 
             <Text style={styles.groupLabel}>{t.customer}</Text>
             <View style={styles.section}>
@@ -1764,14 +1773,14 @@ const styles = StyleSheet.create({
   groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },
   section: { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, paddingLeft: 16, paddingRight: 16, paddingTop: 5, paddingBottom: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderId: { fontSize: 13, color: '#666', fontWeight: '500' },
+  orderId: { fontSize: Platform.OS === 'android' ? 11 : 13, color: '#666', fontWeight: '500' },
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  statusPillText: { fontSize: 12, fontWeight: '600' },
+  statusPillText: { fontSize: Platform.OS === 'android' ? 11 : 12, fontWeight: '600' },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
-  orderCustomer: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 2 },
+  orderCustomer: { fontSize: Platform.OS === 'android' ? 15 : 17, fontWeight: '700', color: '#111', marginBottom: 2 },
   orderFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  orderTotal: { fontSize: 14, fontWeight: '600', color: '#111' },
-  orderShipping: { fontSize: 14, color: '#666' },
+  orderTotal: { fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' },
+  orderShipping: { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#111', fontWeight: '600' },
   orderDate: { fontSize: 13, color: '#999', alignSelf: 'center' },
   orderMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   detailTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 16, marginTop: 16, marginBottom: 4 },
@@ -1792,7 +1801,7 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 16, fontWeight: '700', color: '#111' },
   orderNameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   orderBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  courierName: { fontSize: 14, color: '#8B38CB', fontWeight: '500' },
+  courierName: { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB', fontWeight: '500' },
   
   
 });

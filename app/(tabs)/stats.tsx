@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   Image, Platform,
-  SafeAreaView, ScrollView,
+  RefreshControl, SafeAreaView, ScrollView,
   StyleSheet, Text, TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
@@ -63,8 +63,11 @@ const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
+  const [courierClaims, setCourierClaims] = useState<{ [key: string]: any[] }>({});
+  const [allOrders, setAllOrders] = useState<any[]>([]);
   const [expandedCourier, setExpandedCourier] = useState<string | null>(null);
   const [expandedCourierDay, setExpandedCourierDay] = useState<string | null>(null);
   const { t } = useLanguage();
@@ -112,6 +115,33 @@ useFocusEffect(
               if (result.success) setCourierDelivered(result.couriers);
             })
             .catch(() => {});
+          // Fetch claims and orders for in-progress tracking
+          Promise.all([
+            fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()),
+            fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()),
+          ]).then(([claimsResult, ordersResult]) => {
+            if (claimsResult.success && ordersResult.success) {
+              setAllOrders(ordersResult.orders);
+              // Group claims by courier name
+              const grouped: { [key: string]: any[] } = {};
+              Object.entries(claimsResult.claims).forEach(([orderId, claim]: any) => {
+                if (claim.status === 'delivered') return;
+                const name = claim.name;
+                if (!name) return;
+                const order = ordersResult.orders.find((o: any) => String(o.order_id) === String(orderId));
+                if (!order) return;
+                if (!grouped[name]) grouped[name] = [];
+                grouped[name].push({
+                  order_id: parseInt(orderId),
+                  total: String(order.total || ''),
+                  currency: order.currency || 'CHF',
+                  payment_method: order.payment_method || '',
+                  status: claim.status,
+                });
+              });
+              setCourierClaims(grouped);
+            }
+          }).catch(() => {});
         }
       });
     }, [])
@@ -208,7 +238,70 @@ useFocusEffect(
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                const code = await AsyncStorage.getItem('restaurant_code') || '';
+                if (code) {
+                  await Promise.all([
+                    fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).then(result => {
+                      if (result.success) {
+                        const validOrders = result.orders
+                          .filter((o: any) => o.date_created)
+                          .map((o: any) => ({
+                            order_id: parseInt(o.order_id),
+                            total: String(o.total || ''),
+                            currency: o.currency || 'CHF',
+                            status: o.status || '',
+                            payment_method: o.payment_method || '',
+                            timestamp: new Date(o.date_created).getTime(),
+                            shipping_method: o.shipping?.method || '',
+                          }));
+                        setOrders(validOrders);
+                      }
+                    }).catch(() => {}),
+                    fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`).then(r => r.json()).then(result => {
+                      if (result.success) setCourierDelivered(result.couriers);
+                    }).catch(() => {}),
+                    Promise.all([
+                      fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()),
+                      fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()),
+                    ]).then(([claimsResult, ordersResult]) => {
+                      if (claimsResult.success && ordersResult.success) {
+                        setAllOrders(ordersResult.orders);
+                        const grouped: { [key: string]: any[] } = {};
+                        Object.entries(claimsResult.claims).forEach(([orderId, claim]: any) => {
+                          if (claim.status === 'delivered') return;
+                          const name = claim.name;
+                          if (!name) return;
+                          const order = ordersResult.orders.find((o: any) => String(o.order_id) === String(orderId));
+                          if (!order) return;
+                          if (!grouped[name]) grouped[name] = [];
+                          grouped[name].push({
+                            order_id: parseInt(orderId),
+                            total: String(order.total || ''),
+                            currency: order.currency || 'CHF',
+                            payment_method: order.payment_method || '',
+                            status: claim.status,
+                          });
+                        });
+                        setCourierClaims(grouped);
+                      }
+                    }).catch(() => {}),
+                  ]);
+                }
+                setRefreshing(false);
+              }}
+              tintColor="#111"
+              colors={['#111']}
+            />
+          }
+        >
 
           <Text style={styles.groupLabel}>{t.today}</Text>
           <View style={styles.section}>
@@ -266,10 +359,11 @@ useFocusEffect(
                 return (
                   <View key={name} style={[styles.section, { marginBottom: 10 }]}>
                     <TouchableOpacity
-                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0, backgroundColor: isOpen ? '#f5eeff' : '#fff', borderRadius: isOpen ? 0 : 14 }]}
+                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
                       onPress={() => {
-                        setExpandedCourier(isOpen ? null : name);
-                        setExpandedCourierDay(null);
+                        const opening = !isOpen;
+                        setExpandedCourier(opening ? name : null);
+                        setExpandedCourierDay(opening ? `${name}-0` : null);
                       }}
                     >
                       <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
@@ -284,6 +378,56 @@ useFocusEffect(
 
                     {isOpen && (
                       <>
+                        {(() => {
+                          const inProgress = courierClaims[name] || [];
+                          const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
+                          const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                          if (inProgress.length === 0) return null;
+                          const [openOrders, setOpenOrders] = useState(false);
+                          return (
+                            <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+                              <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, backgroundColor: '#fffbeb' }}
+                                onPress={() => setOpenOrders(!openOrders)}
+                              >
+                                <Ionicons name="time-outline" size={13} color="#f39c12" />
+                                <View style={{ flex: 1, marginLeft: 6 }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>
+                                    {t.openOrders || 'Open Orders'} · {inProgress.length} · {inProgressCash[0]?.currency || 'CHF'} {inProgressCashTotal.toFixed(2)}
+                                  </Text>
+                                </View>
+                                <Ionicons name={openOrders ? 'chevron-up' : 'chevron-down'} size={13} color="#f39c12" />
+                              </TouchableOpacity>
+                              {openOrders && (
+                                <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingBottom: 8 }}>
+                                  {inProgress.map((o: any, oi: number) => (
+                                    <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5, borderBottomWidth: oi === inProgress.length - 1 ? 0 : 1, borderBottomColor: '#fde68a' }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
+                                        <View style={{ backgroundColor: o.status === 'delivering' ? '#fff3e0' : '#e3f2fd', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                                          <Text style={{ fontSize: 11, fontWeight: '600', color: o.status === 'delivering' ? '#f39c12' : '#2980b9' }}>
+                                            {o.status === 'delivering' ? (t.delivering || 'Delivering') : (t.inBag || 'In Bag')}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                      {isCash(o.payment_method) ? (
+                                        <Text style={{ fontSize: 13, color: '#e74c3c', fontWeight: '600' }}>{o.currency} {parseFloat(o.total).toFixed(2)}</Text>
+                                      ) : (
+                                        <Text style={{ fontSize: 13, color: '#999' }}>Online</Text>
+                                      )}
+                                    </View>
+                                  ))}
+                                  {inProgressCash.length > 0 && (
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#f39c12' }}>
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{inProgressCash[0]?.currency} {inProgressCashTotal.toFixed(2)}</Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })()}
                         {groups.length === 0 ? (
                           <View style={{ paddingVertical: 16, alignItems: 'center' }}>
                             <Text style={{ fontSize: 13, color: '#999' }}>No deliveries yet</Text>
