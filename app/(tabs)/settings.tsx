@@ -1033,9 +1033,18 @@ const stopPreviewSound = async () => {
                     {acceptanceTimes.map((time, i) => (
                       <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{time} min</Text>
-                        <TouchableOpacity onPress={() => {
+                        <TouchableOpacity onPress={async () => {
                           const updated = acceptanceTimes.filter((_, idx) => idx !== i);
                           setAcceptanceTimes(updated);
+                          const pin = await AsyncStorage.getItem('owner_pin') || '';
+                          const code = await AsyncStorage.getItem('restaurant_code') || '';
+                          try {
+                            await fetch(`${BACKEND_URL}/acceptance-times`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ restaurant_code: code, owner_pin: pin, times: updated }),
+                            });
+                          } catch (e) {}
                         }}>
                           <Ionicons name="close-circle" size={16} color="#999" />
                         </TouchableOpacity>

@@ -221,7 +221,9 @@ useFocusEffect(
             {Object.keys(courierDelivered).length > 0 && (
             <>
               <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
-              {Object.entries(courierDelivered).map(([name, orders]) => {
+              {Object.entries(courierDelivered)
+                .sort(([, aOrders], [, bOrders]) => (bOrders as any[]).length - (aOrders as any[]).length)
+                .map(([name, orders]) => {
                 const isOpen = expandedCourier === name;
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
@@ -264,18 +266,20 @@ useFocusEffect(
                 return (
                   <View key={name} style={[styles.section, { marginBottom: 10 }]}>
                     <TouchableOpacity
-                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
+                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0, backgroundColor: isOpen ? '#f5eeff' : '#fff', borderRadius: isOpen ? 0 : 14 }]}
                       onPress={() => {
                         setExpandedCourier(isOpen ? null : name);
                         setExpandedCourierDay(null);
                       }}
                     >
-                      <Ionicons name="bicycle-outline" size={16} color="#999" />
+                      <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.rowLabel, { fontWeight: '700', color: '#111' }]}>{name}</Text>
-                        <Text style={{ fontSize: 12, color: '#666' }}>{totalOrders} orders · {currency} {totalCashAll.toFixed(2)} cash</Text>
+                        <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
+                        {!isOpen && (
+                          <Text style={{ fontSize: 12, color: '#666' }}>{totalOrders} orders · {currency} {totalCashAll.toFixed(2)} cash</Text>
+                        )}
                       </View>
-                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#999" />
+                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
                     </TouchableOpacity>
 
                     {isOpen && (
