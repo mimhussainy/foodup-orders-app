@@ -70,6 +70,7 @@ export default function StatsScreen() {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [expandedCourier, setExpandedCourier] = useState<string | null>(null);
   const [expandedCourierDay, setExpandedCourierDay] = useState<string | null>(null);
+  const [expandedOpenOrders, setExpandedOpenOrders] = useState<string | null>(null);
   const { t } = useLanguage();
   const scrollRef = useRef<any>(null);
 
@@ -383,12 +384,12 @@ useFocusEffect(
                           const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
                           const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
                           if (inProgress.length === 0) return null;
-                          const [openOrders, setOpenOrders] = useState(false);
+                          const openOrders = expandedOpenOrders === name;
                           return (
                             <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
                               <TouchableOpacity
                                 style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, backgroundColor: '#fffbeb' }}
-                                onPress={() => setOpenOrders(!openOrders)}
+                                onPress={() => setExpandedOpenOrders(openOrders ? null : name)}
                               >
                                 <Ionicons name="time-outline" size={13} color="#f39c12" />
                                 <View style={{ flex: 1, marginLeft: 6 }}>

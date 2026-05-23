@@ -85,7 +85,10 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   return (
     <View style={{ marginTop: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>🕐 {label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="time-outline" size={12} color={barColor} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: barColor }}>{label}</Text>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Ionicons name="calendar-outline" size={13} color="#8B38CB" />
           <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B38CB' }}>
