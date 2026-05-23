@@ -243,12 +243,23 @@ useFocusEffect(
             <CollapsibleCard title={t.thisWeek} statsKey="week" stats={weekStats} />
             <CollapsibleCard title={t.thisMonth} statsKey="month" stats={monthStats} />
             <CollapsibleCard title={t.thisYear} statsKey="year" stats={yearStats} />
-            {Object.keys(courierDelivered).length > 0 && (
+            {(Object.keys(courierDelivered).length > 0 || Object.keys(courierClaims).length > 0) && (
             <>
               <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
-              {Object.entries(courierDelivered)
-                .sort(([, aOrders], [, bOrders]) => (bOrders as any[]).length - (aOrders as any[]).length)
-                .map(([name, orders]) => {
+              {(() => {
+                const isCashFn = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
+                const allCourierNames = Array.from(new Set([
+                  ...Object.keys(courierDelivered),
+                  ...Object.keys(courierClaims),
+                ])).sort((a, b) => {
+                  const aCash = (courierDelivered[a] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0)
+                    + (courierClaims[a] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0);
+                  const bCash = (courierDelivered[b] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0)
+                    + (courierClaims[b] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0);
+                  return bCash - aCash;
+                });
+                return allCourierNames.map(name => {
+                const orders = courierDelivered[name] || [];
                 const isOpen = expandedCourier === name;
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
@@ -310,6 +321,9 @@ useFocusEffect(
                             {inProgress.length > 0 && (
                               <Text style={{ fontSize: 12, color: '#f39c12', fontWeight: '600' }}>{inProgress.length} {t.openOrders || 'open'} · {currency} {inProgressCashTotal.toFixed(2)}</Text>
                             )}
+                            <Text style={{ fontSize: 12, color: '#111', fontWeight: '700', marginTop: 2 }}>
+                              {t.total || 'Total'}: {currency} {(totalCashAll + inProgressCashTotal).toFixed(2)}
+                            </Text>
                           </View>
                         );
                       })()}
@@ -422,7 +436,8 @@ useFocusEffect(
                     )}
                   </View>
                 );
-              })}
+              });
+              })()}
             </>
           )}
 
