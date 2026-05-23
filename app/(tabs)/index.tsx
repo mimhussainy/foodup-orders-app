@@ -80,7 +80,7 @@ function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: stri
   const maxMs = Math.max(remainingMs, 3600000);
   const countdownProgress = Math.max(0, Math.min(1, remainingMs / maxMs));
   
-  const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.untilScheduled || 'until scheduled time'}` : `${mins}m ${secs}s ${t.untilScheduled || 'until scheduled time'}`;
+  const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.remaining || 'remaining'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`;
 
   return (
     <View style={{ marginTop: 8 }}>
