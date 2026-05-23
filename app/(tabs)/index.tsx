@@ -1765,7 +1765,7 @@ const styles = StyleSheet.create({
   orderId: { fontSize: Platform.OS === 'android' ? 15 : 14, color: '#666', fontWeight: '500' },
   statusPill: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusPillText: { fontSize: Platform.OS === 'android' ? 11 : 12, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 10, marginTop: 3 },
+  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 10 },
   orderCustomer: { fontSize: Platform.OS === 'android' ? 13 : 15, fontWeight: '700', color: '#111', marginBottom: 2 },
   orderFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   orderTotal: { fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#111' },
