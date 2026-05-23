@@ -299,22 +299,20 @@ useFocusEffect(
                       }}
                     >
                       <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
-                        {!isOpen && (() => {
-                          const inProgress = courierClaims[name] || [];
-                          const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
-                          const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                          return (
-                            <View>
-                              <Text style={{ fontSize: 12, color: '#666' }}>
-                                {totalOrders} {t.delivered || 'delivered'} · {currency} {totalCashAll.toFixed(2)}
-                                {inProgress.length > 0 ? `  ·  ${inProgress.length} ${t.openOrders || 'open'} · ${currency} ${inProgressCashTotal.toFixed(2)}` : ''}
-                              </Text>
-                            </View>
-                          );
-                        })()}
-                      </View>
+                      <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
+                      {!isOpen && (() => {
+                        const inProgress = courierClaims[name] || [];
+                        const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
+                        const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                        return (
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 12, color: '#666' }}>{totalOrders} {t.delivered || 'delivered'} · {currency} {totalCashAll.toFixed(2)}</Text>
+                            {inProgress.length > 0 && (
+                              <Text style={{ fontSize: 12, color: '#f39c12', fontWeight: '600' }}>{inProgress.length} {t.openOrders || 'open'} · {currency} {inProgressCashTotal.toFixed(2)}</Text>
+                            )}
+                          </View>
+                        );
+                      })()}
                       <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
                     </TouchableOpacity>
 
