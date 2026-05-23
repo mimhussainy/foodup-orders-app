@@ -64,6 +64,8 @@ export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
+  const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
+  const [expandedCourier, setExpandedCourier] = useState<string | null>(null);
   const { t } = useLanguage();
   const scrollRef = useRef<any>(null);
 
@@ -103,6 +105,12 @@ useFocusEffect(
               if (result.success) setCourierStats(result.stats);
             })
             .catch(() => {});
+          fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`)
+            .then(r => r.json())
+            .then(result => {
+              if (result.success) setCourierDelivered(result.couriers);
+            })
+            .catch(() => {});
         }
       });
     }, [])
@@ -140,12 +148,12 @@ useFocusEffect(
       <View style={styles.divider} />
       <View style={styles.row}>
         <Ionicons name="cash-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.cash}</Text>
+        <Text style={styles.rowLabel}>{t.cashPayment}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.cash.toFixed(2)}</Text>
       </View>
       <View style={styles.row}>
         <Ionicons name="card-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.online}</Text>
+        <Text style={styles.rowLabel}>{t.onlinePayment}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.online.toFixed(2)}</Text>
       </View>
       <View style={[styles.row, { borderBottomWidth: 0 }]}>
@@ -209,28 +217,100 @@ useFocusEffect(
             <CollapsibleCard title={t.thisWeek} statsKey="week" stats={weekStats} />
             <CollapsibleCard title={t.thisMonth} statsKey="month" stats={monthStats} />
             <CollapsibleCard title={t.thisYear} statsKey="year" stats={yearStats} />
-            {Object.keys(courierStats).length > 0 && (
+            {Object.keys(courierDelivered).length > 0 && (
             <>
               <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
-              <View style={styles.section}>
-                {Object.entries(courierStats)
-            .sort(([a], [b]) => {
-              if (a === 'Owner') return -1;
-              if (b === 'Owner') return 1;
-              return a.localeCompare(b);
-            })
-            .map(([name, stats], i, arr) => (
-                  <View key={name} style={[styles.row, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                    <Ionicons name="bicycle-outline" size={16} color="#999" />
-                    <Text style={[styles.rowLabel, { flex: 1, fontWeight: '600', color: '#111' }]}>{name}</Text>
-                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                      <Text style={{ fontSize: 12, color: '#999' }}>{t.today}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.today}</Text></Text>
-                      <Text style={{ fontSize: 12, color: '#999' }}>{t.thisWeek}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.week}</Text></Text>
-                      <Text style={{ fontSize: 12, color: '#999' }}>{t.total}: <Text style={{ color: '#111', fontWeight: '600' }}>{stats.total}</Text></Text>
-                    </View>
+              {Object.entries(courierDelivered).map(([name, orders]) => {
+                const isOpen = expandedCourier === name;
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+                const day2 = new Date(today); day2.setDate(today.getDate() - 2);
+                const day3 = new Date(today); day3.setDate(today.getDate() - 3);
+                const last20Start = new Date(today); last20Start.setDate(today.getDate() - 23);
+                const last20End = new Date(today); last20End.setDate(today.getDate() - 4);
+
+                const isCash = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
+                const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+                const makeDayGroup = (label: string, from: Date, to?: Date, dateRange?: string) => {
+                  const filtered = orders.filter((o: any) => {
+                    const d = new Date(o.delivered_at); d.setHours(0,0,0,0);
+                    if (to) return d >= from && d < to;
+                    return d.getTime() === from.getTime();
+                  });
+                  const cashOrders = filtered.filter((o: any) => isCash(o.payment_method));
+                  const totalCash = cashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                  return { label, dateRange, orders: filtered, cashOrders, totalCash, currency: filtered[0]?.currency || 'CHF' };
+                };
+
+                const groups = [
+                  makeDayGroup('Today', today),
+                  makeDayGroup('Yesterday', yesterday),
+                  makeDayGroup(day2.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' }), day2),
+                  makeDayGroup(day3.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' }), day3),
+                  makeDayGroup('Last 20 Days', last20Start, last20End, `${formatDate(last20Start)} - ${formatDate(last20End)}`),
+                ].filter(g => g.orders.length > 0);
+
+                const totalOrders = orders.length;
+                const totalCashAll = orders.filter((o: any) => isCash(o.payment_method)).reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                const currency = orders[0]?.currency || 'CHF';
+
+                return (
+                  <View key={name} style={[styles.section, { marginBottom: 10 }]}>
+                    <TouchableOpacity
+                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
+                      onPress={() => setExpandedCourier(isOpen ? null : name)}
+                    >
+                      <Ionicons name="bicycle-outline" size={16} color="#999" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.rowLabel, { fontWeight: '700', color: '#111' }]}>{name}</Text>
+                        <Text style={{ fontSize: 12, color: '#666' }}>{totalOrders} orders · {currency} {totalCashAll.toFixed(2)} cash</Text>
+                      </View>
+                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#999" />
+                    </TouchableOpacity>
+                    {isOpen && groups.map((group, gi) => {
+                      const [dayExpanded, setDayExpanded] = useState(false);
+                      return (
+                        <View key={gi}>
+                          <TouchableOpacity
+                            style={[styles.row, { borderBottomWidth: dayExpanded ? 1 : 0, paddingLeft: 8 }]}
+                            onPress={() => setDayExpanded(!dayExpanded)}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{group.label}</Text>
+                                {group.dateRange && <Text style={{ fontSize: 11, color: '#999' }}>{group.dateRange}</Text>}
+                              </View>
+                              <Text style={{ fontSize: 12, color: '#666' }}>{group.orders.length} orders · {group.cashOrders.length} cash · {group.currency} {group.totalCash.toFixed(2)}</Text>
+                            </View>
+                            <Ionicons name={dayExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#999" />
+                          </TouchableOpacity>
+                          {dayExpanded && (
+                            <View style={{ paddingLeft: 8, paddingBottom: 8 }}>
+                              {group.cashOrders.length === 0 ? (
+                                <Text style={{ fontSize: 13, color: '#999', paddingVertical: 8 }}>No cash orders</Text>
+                              ) : (
+                                <>
+                                  {group.cashOrders.map((order: any) => (
+                                    <View key={order.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }}>
+                                      <Text style={{ fontSize: 13, color: '#666' }}>#{order.order_id}</Text>
+                                      <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{order.currency} {parseFloat(order.total).toFixed(2)}</Text>
+                                    </View>
+                                  ))}
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1.5, borderTopColor: '#111', marginTop: 4 }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Total Cash</Text>
+                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{group.currency} {group.totalCash.toFixed(2)}</Text>
+                                  </View>
+                                </>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
-                ))}
-              </View>
+                );
+              })}
             </>
           )}
 

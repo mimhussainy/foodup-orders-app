@@ -70,6 +70,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       paid: lang === 'de' ? '✓ Bezahlt' : '✓ Paid',
       note: lang === 'de' ? 'Hinweis' : 'Note',
       acceptedFor: lang === 'de' ? 'Angenommen für' : 'Accepted for',
+      preOrderFor: lang === 'de' ? 'Vorbestellung für' : 'Pre-order for',
       minutes: lang === 'de' ? 'Minuten' : 'Minutes',
       rejected: lang === 'de' ? 'Abgelehnt' : 'Rejected',
       scanQr: lang === 'de' ? 'QR-Code scannen für Navigation' : 'Scan for navigation',
@@ -93,7 +94,7 @@ const resolvedMinutes = resolvedScheduledStr ? undefined : acceptedMinutes;
 
 const acceptanceHtml = resolvedScheduledStr ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
-      <p style="text-align:center; font-size:16px; color:#333; margin:4px 0;">${labels.acceptedFor}:</p>
+      <p style="text-align:center; font-size:16px; color:#333; margin:4px 0;">${labels.preOrderFor}:</p>
       <p style="text-align:center; font-size:20px; font-weight:900; margin:2px 0;">${resolvedScheduledStr}</p>
     ` : resolvedMinutes ? `
       <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
@@ -163,7 +164,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <table width="100%"><tr><td style="text-align:center; font-size:13px; color:#999; font-weight:700;">Powered by: foodup.ch</td></tr></table>
+          <center><font size="2" color="#000000">Powered by: foodup.ch</font></center>
         </body>
       </html>
     `;
