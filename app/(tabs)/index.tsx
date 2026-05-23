@@ -853,7 +853,7 @@ const toggleExpanded = (order_id: number) => {
         itemRefs.current[order_id]?.measureInWindow((x: number, y: number) => {
           const headerHeight = Platform.OS === 'android' ? 40 + 14 + 12 : 65 + 14 + 12;
           const searchBarHeight = Platform.OS === 'ios' ? 52 : 34;
-          const filterTabHeight = 48;
+          const filterTabHeight = 90;
           const topOffset = headerHeight + searchBarHeight + filterTabHeight;
           const scrollTarget = currentScrollOffset.current + y - topOffset;
           listRef.current?.scrollToOffset({ offset: Math.max(0, scrollTarget), animated: true });
