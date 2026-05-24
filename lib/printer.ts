@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
+import { formatAddress } from './formatters';
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
   try {
@@ -19,9 +20,10 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       }
       itemsHtml += `
         <tr>
-          <td style="text-align:left; padding: 4px 0; font-size:18px; font-weight:bold;">${item.quantity}x ${item.name}</td>
-          <td style="text-align:right; padding: 4px 0; font-size:18px; font-weight:bold; white-space:nowrap;">${item.total}</td>
-        </tr>`;
+          <td style="text-align:left; padding: 4px 0 0 0; font-size:18px; font-weight:bold;">${item.quantity}x ${item.name}</td>
+          <td style="text-align:right; padding: 4px 0 0 0; font-size:18px; font-weight:bold; white-space:nowrap;">${parseFloat(String(item.total || '0')).toFixed(2)}</td>
+        </tr>
+        <tr><td colspan="2" style="padding-bottom:5px;"></td></tr>`;
       if (item.addons && item.addons.length > 0) {
         item.addons.forEach((addon: any) => {
           itemsHtml += `
@@ -153,7 +155,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           </table>
           <div class="divider"></div>
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
-          ${order.shipping_address ? `<p style="margin:4px 0; font-size:20px;">${order.shipping_address}</p>` : ''}
+          ${order.shipping_address ? `<p style="margin:4px 0; font-size:20px;">${formatAddress(order.shipping_address)}</p>` : ''}
           ${order.customer_email ? `<p style="margin:4px 0; font-size:20px;">${order.customer_email}</p>` : ''}
           ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${(() => {
             let p = order.customer_phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -191,7 +193,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
-          <center><font size="2" color="#000000">Powered by: foodup.ch</font></center>
+          <p style="text-align:center; font-size:12px; color:#000000; margin:4px 0;">Powered by: foodup.ch</p>
         </body>
       </html>
     `;

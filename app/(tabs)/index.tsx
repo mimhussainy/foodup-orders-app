@@ -24,7 +24,7 @@ import {
   View
 } from 'react-native';
 import CustomAlert from '../../components/CustomAlert';
-import { formatPhone } from '../../lib/formatPhone';
+import { formatAddress, formatPhone } from '../../lib/formatters';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -1392,7 +1392,7 @@ const flatData: FlatItem[] = [
                     <>
                       <TouchableOpacity style={styles.row} onPress={() => { const encoded = encodeURIComponent(selectedOrder.shipping_address); Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`); }}>
                         <Ionicons name="location-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.shipping_address}</Text>
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{formatAddress(selectedOrder.shipping_address)}</Text>
                       </TouchableOpacity>
                       {selectedOrder.date_created || selectedOrder.note ? <View style={styles.divider} /> : null}
                     </>

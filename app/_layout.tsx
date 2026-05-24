@@ -597,7 +597,10 @@ export default function RootLayout() {
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
-            setNewOrderModal({
+            setShowOrderModal(false);
+              setNewOrderModal(null);
+              setTimeout(() => {
+              setNewOrderModal({
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
                 customer_email: latestOrder.customer_email || '',
@@ -618,6 +621,7 @@ export default function RootLayout() {
                 orderable_order_time: latestOrder.orderable_order_time || '',
               });
               setShowOrderModal(true);
+              }, 100);
             // Check in background if already accepted, close modal if so
             setTimeout(() => {
               fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
@@ -693,8 +697,12 @@ export default function RootLayout() {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
           };
-          setNewOrderModal(newOrder);
-          setShowOrderModal(true);
+          setShowOrderModal(false);
+          setNewOrderModal(null);
+          setTimeout(() => {
+            setNewOrderModal(newOrder);
+            setShowOrderModal(true);
+          }, 100);
         }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
