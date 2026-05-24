@@ -1047,22 +1047,28 @@ useEffect(() => {
           date_created: o.date_created || '',
         }));
         setOrders(prev => {
-          // Start with backend orders as source of truth for status
           const merged = [...prev];
           backendOrders.forEach(bo => {
             const exists = merged.findIndex(o => o.order_id === bo.order_id);
             if (exists === -1) {
               merged.push(bo);
             } else {
-              // Backend is always source of truth for status
               merged[exists] = { ...merged[exists], status: bo.status };
             }
           });
           merged.sort((a, b) => b.order_id - a.order_id);
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          fetchAcceptedTimes(merged);
           return merged;
         });
+        const currentOrders = orders;
+        const merged = [...currentOrders];
+        backendOrders.forEach(bo => {
+          const exists = merged.findIndex(o => o.order_id === bo.order_id);
+          if (exists === -1) merged.push(bo);
+          else merged[exists] = { ...merged[exists], status: bo.status };
+        });
+        merged.sort((a, b) => b.order_id - a.order_id);
+        fetchAcceptedTimes(merged);
       }
     } catch (e) {}
   };
