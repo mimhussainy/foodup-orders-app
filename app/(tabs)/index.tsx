@@ -928,28 +928,8 @@ useEffect(() => {
               const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
               const acceptedResult = await acceptedRes.json();
               if (acceptedResult.success && acceptedResult.accepted_time) return;
-              const newOrder: Order = {
-                order_id: parseInt(latestOrder.order_id),
-                customer_name: latestOrder.customer_name || '',
-                customer_email: latestOrder.customer_email || '',
-                customer_phone: latestOrder.customer_phone || '',
-                total: String(latestOrder.total || ''),
-                currency: latestOrder.currency || 'CHF',
-                status: latestOrder.status || '',
-                event_type: 'new_order',
-                items: latestOrder.items || [],
-                payment_method: latestOrder.payment_method || '',
-                note: latestOrder.note || '',
-                date: latestOrder.date_created ? new Date(latestOrder.date_created).toLocaleString() : new Date().toLocaleString(),
-                timestamp: latestOrder.date_created ? new Date(latestOrder.date_created).getTime() : Date.now(),
-                shipping_method: latestOrder.shipping?.method || '',
-                shipping_address: latestOrder.shipping?.address || '',
-                restaurant_code: latestOrder.restaurant_code || '',
-                orderable_order_date: latestOrder.orderable_order_date || '',
-                orderable_order_time: latestOrder.orderable_order_time || '',
-                date_created: latestOrder.date_created || '',
-              };
-              router.replace('/(tabs)');
+              // New order detected - fetchOrdersFromBackend will pick it up
+              fetchOrdersFromBackend();
             }
           }
         } catch (e) {}
@@ -1015,7 +995,7 @@ useEffect(() => {
           }
         } catch (e) {}
       }));
-      setAcceptedTimes(times);
+      setAcceptedTimes(prev => ({ ...prev, ...times }));
     } catch (e) {}
   };
   const fetchOrdersFromBackend = async () => {
@@ -1048,27 +1028,25 @@ useEffect(() => {
         }));
         setOrders(prev => {
           const merged = [...prev];
+          let hasChanges = false;
           backendOrders.forEach(bo => {
             const exists = merged.findIndex(o => o.order_id === bo.order_id);
             if (exists === -1) {
               merged.push(bo);
+              hasChanges = true;
             } else {
-              merged[exists] = { ...merged[exists], status: bo.status };
+              if (bo.status === 'cancelled' && merged[exists].status !== 'cancelled') {
+                merged[exists] = { ...merged[exists], status: 'cancelled' };
+                hasChanges = true;
+              }
             }
           });
+          if (!hasChanges) return prev;
           merged.sort((a, b) => b.order_id - a.order_id);
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
           return merged;
         });
-        const currentOrders = orders;
-        const merged = [...currentOrders];
-        backendOrders.forEach(bo => {
-          const exists = merged.findIndex(o => o.order_id === bo.order_id);
-          if (exists === -1) merged.push(bo);
-          else merged[exists] = { ...merged[exists], status: bo.status };
-        });
-        merged.sort((a, b) => b.order_id - a.order_id);
-        fetchAcceptedTimes(merged);
+        fetchAcceptedTimes(backendOrders.filter(o => o.status !== 'cancelled'));
       }
     } catch (e) {}
   };
@@ -1106,7 +1084,7 @@ useEffect(() => {
         if (data.event_type === 'status_update') {
           setOrders(prev => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
-            if (exists >= 0) {
+            if (exists >= 0 && data.status === 'cancelled') {
               const updated = [...prev];
               updated[exists] = { ...updated[exists], status: data.status };
               return updated;
