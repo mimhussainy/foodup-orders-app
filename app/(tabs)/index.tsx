@@ -24,6 +24,7 @@ import {
   View
 } from 'react-native';
 import CustomAlert from '../../components/CustomAlert';
+import { formatPhone } from '../../lib/formatPhone';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -1222,7 +1223,11 @@ const flatData: FlatItem[] = [
           </TouchableOpacity>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
           {Platform.OS === 'android' && canPrint ? (
-            <TouchableOpacity onPress={() => printOrder(selectedOrder)} style={styles.backCircle}>
+            <TouchableOpacity onPress={() => {
+              const claim = claims[String(selectedOrder.order_id)];
+              const deliveredBy = claim?.status === 'delivered' ? claim.name : undefined;
+              printOrder(selectedOrder, undefined, undefined, undefined, undefined, deliveredBy);
+            }} style={styles.backCircle}>
               <Ionicons name="print-outline" size={20} color="#111" />
             </TouchableOpacity>
           ) : (
@@ -1230,7 +1235,7 @@ const flatData: FlatItem[] = [
               const { Share } = require('react-native');
               Share.share({
                 title: `Order #${selectedOrder.order_id}`,
-                message: `Order #${selectedOrder.order_id}\nCustomer: ${selectedOrder.customer_name}\nPhone: ${selectedOrder.customer_phone}\nAddress: ${selectedOrder.shipping_address}\nTotal: ${selectedOrder.currency} ${selectedOrder.total}\nPayment: ${selectedOrder.payment_method}\nItems: ${selectedOrder.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}${selectedOrder.note ? `\nNote: ${selectedOrder.note}` : ''}`,
+                message: `Order #${selectedOrder.order_id}\nCustomer: ${selectedOrder.customer_name}\nPhone: ${formatPhone(selectedOrder.customer_phone)}\nAddress: ${selectedOrder.shipping_address}\nTotal: ${selectedOrder.currency} ${selectedOrder.total}\nPayment: ${selectedOrder.payment_method}\nItems: ${selectedOrder.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}${selectedOrder.note ? `\nNote: ${selectedOrder.note}` : ''}`,
               });
             }} style={styles.backCircle}>
               <Ionicons name="share-outline" size={20} color="#111" />
@@ -1378,7 +1383,7 @@ const flatData: FlatItem[] = [
                     <>
                       <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`tel:${selectedOrder.customer_phone}`)}>
                         <Ionicons name="call-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{selectedOrder.customer_phone}</Text>
+                        <Text style={[styles.rowValue, styles.linkValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{formatPhone(selectedOrder.customer_phone)}</Text>
                       </TouchableOpacity>
                       <View style={styles.divider} />
                     </>
@@ -1661,7 +1666,7 @@ const flatData: FlatItem[] = [
                     <Text style={styles.orderCustomer}>{order.customer_name}</Text>
                   </View>
                   {order.orderable_order_time ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Ionicons name={isScheduledOrder(order) ? 'calendar-outline' : 'flash-outline'} size={14} color={isScheduledOrder(order) ? '#8B38CB' : '#f39c12'} />
                       <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: isScheduledOrder(order) ? '#8B38CB' : '#f39c12' }}>
                         {isScheduledOrder(order) ? t.scheduled : t.asapShort}

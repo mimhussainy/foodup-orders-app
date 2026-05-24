@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
 
-export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string) {
+export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
   try {
     const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
 
@@ -74,6 +74,8 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       minutes: lang === 'de' ? 'Minuten' : 'Minutes',
       rejected: lang === 'de' ? 'Abgelehnt' : 'Rejected',
       scanQr: lang === 'de' ? 'QR-Code scannen für Navigation' : 'Scan for navigation',
+      deliveredBy: lang === 'de' ? 'Geliefert von' : 'Delivered by',
+      pickedUp: lang === 'de' ? 'Abgeholt' : 'Picked up',
     };
 
     const inferredScheduledStr = (() => {
@@ -131,11 +133,21 @@ const acceptanceHtml = resolvedScheduledStr ? `
             <tr>
               <td style="width:50%;">
                 <div style="font-size:15px; font-weight:bold; text-transform:uppercase; white-space:nowrap;">${labels.shipmentMethod}:</div>
-                <div style="font-size:22px; font-weight:900; margin-top:2px;">${order.shipping_method || '-'}</div>
+                <div style="font-size:22px; font-weight:900; margin-top:2px;">${
+                  order.shipping_method === 'Lieferung' ? (lang === 'de' ? 'Lieferung' : 'Delivery') :
+                  order.shipping_method === 'Abholung' ? (lang === 'de' ? 'Abholung' : 'Pickup') :
+                  order.shipping_method || '-'
+                }</div>
               </td>
               <td style="width:50%; text-align:right;">
                 <div style="font-size:15px; font-weight:bold; text-transform:uppercase;">${labels.paymentMode}:</div>
-                <div style="font-size:22px; font-weight:900; margin-top:2px; text-align:right;">${order.payment_method || '-'}</div>
+                <div style="font-size:22px; font-weight:900; margin-top:2px; text-align:right;">${
+                  order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash')
+                    ? (lang === 'de' ? 'Barzahlung' : 'Cash')
+                    : order.payment_method?.toLowerCase().includes('online') || order.payment_method?.toLowerCase().includes('card')
+                    ? (lang === 'de' ? 'Online' : 'Online')
+                    : order.payment_method || '-'
+                }</div>
               </td>
             </tr>
           </table>
@@ -143,7 +155,13 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
           ${order.shipping_address ? `<p style="margin:4px 0; font-size:20px;">${order.shipping_address}</p>` : ''}
           ${order.customer_email ? `<p style="margin:4px 0; font-size:20px;">${order.customer_email}</p>` : ''}
-          ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${order.customer_phone}</p>` : ''}
+          ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${(() => {
+            let p = order.customer_phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
+            if (p.startsWith('+41')) p = '0' + p.slice(3);
+            else if (p.startsWith('41')) p = '0' + p.slice(2);
+            if (p.length === 10) p = p.slice(0,3) + ' ' + p.slice(3,6) + ' ' + p.slice(6,8) + ' ' + p.slice(8,10);
+            return p;
+          })()}</p>` : ''}
           <div class="divider"></div>
           <table>${itemsHtml}</table>
           <div class="divider"></div>
@@ -156,6 +174,15 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="text-align:center; font-size:20px; font-weight:900; margin:8px 0; line-height:1.2;">${isPaid ? labels.paid : labels.notPaid}</p>
           ${order.note ? `<div class="divider-dashed"></div><p style="font-size:18px;"><strong>${labels.note}:</strong> ${order.note}</p>` : ''}
           ${acceptanceHtml}
+          ${deliveredBy ? `
+            <div style="border-top:1.5px solid #000; margin:12px 0;"></div>
+            <p style="text-align:center; font-size:16px; color:#333; margin:4px 0;">
+              ${deliveredBy === '__pickup__' || deliveredBy === 'Abgeholt' || deliveredBy === 'Picked Up'
+                ? `✓ ${labels.pickedUp}`
+                : `✓ ${labels.deliveredBy}: ${deliveredBy}`
+              }
+            </p>
+          ` : ''}
           ${order.shipping_address ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <div style="text-align:center; margin:8px 0;">
