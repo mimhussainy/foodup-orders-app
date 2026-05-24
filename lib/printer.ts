@@ -168,8 +168,16 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <table>${itemsHtml}</table>
           <div class="divider"></div>
           <table>
+            ${(() => {
+              const itemsSum = (order.items || []).reduce((sum: number, item: any) => sum + parseFloat(String(item.total || '0')), 0);
+              const tip = parseFloat(String(order.total || '0')) - itemsSum;
+              if (tip > 0.01) {
+                return `<tr><td colspan="2" style="text-align:right; font-size:16px; color:#333;">${lang === 'de' ? 'Trinkgeld' : 'Tip'}:&nbsp;&nbsp;${order.currency} ${tip.toFixed(2)}</td></tr>`;
+              }
+              return '';
+            })()}
             <tr>
-              <td colspan="2" style="text-align:right; font-size:18px; font-weight:bold;">${labels.total}:&nbsp;&nbsp;${order.total}</td>
+              <td colspan="2" style="text-align:right; font-size:18px; font-weight:bold;">${labels.total}:&nbsp;&nbsp;${order.currency} ${parseFloat(String(order.total || '0')).toFixed(2)}</td>
             </tr>
           </table>
           <div class="divider"></div>
