@@ -1525,21 +1525,21 @@ const flatData: FlatItem[] = [
       <View style={styles.header}>
         <View style={styles.headerPlaceholder} />
         <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-        {storeIsOpen !== null ? (
-          <Animated.View style={{
-            backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
-            borderRadius: 12,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
-            opacity: pulseAnim,
-          }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-              {storeIsOpen ? t.openStore.toUpperCase() : t.closeStore.toUpperCase()}
-            </Text>
-          </Animated.View>
-        ) : (
-          <View style={styles.headerPlaceholder} />
-        )}
+        <View style={{ width: 80, alignItems: 'flex-end' }}>
+          {storeIsOpen !== null ? (
+            <Animated.View style={{
+              backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
+              borderRadius: 12,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              opacity: pulseAnim,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                {storeIsOpen ? t.openStore.toUpperCase() : t.closeStore.toUpperCase()}
+              </Text>
+            </Animated.View>
+          ) : null}
+        </View>
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <FlatList
@@ -1760,7 +1760,7 @@ const styles = StyleSheet.create({
   paddingHorizontal: 16,
 },
   logo: { width: 100, height: 30 },
-  headerPlaceholder: { width: 36 },
+  headerPlaceholder: { width: 80 },
   backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center' },
   backArrow: { fontSize: 24, color: '#111', lineHeight: 24, textAlignVertical: 'center', includeFontPadding: false },
   scrollContent: { paddingBottom: 40, paddingTop: 0 },
