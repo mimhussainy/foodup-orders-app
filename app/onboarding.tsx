@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -119,7 +120,7 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         {step === 'pin' ? (
           <TouchableOpacity onPress={goBack} style={styles.backCircle}>
-            <Text style={styles.backArrow}>‹</Text>
+            <Ionicons name="chevron-back" size={20} color="#111" />
           </TouchableOpacity>
         ) : (
           <View style={styles.backCirclePlaceholder} />
