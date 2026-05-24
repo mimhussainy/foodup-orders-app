@@ -880,14 +880,12 @@ const stopPreviewSound = async () => {
                       onChangeText={setRestaurantAddress}
                     />
 
-                    <TextInput
-                      style={[styles.input, { marginTop: 10 }]}
-                      placeholder={t.website}
-                      placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
-                      value={restaurantWebsite}
-                      onChangeText={setRestaurantWebsite}
-                      autoCapitalize="none"
-                    />
+                    <View style={[styles.input, { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0F0F0' }]}>
+                      <Ionicons name="lock-closed-outline" size={14} color="#999" />
+                      <Text style={{ fontSize: 15, color: restaurantWebsite ? '#111' : '#999' }}>
+                        {restaurantWebsite || t.website}
+                      </Text>
+                    </View>
 
                     {profileError ? <Text style={styles.error}>{profileError}</Text> : null}
 
