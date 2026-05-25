@@ -1082,7 +1082,24 @@ useEffect(() => {
         };
 
         if (data.event_type === 'auto_accepted') {
-          loadAutoPrintOrders();
+          const printData = {
+            accepted_time: data.accepted_time || '',
+            order_id: data.order_id,
+            customer_name: data.customer_name || '',
+            customer_email: data.customer_email || '',
+            customer_phone: data.customer_phone || '',
+            total: data.total || '',
+            currency: data.currency || 'CHF',
+            payment_method: data.payment_method || '',
+            note: data.note || '',
+            shipping_method: data.shipping_method || '',
+            shipping_address: data.shipping_address || '',
+            orderable_order_time: data.orderable_order_time || '',
+            orderable_order_date: data.orderable_order_date || '',
+            date_created: data.date_created || '',
+            items: data.items || '[]',
+          };
+          setAutoPrintOrders(prev => ({ ...prev, [String(data.order_id)]: printData }));
           return;
         }
         if (data.event_type === 'status_update') {
