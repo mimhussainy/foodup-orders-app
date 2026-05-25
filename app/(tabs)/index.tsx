@@ -63,7 +63,7 @@ interface Order {
 }
 function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: string }) {
   const [now, setNow] = useState(Date.now());
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -119,6 +119,7 @@ function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; a
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
   const { t } = useLanguage();
+  
 
   useEffect(() => {
     if (!accepted_at || !accepted_time) return;
@@ -1644,7 +1645,7 @@ const flatData: FlatItem[] = [
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {autoPrintOrders[String(order.order_id)] && (
                       <View style={{ backgroundColor: '#79554820', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>Auto</Text>
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>{t.autoAccepted}</Text>
                       </View>
                     )}
                     <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
