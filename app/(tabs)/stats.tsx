@@ -62,7 +62,7 @@ const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
 export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const fetchAllStats = useCallback(async () => {
     const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -128,9 +128,7 @@ useFocusEffect(
     }, [fetchAllStats])
   );
   const toggleExpand = (key: string) => {
-    setExpanded(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
+    setExpanded(prev => prev === key ? null : key);
   };
 
   const todayStats = getStats(orders, getStartOfDay());
@@ -176,7 +174,7 @@ useFocusEffect(
   );
 
   const CollapsibleCard = ({ title, statsKey, stats }: { title: string; statsKey: string; stats: any }) => {
-    const isOpen = expanded.includes(statsKey);
+    const isOpen = expanded === statsKey;
     return (
       <>
         <Text style={styles.groupLabel}>{title}</Text>

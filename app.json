@@ -7,9 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "fooduporders",
     "userInterfaceStyle": "automatic",
+    "notification": {
+      "icon": "./assets/images/android-icon-monochrome.png",
+      "color": "#8B38CB"
+    },
     "ios": {
       "bundleIdentifier": "com.foodup.orders",
-      "buildNumber": "6",
+      "buildNumber": "8",
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
@@ -28,6 +32,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.foodup.orders",
+      "softwareKeyboardLayoutMode": "pan",
       "versionCode": 2,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
