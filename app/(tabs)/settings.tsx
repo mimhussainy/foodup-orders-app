@@ -666,9 +666,16 @@ const stopPreviewSound = async () => {
                     >
                       <Ionicons name="person-outline" size={16} color="#999" />
 
-                      <Text style={[styles.rowValue, { flex: 1 }]}>
-                        {account.username.charAt(0).toUpperCase() + account.username.slice(1)}
-                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rowValue}>
+                          {account.username.charAt(0).toUpperCase() + account.username.slice(1)}
+                        </Text>
+                        {account.phone ? (
+                          <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{account.phone}</Text>
+                        ) : (
+                          <Text style={{ fontSize: 12, color: '#e74c3c', marginTop: 2 }}>No phone set</Text>
+                        )}
+                      </View>
 
                       <TouchableOpacity
                         onPress={() => {
