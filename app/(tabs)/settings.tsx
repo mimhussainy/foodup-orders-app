@@ -700,13 +700,13 @@ const stopPreviewSound = async () => {
                           setNewResetPassword('');
                         }}
                       >
-                        <Text style={styles.resetText}>{t.reset}</Text>
+                        <Ionicons name="key-outline" size={16} color="#007AFF" />
                       </TouchableOpacity>
 
-                      <Text style={styles.dividerText}> · </Text>
+                      <View style={{ width: 8 }} />
 
                       <TouchableOpacity onPress={() => handleDeleteAccount(account.username)}>
-                        <Text style={styles.deleteText}>{t.remove}</Text>
+                        <Ionicons name="trash-outline" size={16} color="#e74c3c" />
                       </TouchableOpacity>
                     </View>
 
