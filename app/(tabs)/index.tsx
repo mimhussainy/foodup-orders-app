@@ -873,6 +873,7 @@ useEffect(() => {
     useCallback(() => {
       fetchOrdersFromBackend();
       fetchClaims();
+      loadAutoPrintOrders();
       setTimeout(() => {
         try {
           listRef.current?.scrollToLocation({ 
