@@ -1614,7 +1614,7 @@ const flatData: FlatItem[] = [
                     renderItem={({ item: f }) => (
                       <TouchableOpacity
                         onPress={() => setFilter(f.key)}
-                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        style={{ padding: 5, borderRadius: 6, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
                         <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
                         <View style={{ backgroundColor: '#fff', borderRadius: 3, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
