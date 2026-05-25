@@ -1193,14 +1193,7 @@ useEffect(() => {
         o.customer_phone.toLowerCase().includes(s)
       );
     });
-const sortedFilteredOrders = [...filteredOrders].sort((a, b) => {
-  const aIsNew = getDeliveryStatus(a) === 'new';
-  const bIsNew = getDeliveryStatus(b) === 'new';
-  if (aIsNew && !bIsNew) return -1;
-  if (!aIsNew && bIsNew) return 1;
-  return b.order_id - a.order_id;
-});
-const sections = groupOrdersByDate(sortedFilteredOrders, t);
+const sections = groupOrdersByDate(filteredOrders, t);
 
 type FlatItem = { type: 'storeStatus' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string } | { type: 'order'; item: Order };
 
