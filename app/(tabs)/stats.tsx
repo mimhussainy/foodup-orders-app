@@ -284,13 +284,8 @@ useFocusEffect(
                   return { label, dateRange, orders: filtered, cashOrders, totalCash, currency: filtered[0]?.currency || 'CHF' };
                 };
 
-                const businessDayStart = new Date();
-                if (businessDayStart.getHours() < 6) {
-                  businessDayStart.setDate(businessDayStart.getDate() - 1);
-                }
-                businessDayStart.setHours(6, 0, 0, 0);
                 const groups = [
-                  makeDayGroup('Today', businessDayStart),
+                  makeDayGroup('Today', today),
                 ].filter(g => g.orders.length > 0);
 
                 const totalOrders = orders.length;
