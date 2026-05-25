@@ -1225,7 +1225,14 @@ useEffect(() => {
         o.customer_phone.toLowerCase().includes(s)
       );
     });
-const sections = groupOrdersByDate(filteredOrders, t);
+const sortedOrders = [...filteredOrders].sort((a, b) => {
+  const aIsCancelled = getDeliveryStatus(a) === 'cancelled';
+  const bIsCancelled = getDeliveryStatus(b) === 'cancelled';
+  if (aIsCancelled && !bIsCancelled) return 1;
+  if (!aIsCancelled && bIsCancelled) return -1;
+  return b.order_id - a.order_id;
+});
+const sections = groupOrdersByDate(sortedOrders, t);
 
 type FlatItem = { type: 'storeStatus' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string } | { type: 'order'; item: Order };
 
@@ -1687,9 +1694,10 @@ const flatData: FlatItem[] = [
                           setAcceptRejectOrder(order);
                           setShowAcceptReject(true);
                         }}
-                        style={{ backgroundColor: '#f39c1220', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+                        style={{ backgroundColor: '#E91E6320', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
-                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#f39c12' }}>
+                        <Ionicons name="finger-print-outline" size={11} color="#E91E63" />
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#E91E63' }}>
                           {t.review || 'Review'}
                         </Text>
                       </TouchableOpacity>
@@ -1799,6 +1807,14 @@ const flatData: FlatItem[] = [
         icon={alertConfig.icon}
         iconColor={alertConfig.iconColor}
         onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
+      <AcceptRejectModal
+        order={acceptRejectOrder}
+        visible={showAcceptReject}
+        onClose={() => {
+          setShowAcceptReject(false);
+          setAcceptRejectOrder(null);
+        }}
       />
     </View>
   );
