@@ -1060,26 +1060,6 @@ useEffect(() => {
   useEffect(() => {
       const subscription = Notifications.addNotificationReceivedListener(notification => {
         const data = notification.request.content.data as any;
-        const newOrder: Order = {
-        order_id: parseInt(data.order_id),
-        customer_name: data.customer_name,
-        customer_email: data.customer_email || '',
-        customer_phone: data.customer_phone || '',
-        total: data.total,
-        currency: data.currency,
-        status: data.status,
-        event_type: data.event_type || 'new_order',
-        items: JSON.parse(data.items || '[]'),
-        payment_method: data.payment_method,
-        note: data.note,
-        date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-        timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
-        shipping_method: data.shipping_method || '',
-        shipping_address: data.shipping_address || '',
-        restaurant_code: data.restaurant_code || '',
-        orderable_order_time: data.orderable_order_time || '',
-        orderable_order_date: data.orderable_order_date || '',
-        };
 
         if (data.event_type === 'auto_accepted') {
           const printData = {
@@ -1102,6 +1082,28 @@ useEffect(() => {
           setAutoPrintOrders(prev => ({ ...prev, [String(data.order_id)]: printData }));
           return;
         }
+
+        const newOrder: Order = {
+        order_id: parseInt(data.order_id),
+        customer_name: data.customer_name,
+        customer_email: data.customer_email || '',
+        customer_phone: data.customer_phone || '',
+        total: data.total,
+        currency: data.currency,
+        status: data.status,
+        event_type: data.event_type || 'new_order',
+        items: JSON.parse(data.items || '[]'),
+        payment_method: data.payment_method,
+        note: data.note,
+        date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
+        timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
+        shipping_method: data.shipping_method || '',
+        shipping_address: data.shipping_address || '',
+        restaurant_code: data.restaurant_code || '',
+        orderable_order_time: data.orderable_order_time || '',
+        orderable_order_date: data.orderable_order_date || '',
+        };
+
         if (data.event_type === 'status_update') {
           setOrders(prev => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
@@ -1650,27 +1652,6 @@ const flatData: FlatItem[] = [
                       <View style={{ backgroundColor: '#79554820', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
                         <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>Auto</Text>
                       </View>
-                    )}
-                    {canPrint && autoPrintOrders[String(order.order_id)] && (
-                      <TouchableOpacity
-                        onPress={async (e) => {
-                          e.stopPropagation();
-                          const printData = autoPrintOrders[String(order.order_id)];
-                          const orderObj = { ...order, items: typeof printData.items === 'string' ? JSON.parse(printData.items) : printData.items };
-                          const acceptedTime = printData.accepted_time || '';
-                          const mins = parseInt(acceptedTime);
-                          const isScheduledTime = acceptedTime.includes('—') || acceptedTime.includes(':');
-                          const success = await (isScheduledTime ? printOrder(orderObj, undefined, false, '', acceptedTime) : printOrder(orderObj, isNaN(mins) ? 30 : mins)).catch(() => false);
-                          if (success) {
-                            await AsyncStorage.removeItem(`auto_print_${order.order_id}`);
-                            setAutoPrintOrders(prev => { const updated = { ...prev }; delete updated[String(order.order_id)]; return updated; });
-                          }
-                        }}
-                        style={{ backgroundColor: '#8B38CB', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                      >
-                        <Ionicons name="print-outline" size={14} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Auto</Text>
-                      </TouchableOpacity>
                     )}
                     <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
                       <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
