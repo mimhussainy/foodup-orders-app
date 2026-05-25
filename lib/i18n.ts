@@ -175,7 +175,9 @@ export const translations = {
     scheduledOrder: 'Scheduled Order',
     scheduledConfirm: 'Confirm this scheduled order for',
     confirmAccept: 'Confirm & Print',
-    
+    tabOrders: 'Orders',
+    tabStatistics: 'Statistics',
+    tabSettings: 'Settings',
   },
 
 
@@ -354,7 +356,9 @@ export const translations = {
     scheduledOrder: 'Geplante Bestellung',
     scheduledConfirm: 'Diese geplante Bestellung bestätigen für',
     confirmAccept: 'Bestätigen & Drucken',
-    
+    tabOrders: 'Bestellungen',
+    tabStatistics: 'Statistiken',
+    tabSettings: 'Einstellungen',
   },
 };
 

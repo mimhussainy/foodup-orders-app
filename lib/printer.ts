@@ -29,10 +29,9 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       }
       itemsHtml += `
         <tr>
-          <td style="text-align:left; padding: 4px 0 0 0; font-size:18px; font-weight:bold;">${item.quantity}x ${item.name}</td>
-          <td style="text-align:right; padding: 4px 0 0 0; font-size:18px; font-weight:bold; white-space:nowrap;">${parseFloat(String(item.total || '0')).toFixed(2)}</td>
-        </tr>
-        <tr><td colspan="2" style="padding-bottom:5px;"></td></tr>`;
+          <td style="text-align:left; padding: 0; font-size:18px; font-weight:bold;">${item.quantity}x ${item.name}</td>
+          <td style="text-align:right; padding: 0; font-size:18px; font-weight:bold; white-space:nowrap;">${parseFloat(String(item.total || '0')).toFixed(2)}</td>
+        </tr>`;
       if (item.addons && item.addons.length > 0) {
         item.addons.forEach((addon: any) => {
           itemsHtml += `
@@ -41,6 +40,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
           </tr>`;
         });
       }
+      itemsHtml += `<tr><td colspan="2" style="padding-bottom:8px;"></td></tr>`;
     });
 
     const lang = (await AsyncStorage.getItem('app_language') || await AsyncStorage.getItem('language') || 'en') as 'en' | 'de';

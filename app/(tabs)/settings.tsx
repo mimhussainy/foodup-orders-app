@@ -4,7 +4,7 @@ import { Audio } from 'expo-av';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, Image, Keyboard, Linking, Platform,
+  Alert, Image, Keyboard, KeyboardAvoidingView, Linking, Platform,
   SafeAreaView, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
@@ -460,7 +460,12 @@ const stopPreviewSound = async () => {
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
           {role === 'delivery' && (
             <>
               <Text style={styles.groupLabel}>{t.profile}</Text>
@@ -671,7 +676,17 @@ const stopPreviewSound = async () => {
                           {account.username.charAt(0).toUpperCase() + account.username.slice(1)}
                         </Text>
                         {account.phone ? (
-                          <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{account.phone}</Text>
+                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${account.phone}`)}>
+                            <Text style={{ fontSize: 12, color: '#007AFF', marginTop: 2 }}>
+                              {(() => {
+                                let p = account.phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
+                                if (p.startsWith('+41')) p = '0' + p.slice(3);
+                                else if (p.startsWith('41')) p = '0' + p.slice(2);
+                                if (p.length === 10) p = p.slice(0,3) + ' ' + p.slice(3,6) + ' ' + p.slice(6,8) + ' ' + p.slice(8,10);
+                                return p;
+                              })()}
+                            </Text>
+                          </TouchableOpacity>
                         ) : (
                           <Text style={{ fontSize: 12, color: '#e74c3c', marginTop: 2 }}>No phone set</Text>
                         )}
@@ -1153,6 +1168,7 @@ const stopPreviewSound = async () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );

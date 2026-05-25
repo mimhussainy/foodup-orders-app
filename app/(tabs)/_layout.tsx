@@ -4,6 +4,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { useLanguage } from '../../lib/useLanguage';
 
 function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
   const color = focused ? '#8B38CB' : '#8E8E93';
@@ -23,6 +24,7 @@ function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
 
 const TabLayout = React.memo(function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   return (
     <Tabs
@@ -39,7 +41,7 @@ const TabLayout = React.memo(function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Orders',
+          title: t.tabOrders,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="receipt-outline" size={size} color={color} />
           ),
@@ -48,7 +50,7 @@ const TabLayout = React.memo(function TabLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Statistics',
+          title: t.tabStatistics,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
@@ -57,7 +59,7 @@ const TabLayout = React.memo(function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t.tabSettings,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />
           ),
