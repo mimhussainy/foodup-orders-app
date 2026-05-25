@@ -264,11 +264,6 @@ useFocusEffect(
                 const orders = courierDelivered[name] || [];
                 const isOpen = expandedCourier === name;
                 const today = new Date(); today.setHours(0, 0, 0, 0);
-                const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-                const day2 = new Date(today); day2.setDate(today.getDate() - 2);
-                const day3 = new Date(today); day3.setDate(today.getDate() - 3);
-                const last20Start = new Date(today); last20Start.setDate(today.getDate() - 23);
-                const last20End = new Date(today); last20End.setDate(today.getDate() - 4);
 
                 const isCash = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
                 const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
@@ -289,12 +284,13 @@ useFocusEffect(
                   return { label, dateRange, orders: filtered, cashOrders, totalCash, currency: filtered[0]?.currency || 'CHF' };
                 };
 
+                const businessDayStart = new Date();
+                if (businessDayStart.getHours() < 6) {
+                  businessDayStart.setDate(businessDayStart.getDate() - 1);
+                }
+                businessDayStart.setHours(6, 0, 0, 0);
                 const groups = [
-                  makeDayGroup('Today', today),
-                  makeDayGroup('Yesterday', yesterday),
-                  makeDayGroup(day2.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' }), day2),
-                  makeDayGroup(day3.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' }), day3),
-                  makeDayGroup('Last 20 Days', last20Start, last20End, `${formatDate(last20Start)} - ${formatDate(last20End)}`),
+                  makeDayGroup('Today', businessDayStart),
                 ].filter(g => g.orders.length > 0);
 
                 const totalOrders = orders.length;
@@ -396,7 +392,7 @@ useFocusEffect(
                             return (
                               <View key={gi}>
                                 <TouchableOpacity
-                                  style={[styles.row, { borderBottomWidth: isDayOpen ? 1 : 0, paddingLeft: 8 }]}
+                                  style={[styles.row, { borderBottomWidth: isDayOpen ? 1 : 0 }]}
                                   onPress={() => setExpandedCourierDay(isDayOpen ? null : dayKey)}
                                 >
                                   <View style={{ flex: 1 }}>
