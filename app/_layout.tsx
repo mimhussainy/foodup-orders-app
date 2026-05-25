@@ -113,17 +113,18 @@ function AcceptRejectModal({ order, visible, onClose }: { order: any | null, vis
       setAutoSettings(null);
       return;
     }
-    AsyncStorage.getItem('restaurant_code').then(async code => {
-      if (!code) return;
+    // When modal opens, cancel backend auto-action so owner is now in control
+    AsyncStorage.multiGet(['restaurant_code', 'owner_pin']).then(async ([[, code], [, pin]]) => {
+      if (!code || !order) return;
       try {
-        const res = await fetch(`${BACKEND_URL}/auto-settings/${code}`);
-        const result = await res.json();
-        if (result.success && result.settings.auto_action !== 'disabled') {
-          setAutoSettings(result.settings);
-          setCountdown(result.settings.wait_minutes * 60);
-        }
+        await fetch(`${BACKEND_URL}/cancel-auto-action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, owner_pin: pin }),
+        });
       } catch (e) {}
     });
+    // Don't show countdown — owner is now in control
   }, [visible]);
 
   useEffect(() => {
