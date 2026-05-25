@@ -597,6 +597,12 @@ export default function RootLayout() {
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
+              // Check if already accepted before showing modal
+              try {
+                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
+                const acceptedResult = await acceptedRes.json();
+                if (acceptedResult.success && acceptedResult.accepted_time) return;
+              } catch(e) {}
             setShowOrderModal(false);
               setNewOrderModal(null);
               setTimeout(() => {

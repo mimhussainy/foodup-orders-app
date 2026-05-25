@@ -5,7 +5,16 @@ import { formatAddress } from './formatters';
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
   try {
-    const logoHtml = `<img src="https://eatime.ch/wp-content/uploads/2026/05/print-logo.png" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
+    let logoHtml = '';
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const profileRes = await fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`);
+      const profileData = await profileRes.json();
+      const logoUrl = profileData?.profile?.print_logo_url;
+      if (logoUrl) {
+        logoHtml = `<img src="${logoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
+      }
+    } catch (e) {}
 
     const items = order.items || [];
     const isPaid = !order.payment_method?.toLowerCase().includes('bar');
