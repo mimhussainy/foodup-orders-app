@@ -343,7 +343,7 @@ useFocusEffect(
                           return (
                             <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
                               <TouchableOpacity
-                                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, backgroundColor: '#fffbeb' }}
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fffbeb' }}
                                 onPress={() => setExpandedOpenOrders(openOrders ? null : name)}
                               >
                                 <Ionicons name="time-outline" size={13} color="#f39c12" />
