@@ -585,15 +585,24 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                   Order #{order.order_id}
                 </Text>
                 {countdown !== null && autoSettings && (
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
-                    ⏱ {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="hourglass-outline" size={18} color={countdown < 60 ? '#e74c3c' : '#f39c12'} />
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
+                      {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                    </Text>
+                  </View>
                 )}
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                <View>
-                  <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
-                  <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
+                <View style={{ gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="person-outline" size={13} color="#999" />
+                    <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="cash-outline" size={13} color="#999" />
+                    <Text style={{ fontSize: 14, color: '#999' }}>{order.currency} {order.total}</Text>
+                  </View>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
                   {order.orderable_order_time ? (
