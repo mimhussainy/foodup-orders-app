@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, BackHandler, Modal, Platform, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LanguageProvider } from '../lib/LanguageContext';
+import { formatAddress } from '../lib/formatters';
 import { printOrder } from '../lib/printer';
 import { useLanguage } from '../lib/useLanguage';
 
@@ -428,7 +429,10 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
                 </View>
               </View>
               {order.shipping_address ? (
-                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 12 }}>📍 {order.shipping_address}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <Ionicons name="location-outline" size={14} color="#8B38CB" />
+                  <Text style={{ fontSize: 13, color: '#8B38CB', flex: 1 }}>{formatAddress(order.shipping_address)}</Text>
+                </View>
               ) : null}
               <View style={{ backgroundColor: '#F7F7F7', borderRadius: 12, padding: 12, marginBottom: 16, maxHeight: 160 }}>
                 <ScrollView nestedScrollEnabled>

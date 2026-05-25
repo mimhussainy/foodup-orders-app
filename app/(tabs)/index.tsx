@@ -630,14 +630,16 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
                 </View>
               </View>
               {isScheduled && order.orderable_order_date ? (
-                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 4 }}>
-                  🕐 {scheduledTime} — {scheduledDate}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons name="time-outline" size={14} color="#8B38CB" />
+                  <Text style={{ fontSize: 13, color: '#8B38CB' }}>{scheduledTime} — {scheduledDate}</Text>
+                </View>
               ) : null}
               {order.shipping_address ? (
-                <Text style={{ fontSize: 13, color: '#8B38CB', marginBottom: 12 }}>
-                  📍 {order.shipping_address}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <Ionicons name="location-outline" size={14} color="#8B38CB" />
+                  <Text style={{ fontSize: 13, color: '#8B38CB', flex: 1 }}>{formatAddress(order.shipping_address)}</Text>
+                </View>
               ) : null}
               <View style={{ backgroundColor: '#F7F7F7', borderRadius: 12, padding: 12, marginBottom: 16, maxHeight: 160 }}>
                 <ScrollView nestedScrollEnabled>
