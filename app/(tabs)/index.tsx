@@ -1211,16 +1211,18 @@ const flatData: FlatItem[] = [
 
 
 
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayOrders = orders.filter(o => new Date(o.timestamp) >= todayStart);
   const filterCounts = {
-    new: orders.filter(o => getDeliveryStatus(o) === 'new').length,
-    scheduled: orders.filter(o => isScheduledOrder(o) && o.status !== 'cancelled').length,
-    in_bag: orders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
-    delivering: orders.filter(o => getDeliveryStatus(o) === 'delivering').length,
-    delivered: orders.filter(o => getDeliveryStatus(o) === 'delivered').length,
-    pickedUp: orders.filter(o => getDeliveryStatus(o) === 'pickedUp').length,
-    cancelled: orders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
-    auto: orders.filter(o => !!autoPrintOrders[String(o.order_id)]).length,
-    all: orders.length,
+    new: todayOrders.filter(o => getDeliveryStatus(o) === 'new').length,
+    scheduled: todayOrders.filter(o => isScheduledOrder(o) && o.status !== 'cancelled').length,
+    in_bag: todayOrders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
+    delivering: todayOrders.filter(o => getDeliveryStatus(o) === 'delivering').length,
+    delivered: todayOrders.filter(o => getDeliveryStatus(o) === 'delivered').length,
+    pickedUp: todayOrders.filter(o => getDeliveryStatus(o) === 'pickedUp').length,
+    cancelled: todayOrders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
+    auto: todayOrders.filter(o => !!autoPrintOrders[String(o.order_id)]).length,
+    all: todayOrders.length,
   };
 
   if (role === 'delivery') return null;
