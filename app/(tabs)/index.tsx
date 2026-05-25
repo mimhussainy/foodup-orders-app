@@ -1081,6 +1081,10 @@ useEffect(() => {
         orderable_order_date: data.orderable_order_date || '',
         };
 
+        if (data.event_type === 'auto_accepted') {
+          loadAutoPrintOrders();
+          return;
+        }
         if (data.event_type === 'status_update') {
           setOrders(prev => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
@@ -1158,6 +1162,7 @@ useEffect(() => {
   const filteredOrders = orders
     .filter(o => {
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
+      if (filter === 'auto') return !!autoPrintOrders[String(o.order_id)];
       return filter === 'all' || getDeliveryStatus(o) === filter;
     })
     .filter(o => {
@@ -1200,6 +1205,7 @@ const flatData: FlatItem[] = [
     delivered: orders.filter(o => getDeliveryStatus(o) === 'delivered').length,
     pickedUp: orders.filter(o => getDeliveryStatus(o) === 'pickedUp').length,
     cancelled: orders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
+    auto: orders.filter(o => !!autoPrintOrders[String(o.order_id)]).length,
     all: orders.length,
   };
 
@@ -1581,11 +1587,12 @@ const flatData: FlatItem[] = [
                     data={[
                       { key: 'all', label: t.all, color: '#111' },
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
-                      { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#8B38CB' },
+                      { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
                       { key: 'in_bag', label: t.inBag, color: '#2980b9' },
                       { key: 'delivering', label: t.delivering, color: '#16a085' },
                       { key: 'delivered', label: t.delivered, color: '#2fc053' },
-                      { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#8B38CB' },
+                      { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#E91E63' },
+                      { key: 'auto', label: 'Auto', color: '#795548' },
                       { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
                     ]}
                     keyExtractor={f => f.key}
@@ -1622,6 +1629,11 @@ const flatData: FlatItem[] = [
                 <View style={styles.orderTopRow}>
                   <Text style={styles.orderId}>Order #{order.order_id}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {autoPrintOrders[String(order.order_id)] && (
+                      <View style={{ backgroundColor: '#79554820', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>Auto</Text>
+                      </View>
+                    )}
                     {canPrint && autoPrintOrders[String(order.order_id)] && (
                       <TouchableOpacity
                         onPress={async (e) => {
