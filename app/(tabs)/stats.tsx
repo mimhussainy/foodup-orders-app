@@ -343,7 +343,7 @@ useFocusEffect(
                           return (
                             <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
                               <TouchableOpacity
-                                <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 20, paddingBottom: 8 }}>
+                                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fffbeb' }}
                                 onPress={() => setExpandedOpenOrders(openOrders ? null : name)}
                               >
                                 <Ionicons name="time-outline" size={13} color="#f39c12" />
@@ -355,7 +355,7 @@ useFocusEffect(
                                 <Ionicons name={openOrders ? 'chevron-up' : 'chevron-down'} size={13} color="#f39c12" />
                               </TouchableOpacity>
                               {openOrders && (
-                                <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingBottom: 8 }}>
+                                <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 20, paddingBottom: 8 }}>
                                   {inProgress.map((o: any, oi: number) => (
                                     <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5, borderBottomWidth: oi === inProgress.length - 1 ? 0 : 1, borderBottomColor: '#fde68a' }}>
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
