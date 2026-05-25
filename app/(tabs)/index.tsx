@@ -1696,7 +1696,7 @@ const flatData: FlatItem[] = [
                         }}
                         style={{ backgroundColor: '#E91E6320', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
-                        <Ionicons name="finger-print-outline" size={11} color="#E91E63" />
+                        <Ionicons name="hand-left-outline" size={11} color="#E91E63" />
                         <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#E91E63' }}>
                           {t.review || 'Review'}
                         </Text>

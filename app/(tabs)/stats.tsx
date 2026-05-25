@@ -144,11 +144,13 @@ useFocusEffect(
         <Text style={styles.rowLabel}>{t.total} {t.orders}</Text>
         <Text style={styles.rowValue}>{stats.totalOrders}</Text>
       </View>
+      <View style={styles.divider} />
       <View style={styles.row}>
         <Ionicons name="bicycle-outline" size={16} color="#999" />
         <Text style={styles.rowLabel}>{t.deliveryLabel}</Text>
         <Text style={styles.rowValue}>{stats.deliveries}</Text>
       </View>
+      <View style={styles.divider} />
       <View style={styles.row}>
         <Ionicons name="bag-outline" size={16} color="#999" />
         <Text style={styles.rowLabel}>{t.pickupLabel}</Text>
@@ -160,12 +162,14 @@ useFocusEffect(
         <Text style={styles.rowLabel}>{t.cashPayment}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.cash.toFixed(2)}</Text>
       </View>
+      <View style={styles.divider} />
       <View style={styles.row}>
         <Ionicons name="card-outline" size={16} color="#999" />
         <Text style={styles.rowLabel}>{t.onlinePayment}</Text>
         <Text style={styles.rowValue}>{stats.currency} {stats.online.toFixed(2)}</Text>
       </View>
-      <View style={[styles.row, { borderBottomWidth: 0 }]}>
+      <View style={styles.divider} />
+      <View style={styles.row}>
         <Ionicons name="trending-up-outline" size={16} color="#999" />
         <Text style={[styles.rowLabel, { fontWeight: '700', color: '#111' }]}>{t.totalRevenue}</Text>
         <Text style={[styles.rowValue, { fontWeight: '700', color: '#111' }]}>{stats.currency} {stats.total.toFixed(2)}</Text>
@@ -453,7 +457,7 @@ const styles = StyleSheet.create({
   groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },
   section: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 0 },
   rowLabel: { fontSize: 14, color: '#666', flex: 1 },
   rowValue: { fontSize: 14, color: '#111', fontWeight: '500' },
   chevron: { fontSize: 12, color: '#999' },
