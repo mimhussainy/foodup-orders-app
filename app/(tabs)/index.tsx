@@ -1081,6 +1081,7 @@ useEffect(() => {
             date_created: data.date_created || '',
             items: data.items || '[]',
           };
+          AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(printData)).catch(() => {});
           setAutoPrintOrders(prev => ({ ...prev, [String(data.order_id)]: printData }));
           return;
         }
