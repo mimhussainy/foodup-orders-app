@@ -197,6 +197,10 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
         }).catch(() => {});
       }
+      AsyncStorage.getItem('pending_decision').then(stored => {
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter((id: number) => id !== order.order_id)));
+      }).catch(() => {});
       setLoading(false);
       onClose();
       setTimeout(() => {
@@ -239,6 +243,10 @@ const scheduledDate = isScheduled ? order?.orderable_order_date : '';
           event_type: 'status_update',
           sound: false,
         }),
+      }).catch(() => {});
+      AsyncStorage.getItem('pending_decision').then(stored => {
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter((id: number) => id !== order.order_id)));
       }).catch(() => {});
       setLoading(false);
       onClose();
@@ -575,7 +583,25 @@ export default function RootLayout() {
     });
     return () => backHandler.remove();
   }, []);
+async function addPendingDecision(orderId: number) {
+  try {
+    const stored = await AsyncStorage.getItem('pending_decision');
+    const list: number[] = stored ? JSON.parse(stored) : [];
+    if (!list.includes(orderId)) {
+      list.push(orderId);
+      await AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+    }
+  } catch (e) {}
+}
 
+async function removePendingDecision(orderId: number) {
+  try {
+    const stored = await AsyncStorage.getItem('pending_decision');
+    const list: number[] = stored ? JSON.parse(stored) : [];
+    const updated = list.filter(id => id !== orderId);
+    await AsyncStorage.setItem('pending_decision', JSON.stringify(updated));
+  } catch (e) {}
+}
   const checkUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('user_role');
@@ -721,7 +747,14 @@ export default function RootLayout() {
           setNewOrderModal(null);
           setTimeout(() => {
             setNewOrderModal(newOrder);
-            setShowOrderModal(true);
+          setShowOrderModal(true);
+          AsyncStorage.getItem('pending_decision').then(stored => {
+            const list: number[] = stored ? JSON.parse(stored) : [];
+            if (!list.includes(newOrder.order_id)) {
+              list.push(newOrder.order_id);
+              AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+            }
+          }).catch(() => {});
           }, 100);
         }
         try {

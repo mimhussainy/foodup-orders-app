@@ -384,6 +384,10 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
         }).catch(() => {});
       }
+      AsyncStorage.getItem('pending_decision').then(stored => {
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== order.order_id)));
+      }).catch(() => {});
       setLoading(false);
       onClose();
       InteractionManager.runAfterInteractions(() => {
@@ -427,6 +431,10 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
           event_type: 'status_update',
           sound: false,
         }),
+      }).catch(() => {});
+      AsyncStorage.getItem('pending_decision').then(stored => {
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== order.order_id)));
       }).catch(() => {});
       setLoading(false);
       onClose();
@@ -856,6 +864,7 @@ const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[]; icon?: string; iconColor?: string }>({ visible: false, title: '', message: '', buttons: [] });
 const [canPrint, setCanPrint] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
+const [pendingDecisionOrders, setPendingDecisionOrders] = useState<number[]>([]);
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -886,6 +895,7 @@ useEffect(() => {
       fetchOrdersFromBackend();
       fetchClaims();
       loadAutoPrintOrders();
+      loadPendingDecision();
       setTimeout(() => {
         try {
           listRef.current?.scrollToLocation({ 
@@ -918,6 +928,7 @@ useEffect(() => {
         fetchClaims();
         fetchStoreStatus();
         loadAutoPrintOrders();
+        loadPendingDecision();
       }
     });
 
@@ -1155,6 +1166,12 @@ useEffect(() => {
     const stored = await AsyncStorage.getItem('pickup_ready_orders');
     if (stored) setPickupReadyOrders(JSON.parse(stored));
   };
+  const loadPendingDecision = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('pending_decision');
+      if (stored) setPendingDecisionOrders(JSON.parse(stored));
+    } catch (e) {}
+  };
   const loadAutoPrintOrders = async () => {
     const keys = await AsyncStorage.getAllKeys();
     const printKeys = keys.filter(k => k.startsWith('auto_print_'));
@@ -1172,6 +1189,7 @@ useEffect(() => {
   useEffect(() => {
     loadPickupReadyOrders();
     loadAutoPrintOrders();
+    loadPendingDecision();
   }, []);
 
   const getDeliveryStatus = (order: Order) => {
@@ -1661,6 +1679,20 @@ const flatData: FlatItem[] = [
                       <View style={{ backgroundColor: '#79554820', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
                         <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>{t.autoAccepted}</Text>
                       </View>
+                    )}
+                    {pendingDecisionOrders.includes(order.order_id) && (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setAcceptRejectOrder(order);
+                          setShowAcceptReject(true);
+                        }}
+                        style={{ backgroundColor: '#f39c1220', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+                      >
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#f39c12' }}>
+                          {t.review || 'Review'}
+                        </Text>
+                      </TouchableOpacity>
                     )}
                     <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
                       <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
