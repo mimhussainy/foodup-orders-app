@@ -1610,14 +1610,14 @@ const flatData: FlatItem[] = [
                       { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
                     ]}
                     keyExtractor={f => f.key}
-                    contentContainerStyle={{ paddingHorizontal: 10, gap: 6, alignItems: 'center', paddingVertical: 10 }}
+                    contentContainerStyle={{ paddingLeft: 10, paddingRight: 8, gap: 5, alignItems: 'center', paddingVertical: 10 }}
                     renderItem={({ item: f }) => (
                       <TouchableOpacity
                         onPress={() => setFilter(f.key)}
                         style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 6 }}
                       >
                         <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
-                        <View style={{ backgroundColor: '#fff', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
+                        <View style={{ backgroundColor: '#fff', borderRadius: 3, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>{filterCounts[f.key as keyof typeof filterCounts]}</Text>
                         </View>
                       </TouchableOpacity>
