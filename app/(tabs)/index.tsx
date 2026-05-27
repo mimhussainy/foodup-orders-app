@@ -328,13 +328,51 @@ useEffect(() => {
     fetchStoreStatus();
     checkPrintPermission();
 
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+    const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
         fetchOrdersFromBackend();
         fetchClaims();
         fetchStoreStatus();
         loadAutoPrintOrders();
         loadPendingDecision();
+        // Check for background auto-accepts
+        try {
+          const code = await AsyncStorage.getItem('restaurant_code') || '';
+          if (!code) return;
+          const ordersRes = await fetch(`${BACKEND_URL}/orders/${code}`);
+          const ordersResult = await ordersRes.json();
+          if (ordersResult.success) {
+            for (const o of ordersResult.orders.slice(0, 10)) {
+              const existing = await AsyncStorage.getItem(`auto_print_${o.order_id}`);
+              if (existing) continue;
+              const autoRes = await fetch(`${BACKEND_URL}/check-auto-accepted/${code}/${o.order_id}`);
+              const autoResult = await autoRes.json();
+              if (autoResult.auto_accepted) {
+                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${o.order_id}`);
+                const acceptedResult = await acceptedRes.json();
+                const printData = {
+                  accepted_time: acceptedResult.accepted_time || '',
+                  order_id: o.order_id,
+                  customer_name: o.customer_name || '',
+                  customer_email: o.customer_email || '',
+                  customer_phone: o.customer_phone || '',
+                  total: String(o.total || ''),
+                  currency: o.currency || 'CHF',
+                  payment_method: o.payment_method || '',
+                  note: o.note || '',
+                  shipping_method: o.shipping?.method || '',
+                  shipping_address: o.shipping?.address || '',
+                  orderable_order_time: o.orderable_order_time || '',
+                  orderable_order_date: o.orderable_order_date || '',
+                  date_created: o.date_created || '',
+                  items: JSON.stringify(o.items || []),
+                };
+                await AsyncStorage.setItem(`auto_print_${o.order_id}`, JSON.stringify(printData));
+                await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
+              }
+            }
+          }
+        } catch (e) {}
       }
     });
 

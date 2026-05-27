@@ -142,6 +142,26 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     if (!order || !autoSettings || step !== 'main') return;
     if (autoSettings.auto_action === 'accept') {
       const acceptTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time;
+      // Save auto_print data so pill shows immediately
+      const printData = {
+        accepted_time: acceptTime,
+        order_id: order.order_id,
+        customer_name: order.customer_name || '',
+        customer_email: order.customer_email || '',
+        customer_phone: order.customer_phone || '',
+        total: order.total || '',
+        currency: order.currency || 'CHF',
+        payment_method: order.payment_method || '',
+        note: order.note || '',
+        shipping_method: order.shipping_method || '',
+        shipping_address: order.shipping_address || '',
+        orderable_order_time: order.orderable_order_time || '',
+        orderable_order_date: order.orderable_order_date || '',
+        date_created: order.date_created || '',
+        items: typeof order.items === 'string' ? order.items : JSON.stringify(order.items || []),
+      };
+      await AsyncStorage.setItem(`auto_print_${order.order_id}`, JSON.stringify(printData));
+      await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
       await handleConfirmAcceptWithTime(acceptTime);
     } else if (autoSettings.auto_action === 'reject') {
       await handleConfirmRejectWithReason(autoSettings.reject_reason);
