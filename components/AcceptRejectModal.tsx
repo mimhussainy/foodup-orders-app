@@ -90,13 +90,13 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
 
     // Always cancel backend auto-action when modal opens
     // This prevents backend from auto-accepting while owner has modal open
-    AsyncStorage.multiGet(['restaurant_code', 'owner_pin']).then(async ([[, code], [, pin]]) => {
+    AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code || !order) return;
       try {
         await fetch(`${BACKEND_URL}/cancel-auto-action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, owner_pin: pin }),
+          body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
         });
       } catch (e) {}
     });

@@ -129,7 +129,10 @@ export default function RootLayout() {
           if (result.success && result.orders && result.orders.length > 0) {
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
+            const pendingStored = await AsyncStorage.getItem('pending_decision');
+              const pendingList: number[] = pendingStored ? JSON.parse(pendingStored) : [];
+              const isPending = pendingList.includes(parseInt(latestOrder.order_id));
+              if ((String(latestOrder.order_id) !== lastSeenId || isPending) && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
               // Check if already accepted before showing modal
               try {
@@ -140,6 +143,14 @@ export default function RootLayout() {
             setShowOrderModal(false);
               setNewOrderModal(null);
               setShowCountdown(false);
+              // Save to pending_decision immediately before showing modal
+              AsyncStorage.getItem('pending_decision').then(stored => {
+                const list: number[] = stored ? JSON.parse(stored) : [];
+                if (!list.includes(parseInt(latestOrder.order_id))) {
+                  list.push(parseInt(latestOrder.order_id));
+                  AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+                }
+              }).catch(() => {});
               setTimeout(() => {
               setNewOrderModal({
                 order_id: parseInt(latestOrder.order_id),
@@ -241,10 +252,7 @@ export default function RootLayout() {
           setShowOrderModal(false);
           setNewOrderModal(null);
           setShowCountdown(false);
-          setTimeout(() => {
-            setNewOrderModal(newOrder);
-            setShowOrderModal(true);
-            setShowCountdown(true);
+          // Save pending_decision BEFORE setTimeout so it persists even on force close
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
             if (!list.includes(newOrder.order_id)) {
@@ -252,6 +260,10 @@ export default function RootLayout() {
               AsyncStorage.setItem('pending_decision', JSON.stringify(list));
             }
           }).catch(() => {});
+          setTimeout(() => {
+            setNewOrderModal(newOrder);
+            setShowOrderModal(true);
+            setShowCountdown(true);
           }, 100);
         }
         try {
