@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import {
-    AppState, InteractionManager, Modal, Platform,
+    InteractionManager, Modal, Platform,
     ScrollView, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { formatAddress } from '../lib/formatters';
@@ -43,9 +43,10 @@ interface AcceptRejectModalProps {
   visible: boolean;
   onClose: () => void;
   onDecisionMade?: (orderId: number) => void;
+  showCountdown?: boolean; // true only for live foreground notifications
 }
 
-export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade }: AcceptRejectModalProps) {
+export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade, showCountdown = false }: AcceptRejectModalProps) {
   const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
   const [selectedTime, setSelectedTime] = useState<number | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
@@ -79,29 +80,30 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     });
   }, [visible]);
 
-  // Handle auto settings and countdown
+  // Handle auto settings, countdown, and backend cancellation
   useEffect(() => {
     if (!visible) {
       setCountdown(null);
       setAutoSettings(null);
       return;
     }
-    const appIsActive = AppState.currentState === 'active';
-    if (!appIsActive) {
-      // App was in background — cancel backend timer
-      AsyncStorage.multiGet(['restaurant_code', 'owner_pin']).then(async ([[, code], [, pin]]) => {
-        if (!code || !order) return;
-        try {
-          await fetch(`${BACKEND_URL}/cancel-auto-action`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, owner_pin: pin }),
-          });
-        } catch (e) {}
-      });
-      return;
-    }
-    // App is in foreground — show countdown
+
+    // Always cancel backend auto-action when modal opens
+    // This prevents backend from auto-accepting while owner has modal open
+    AsyncStorage.multiGet(['restaurant_code', 'owner_pin']).then(async ([[, code], [, pin]]) => {
+      if (!code || !order) return;
+      try {
+        await fetch(`${BACKEND_URL}/cancel-auto-action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, owner_pin: pin }),
+        });
+      } catch (e) {}
+    });
+
+    // Only show countdown if this is a live foreground notification
+    if (!showCountdown) return;
+
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;
       try {
@@ -113,7 +115,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         }
       } catch (e) {}
     });
-  }, [visible]);
+  }, [visible, showCountdown]);
 
   // Countdown timer
   useEffect(() => {
@@ -368,7 +370,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>Order #{order.order_id}</Text>
-                {countdown !== null && autoSettings && (
+                {countdown !== null && autoSettings && showCountdown && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="hourglass-outline" size={18} color={countdown < 60 ? '#e74c3c' : '#f39c12'} />
                     <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
@@ -401,7 +403,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                       </Text>
                     </View>
                   ) : null}
-                  {countdown !== null && autoSettings && (
+                  {countdown !== null && autoSettings && showCountdown && (
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 11, color: '#999' }}>
                         {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:

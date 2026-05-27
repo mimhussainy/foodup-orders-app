@@ -253,35 +253,6 @@ function groupOrdersByDate(orders: Order[], t: any) {
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
-async function scheduleScheduledOrderReminder(order: any, acceptTime: string) {
-  try {
-    const parts = acceptTime.split('—');
-    if (parts.length < 2) return;
-    const timePart = parts[0].trim();
-    const datePart = parts[1].trim().split('/');
-    if (datePart.length < 3) return;
-    const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
-    const reminderMs = scheduledMs - 30 * 60 * 1000;
-    const now = Date.now();
-    if (reminderMs <= now) return; // already past 30 min mark
-    const secondsUntilReminder = Math.floor((reminderMs - now) / 1000);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '⏰ Scheduled Order Reminder',
-        body: `Order #${order.order_id} for ${order.customer_name} is due in 30 minutes! (${timePart})`,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: secondsUntilReminder,
-      },
-    });
-  } catch (e) {
-    console.log('scheduleScheduledOrderReminder error:', e);
-  }
-}
-
-
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -370,6 +341,14 @@ useEffect(() => {
     const claimsInterval = setInterval(() => fetchClaims(), 10000);
     const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 30000);
     const storeInterval = setInterval(() => fetchStoreStatus(), 15000);
+    let lastAutoRefresh = '';
+    const autoRefreshInterval = setInterval(async () => {
+      const flag = await AsyncStorage.getItem('auto_accepted_refresh');
+      if (flag && flag !== lastAutoRefresh) {
+        lastAutoRefresh = flag;
+        loadAutoPrintOrders();
+      }
+    }, 2000);
     const newOrderInterval = setInterval(async () => {
       if (Platform.OS !== 'ios') {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -401,6 +380,7 @@ useEffect(() => {
       clearInterval(ordersInterval);
       clearInterval(storeInterval);
       clearInterval(newOrderInterval);
+      clearInterval(autoRefreshInterval);
     };
   }, []);
 

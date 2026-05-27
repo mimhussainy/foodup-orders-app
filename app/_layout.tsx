@@ -87,6 +87,7 @@ export default function RootLayout() {
   const router = useRouter();
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
   const orderSoundRef = useRef<any>(null);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function RootLayout() {
               } catch(e) {}
             setShowOrderModal(false);
               setNewOrderModal(null);
+              setShowCountdown(false);
               setTimeout(() => {
               setNewOrderModal({
                 order_id: parseInt(latestOrder.order_id),
@@ -184,7 +186,7 @@ export default function RootLayout() {
       if (data.event_type === 'auto_accepted') {
         try {
           const code = await AsyncStorage.getItem('restaurant_code') || '';
-          // Save flag so order card shows print button (canPrint in index.tsx controls visibility)
+          await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
           await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
               accepted_time: data.accepted_time || '',
               order_id: data.order_id,
@@ -238,9 +240,11 @@ export default function RootLayout() {
           };
           setShowOrderModal(false);
           setNewOrderModal(null);
+          setShowCountdown(false);
           setTimeout(() => {
             setNewOrderModal(newOrder);
-          setShowOrderModal(true);
+            setShowOrderModal(true);
+            setShowCountdown(true);
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
             if (!list.includes(newOrder.order_id)) {
@@ -323,6 +327,7 @@ export default function RootLayout() {
           <AcceptRejectModal
             order={newOrderModal}
             visible={showOrderModal}
+            showCountdown={showCountdown}
             onClose={async () => {
               if (orderSoundRef.current) {
                 await orderSoundRef.current.stopAsync().catch(() => {});
@@ -331,6 +336,7 @@ export default function RootLayout() {
               }
               setShowOrderModal(false);
               setNewOrderModal(null);
+              setShowCountdown(false);
             }}
           />
         </View>
