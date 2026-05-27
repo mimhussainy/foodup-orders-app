@@ -282,7 +282,7 @@ async function scheduleScheduledOrderReminder(order: any, acceptTime: string) {
   }
 }
 
-function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, visible: boolean, onClose: () => void }) {
+function AcceptRejectModal({ order, visible, onClose, onDecisionMade }: { order: Order | null, visible: boolean, onClose: () => void, onDecisionMade?: (orderId: number) => void }) {
   const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
   const [selectedTime, setSelectedTime] = useState<number | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
@@ -387,6 +387,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       AsyncStorage.getItem('pending_decision').then(stored => {
         const list: number[] = stored ? JSON.parse(stored) : [];
         AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== order.order_id)));
+        onDecisionMade?.(order.order_id);
       }).catch(() => {});
       setLoading(false);
       onClose();
@@ -435,6 +436,7 @@ function AcceptRejectModal({ order, visible, onClose }: { order: Order | null, v
       AsyncStorage.getItem('pending_decision').then(stored => {
         const list: number[] = stored ? JSON.parse(stored) : [];
         AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== order.order_id)));
+        onDecisionMade?.(order.order_id);
       }).catch(() => {});
       setLoading(false);
       onClose();
@@ -1814,6 +1816,9 @@ const flatData: FlatItem[] = [
         onClose={() => {
           setShowAcceptReject(false);
           setAcceptRejectOrder(null);
+        }}
+        onDecisionMade={(orderId: number) => {
+          setPendingDecisionOrders(prev => prev.filter(id => id !== orderId));
         }}
       />
     </View>
