@@ -116,6 +116,29 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
+    const sendHeartbeat = async () => {
+      try {
+        const code = await AsyncStorage.getItem('restaurant_code') || '';
+        const role = await AsyncStorage.getItem('user_role') || '';
+        if (!code || role !== 'owner') return;
+        await fetch(`${BACKEND_URL}/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurant_code: code,
+            device_id: Device.modelName || '',
+            app_version: '1.0.0',
+          }),
+        });
+      } catch(e) {}
+    };
+
+    sendHeartbeat();
+    const heartbeatInterval = setInterval(sendHeartbeat, 5 * 60 * 1000);
+    return () => clearInterval(heartbeatInterval);
+  }, []);
+
+  useEffect(() => {
     checkUserRole();
 
     const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
