@@ -453,7 +453,20 @@ useEffect(() => {
       if (!code) return;
       const response = await fetch(`${BACKEND_URL}/claims/${code}`);
       const result = await response.json();
-      if (result.success) setClaims(result.claims);
+      if (result.success) {
+        if (orders.length === 0) {
+          setClaims(result.claims);
+          return;
+        }
+        const currentOrderIds = new Set(orders.map(o => String(o.order_id)));
+        const filteredClaims: { [key: string]: any } = {};
+        Object.keys(result.claims).forEach(orderId => {
+          if (currentOrderIds.has(orderId)) {
+            filteredClaims[orderId] = result.claims[orderId];
+          }
+        });
+        setClaims(filteredClaims);
+      }
     } catch (e) {}
   };
 
