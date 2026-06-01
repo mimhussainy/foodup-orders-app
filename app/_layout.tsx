@@ -399,7 +399,7 @@ export default function RootLayout() {
               setShowOrderModal(false);
               setNewOrderModal(null);
               setShowCountdown(false);
-              showNextInQueue();
+              setTimeout(() => showNextInQueue(), 1500);
             }}
           />
         </View>
