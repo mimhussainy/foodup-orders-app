@@ -1,9 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
-import { Alert } from 'react-native';
 import { formatAddress } from './formatters';
 
+let isPrinting = false;
+
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
+  if (isPrinting) {
+    console.log(`[print] blocked — already printing`);
+    return false;
+  }
+  isPrinting = true;
+  console.log(`[print] started for order ${order?.order_id}`);
   try {
     let logoHtml = '';
     try {
@@ -215,11 +222,23 @@ const acceptanceHtml = resolvedScheduledStr ? `
       </html>
     `;
 
-    await Print.printAsync({ html, width: 280 });
+    const printTimeout = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('Print timeout after 60s')), 60000)
+    );
+    try {
+      await Promise.race([Print.printAsync({ html, width: 280 }), printTimeout]);
+      console.log(`[print] completed for order ${order?.order_id}`);
+    } catch (printError: any) {
+      console.log(`[print] failed or timed out for order ${order?.order_id}:`, printError?.message || String(printError));
+    } finally {
+      isPrinting = false;
+      console.log(`[print] lock released for order ${order?.order_id}`);
+    }
     return true;
 
   } catch (e: any) {
-    Alert.alert('Print Error', e?.message || String(e));
+    console.log(`[print] outer error for order ${order?.order_id}:`, e?.message || String(e));
+    isPrinting = false;
     return false;
   }
 }
