@@ -146,6 +146,8 @@ export default function RootLayout() {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
         const role = await AsyncStorage.getItem('user_role') || '';
         if (!code || role !== 'owner') return;
+        const debugStored = await AsyncStorage.getItem('pending_decision');
+        console.log(`[pending_decision] ON RESUME:`, debugStored ? JSON.parse(debugStored) : []);
         try {
           const response = await fetch(`${BACKEND_URL}/orders/${code}`);
           const result = await response.json();
@@ -172,9 +174,13 @@ export default function RootLayout() {
                 if (!list.includes(parseInt(latestOrder.order_id))) {
                   list.push(parseInt(latestOrder.order_id));
                   AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+                  console.log(`[pending_decision] ADDED via AppState resume: ${latestOrder.order_id} — list now:`, list);
+                } else {
+                  console.log(`[pending_decision] SKIPPED duplicate via AppState resume: ${latestOrder.order_id}`);
                 }
               }).catch(() => {});
               setTimeout(() => {
+              console.log(`[modal] SHOW via AppState resume: order ${latestOrder.order_id}`);
               setNewOrderModal({
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
@@ -281,9 +287,13 @@ export default function RootLayout() {
             if (!list.includes(newOrder.order_id)) {
               list.push(newOrder.order_id);
               AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+              console.log(`[pending_decision] ADDED via notification: ${newOrder.order_id} — list now:`, list);
+            } else {
+              console.log(`[pending_decision] SKIPPED duplicate via notification: ${newOrder.order_id}`);
             }
           }).catch(() => {});
           setTimeout(() => {
+            console.log(`[modal] SHOW via notification: order ${newOrder.order_id}`);
             setNewOrderModal(newOrder);
             setShowOrderModal(true);
             setShowCountdown(true);

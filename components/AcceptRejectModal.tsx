@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import {
-    InteractionManager, Modal, Platform,
-    ScrollView, Text, TextInput, TouchableOpacity, View
+  InteractionManager, Modal, Platform,
+  ScrollView, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { formatAddress } from '../lib/formatters';
 import { printOrder } from '../lib/printer';
@@ -172,7 +172,10 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     try {
       const stored = await AsyncStorage.getItem('pending_decision');
       const list: number[] = stored ? JSON.parse(stored) : [];
-      await AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== orderId)));
+      console.log(`[pending_decision] BEFORE removal of ${orderId}:`, list);
+      const updated = list.filter(id => id !== orderId);
+      await AsyncStorage.setItem('pending_decision', JSON.stringify(updated));
+      console.log(`[pending_decision] AFTER removal of ${orderId}:`, updated);
       onDecisionMade?.(orderId);
     } catch (e) {}
   };
