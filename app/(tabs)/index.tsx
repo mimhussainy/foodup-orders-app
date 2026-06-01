@@ -387,6 +387,14 @@ useEffect(() => {
         loadAutoPrintOrders();
       }
     }, 2000);
+    let lastPendingRefresh = '';
+    const pendingRefreshInterval = setInterval(async () => {
+      const flag = await AsyncStorage.getItem('pending_decision_refresh');
+      if (flag && flag !== lastPendingRefresh) {
+        lastPendingRefresh = flag;
+        loadPendingDecision();
+      }
+    }, 2000);
     const newOrderInterval = setInterval(async () => {
       if (Platform.OS !== 'ios') {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -419,6 +427,7 @@ useEffect(() => {
       clearInterval(storeInterval);
       clearInterval(newOrderInterval);
       clearInterval(autoRefreshInterval);
+      clearInterval(pendingRefreshInterval);
     };
   }, []);
 

@@ -172,10 +172,8 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     try {
       const stored = await AsyncStorage.getItem('pending_decision');
       const list: number[] = stored ? JSON.parse(stored) : [];
-      console.log(`[pending_decision] BEFORE removal of ${orderId}:`, list);
-      const updated = list.filter(id => id !== orderId);
-      await AsyncStorage.setItem('pending_decision', JSON.stringify(updated));
-      console.log(`[pending_decision] AFTER removal of ${orderId}:`, updated);
+      await AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== orderId)));
+      await AsyncStorage.setItem('pending_decision_refresh', String(Date.now()));
       onDecisionMade?.(orderId);
     } catch (e) {}
   };

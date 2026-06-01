@@ -89,6 +89,8 @@ export default function RootLayout() {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
   const orderSoundRef = useRef<any>(null);
+  const orderQueueRef = useRef<any[]>([]);
+  const modalOpenRef = useRef(false);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -96,6 +98,41 @@ export default function RootLayout() {
     });
     return () => backHandler.remove();
   }, []);
+  const showNextInQueue = () => {
+    if (orderQueueRef.current.length === 0) {
+      modalOpenRef.current = false;
+      return;
+    }
+    const next = orderQueueRef.current.shift();
+    if (!next) {
+      modalOpenRef.current = false;
+      return;
+    }
+    setShowOrderModal(false);
+    setNewOrderModal(null);
+    setShowCountdown(false);
+    setTimeout(() => {
+      setNewOrderModal(next.order);
+      setShowOrderModal(true);
+      setShowCountdown(next.showCountdown);
+      modalOpenRef.current = true;
+    }, 400);
+  };
+
+  const enqueueOrder = (order: any, withCountdown: boolean) => {
+    if (modalOpenRef.current) {
+      const alreadyQueued = orderQueueRef.current.some(q => q.order.order_id === order.order_id);
+      if (!alreadyQueued) {
+        orderQueueRef.current.push({ order, showCountdown: withCountdown });
+      }
+      return;
+    }
+    modalOpenRef.current = true;
+    setNewOrderModal(order);
+    setShowOrderModal(true);
+    setShowCountdown(withCountdown);
+  };
+
   const checkUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('user_role');
@@ -165,23 +202,14 @@ export default function RootLayout() {
                 const acceptedResult = await acceptedRes.json();
                 if (acceptedResult.success && acceptedResult.accepted_time) return;
               } catch(e) {}
-            setShowOrderModal(false);
-              setNewOrderModal(null);
-              setShowCountdown(false);
-              // Save to pending_decision immediately before showing modal
-              AsyncStorage.getItem('pending_decision').then(stored => {
+            AsyncStorage.getItem('pending_decision').then(stored => {
                 const list: number[] = stored ? JSON.parse(stored) : [];
                 if (!list.includes(parseInt(latestOrder.order_id))) {
                   list.push(parseInt(latestOrder.order_id));
                   AsyncStorage.setItem('pending_decision', JSON.stringify(list));
-                  console.log(`[pending_decision] ADDED via AppState resume: ${latestOrder.order_id} — list now:`, list);
-                } else {
-                  console.log(`[pending_decision] SKIPPED duplicate via AppState resume: ${latestOrder.order_id}`);
                 }
               }).catch(() => {});
-              setTimeout(() => {
-              console.log(`[modal] SHOW via AppState resume: order ${latestOrder.order_id}`);
-              setNewOrderModal({
+              enqueueOrder({
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
                 customer_email: latestOrder.customer_email || '',
@@ -200,9 +228,7 @@ export default function RootLayout() {
                 restaurant_code: latestOrder.restaurant_code || '',
                 orderable_order_date: latestOrder.orderable_order_date || '',
                 orderable_order_time: latestOrder.orderable_order_time || '',
-              });
-              setShowOrderModal(true);
-              }, 100);
+              }, false);
             // Check in background if already accepted, close modal if so
             setTimeout(() => {
               fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
@@ -278,10 +304,7 @@ export default function RootLayout() {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
           };
-          setShowOrderModal(false);
-          setNewOrderModal(null);
-          setShowCountdown(false);
-          // Save pending_decision BEFORE setTimeout so it persists even on force close
+          // Save pending_decision BEFORE enqueue so it persists even on force close
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
             if (!list.includes(newOrder.order_id)) {
@@ -292,12 +315,7 @@ export default function RootLayout() {
               console.log(`[pending_decision] SKIPPED duplicate via notification: ${newOrder.order_id}`);
             }
           }).catch(() => {});
-          setTimeout(() => {
-            console.log(`[modal] SHOW via notification: order ${newOrder.order_id}`);
-            setNewOrderModal(newOrder);
-            setShowOrderModal(true);
-            setShowCountdown(true);
-          }, 100);
+          enqueueOrder(newOrder, true);
         }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
@@ -346,8 +364,7 @@ export default function RootLayout() {
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
-        setNewOrderModal(newOrder);
-        setShowOrderModal(true);
+        enqueueOrder(newOrder, false);
       }
     });
 
@@ -382,6 +399,7 @@ export default function RootLayout() {
               setShowOrderModal(false);
               setNewOrderModal(null);
               setShowCountdown(false);
+              showNextInQueue();
             }}
           />
         </View>
