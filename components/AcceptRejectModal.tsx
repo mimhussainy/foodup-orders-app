@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
 import {
-  InteractionManager, Modal, Platform,
+  Modal, Platform,
   ScrollView, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { formatAddress } from '../lib/formatters';
@@ -209,18 +209,16 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
-          if (isScheduledTime) {
-            printOrder(order, undefined, false, '', acceptTime).catch(() => {});
-            scheduleScheduledOrderReminder(order, acceptTime).catch(() => {});
-          } else {
-            const mins = parseInt(acceptTime);
-            printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
-          }
-        }, 500);
-      });
+      setTimeout(() => {
+        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+        if (isScheduledTime) {
+          printOrder(order, undefined, false, '', acceptTime).catch(() => {});
+          scheduleScheduledOrderReminder(order, acceptTime).catch(() => {});
+        } else {
+          const mins = parseInt(acceptTime);
+          printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
+        }
+      }, 2000);
     } catch (e) {
       setLoading(false);
     }
@@ -266,11 +264,9 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          printOrder(order, undefined, true, reason).catch(() => {});
-        }, 500);
-      });
+      setTimeout(() => {
+        printOrder(order, undefined, true, reason).catch(() => {});
+      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();
@@ -308,16 +304,14 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          if (isScheduled) {
-            printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
-            scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`).catch(() => {});
-          } else {
-            printOrder(order, selectedTime).catch(() => {});
-          }
-        }, 500);
-      });
+      setTimeout(() => {
+        if (isScheduled) {
+          printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
+          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`).catch(() => {});
+        } else {
+          printOrder(order, selectedTime).catch(() => {});
+        }
+      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();
@@ -372,11 +366,9 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          printOrder(order, undefined, true, reason).catch(() => {});
-        }, 500);
-      });
+      setTimeout(() => {
+        printOrder(order, undefined, true, reason).catch(() => {});
+      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();

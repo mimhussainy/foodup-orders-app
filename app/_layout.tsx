@@ -104,10 +104,6 @@ export default function RootLayout() {
       return;
     }
     const next = orderQueueRef.current.shift();
-    if (!next) {
-      modalOpenRef.current = false;
-      return;
-    }
     setShowOrderModal(false);
     setNewOrderModal(null);
     setShowCountdown(false);
@@ -194,7 +190,7 @@ export default function RootLayout() {
             const pendingStored = await AsyncStorage.getItem('pending_decision');
               const pendingList: number[] = pendingStored ? JSON.parse(pendingStored) : [];
               const isPending = pendingList.includes(parseInt(latestOrder.order_id));
-              if ((String(latestOrder.order_id) !== lastSeenId || isPending) && latestOrder.status !== 'cancelled') {
+              if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
               // Check if already accepted before showing modal
               try {
@@ -304,7 +300,10 @@ export default function RootLayout() {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
           };
-          // Save pending_decision BEFORE enqueue so it persists even on force close
+          setShowOrderModal(false);
+          setNewOrderModal(null);
+          setShowCountdown(false);
+          // Save pending_decision BEFORE setTimeout so it persists even on force close
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
             if (!list.includes(newOrder.order_id)) {
@@ -364,7 +363,8 @@ export default function RootLayout() {
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
-        enqueueOrder(newOrder, false);
+        setNewOrderModal(newOrder);
+        setShowOrderModal(true);
       }
     });
 
@@ -399,7 +399,7 @@ export default function RootLayout() {
               setShowOrderModal(false);
               setNewOrderModal(null);
               setShowCountdown(false);
-              setTimeout(() => showNextInQueue(), 1500);
+              showNextInQueue();
             }}
           />
         </View>
