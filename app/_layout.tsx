@@ -4,7 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler, Platform, StatusBar, View } from 'react-native';
+import { AppState, BackHandler, Platform, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
@@ -92,6 +92,27 @@ export default function RootLayout() {
   const orderQueueRef = useRef<any[]>([]);
   const modalOpenRef = useRef(false);
 
+  // ─── DEBUG PANEL START ───────────────────────────────────────────
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+
+  const debugLog = (message: string) => {
+    const entry = `${new Date().toLocaleTimeString()} ${message}`;
+    console.log(`[DBG] ${entry}`);
+    setDebugLogs(prev => {
+      const updated = [...prev, entry].slice(-20);
+      AsyncStorage.setItem('debug_log', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  };
+
+  useEffect(() => {
+    AsyncStorage.getItem('debug_log').then(stored => {
+      if (stored) setDebugLogs(JSON.parse(stored));
+    }).catch(() => {});
+  }, []);
+  // ─── DEBUG PANEL END ─────────────────────────────────────────────
+
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       return false;
@@ -116,13 +137,30 @@ export default function RootLayout() {
   };
 
   const enqueueOrder = (order: any, withCountdown: boolean) => {
+    AsyncStorage.getItem('pending_decision').then(stored => {
+      debugLog(`ENQUEUE order:${order.order_id} pending:${JSON.stringify(stored ? JSON.parse(stored) : [])}`);
+    }).catch(() => {});
+    AsyncStorage.getItem('restaurant_code').then(async code => {
+      if (!code) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
+        const result = await res.json();
+        debugLog(`ENQUEUE order:${order.order_id} server_accepted:${result.accepted_time || 'none'}`);
+      } catch (e) {
+        debugLog(`ENQUEUE order:${order.order_id} server_check_failed`);
+      }
+    }).catch(() => {});
     if (modalOpenRef.current) {
       const alreadyQueued = orderQueueRef.current.some(q => q.order.order_id === order.order_id);
       if (!alreadyQueued) {
         orderQueueRef.current.push({ order, showCountdown: withCountdown });
+        debugLog(`QUEUED order:${order.order_id} queue:${JSON.stringify(orderQueueRef.current.map(q => q.order.order_id))}`);
+      } else {
+        debugLog(`SKIP_DUP order:${order.order_id}`);
       }
       return;
     }
+    debugLog(`SHOW order:${order.order_id}`);
     modalOpenRef.current = true;
     setNewOrderModal(order);
     setShowOrderModal(true);
@@ -205,6 +243,7 @@ export default function RootLayout() {
                   AsyncStorage.setItem('pending_decision', JSON.stringify(list));
                 }
               }).catch(() => {});
+              debugLog(`SRC:AppState order:${latestOrder.order_id}`);
               enqueueOrder({
                 order_id: parseInt(latestOrder.order_id),
                 customer_name: latestOrder.customer_name || '',
@@ -300,10 +339,8 @@ export default function RootLayout() {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
           };
-          setShowOrderModal(false);
-          setNewOrderModal(null);
-          setShowCountdown(false);
-          // Save pending_decision BEFORE setTimeout so it persists even on force close
+          
+          // Save pending_decision BEFORE enqueue so it persists even on force close
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
             if (!list.includes(newOrder.order_id)) {
@@ -314,6 +351,7 @@ export default function RootLayout() {
               console.log(`[pending_decision] SKIPPED duplicate via notification: ${newOrder.order_id}`);
             }
           }).catch(() => {});
+          debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
           enqueueOrder(newOrder, true);
         }
         try {
@@ -363,8 +401,8 @@ export default function RootLayout() {
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
-        setNewOrderModal(newOrder);
-        setShowOrderModal(true);
+        debugLog(`SRC:tap order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
+        enqueueOrder(newOrder, false);
       }
     });
 
@@ -404,6 +442,32 @@ export default function RootLayout() {
           />
         </View>
       )}
+    {/* ─── DEBUG PANEL START ─────────────────────────────────────── */}
+      <TouchableOpacity
+        onPress={() => setDebugVisible(v => !v)}
+        style={{ position: 'absolute', bottom: 40, left: 12, zIndex: 99999, backgroundColor: '#8B38CB', borderRadius: 18, width: 32, height: 32, justifyContent: 'center', alignItems: 'center', opacity: 0.75 }}
+      >
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>D</Text>
+      </TouchableOpacity>
+      {debugVisible && (
+        <View style={{ position: 'absolute', bottom: 80, left: 12, right: 12, zIndex: 99999, backgroundColor: '#111', borderRadius: 12, padding: 10, maxHeight: 380 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Debug ({debugLogs.length})</Text>
+            <TouchableOpacity onPress={() => {
+              setDebugLogs([]);
+              AsyncStorage.removeItem('debug_log').catch(() => {});
+            }}>
+              <Text style={{ color: '#e74c3c', fontSize: 12, fontWeight: '600' }}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={{ maxHeight: 330 }}>
+            {debugLogs.slice().reverse().map((log, i) => (
+              <Text key={i} style={{ color: '#eee', fontSize: 10, marginBottom: 2, fontFamily: 'monospace' }}>{log}</Text>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+      {/* ─── DEBUG PANEL END ───────────────────────────────────────── */}
     </GestureHandlerRootView>
   );
 }
