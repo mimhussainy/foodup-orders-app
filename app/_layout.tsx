@@ -104,6 +104,17 @@ export default function RootLayout() {
       AsyncStorage.setItem('debug_log', JSON.stringify(updated)).catch(() => {});
       return updated;
     });
+    const shouldSendToBackend = ['SRC:', 'DROP', 'SHOW', 'QUEUED', 'SKIP_DUP', 'ENQUEUE'].some(keyword => message.includes(keyword));
+    if (shouldSendToBackend) {
+      AsyncStorage.getItem('restaurant_code').then(code => {
+        if (!code) return;
+        fetch(`${BACKEND_URL}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, restaurant_code: code }),
+        }).catch(() => {});
+      }).catch(() => {});
+    }
   };
 
   useEffect(() => {
@@ -136,7 +147,22 @@ export default function RootLayout() {
     }, 400);
   };
 
-  const enqueueOrder = (order: any, withCountdown: boolean) => {
+  const enqueueOrder = (order: any, withCountdown: boolean, fromNotification: boolean = false) => {
+    if (fromNotification && order.timestamp) {
+      const ageMin = Math.floor((Date.now() - order.timestamp) / 60000);
+      if (ageMin > 15) {
+        debugLog(`DROP old notification order:${order.order_id} age_min:${ageMin}`);
+        AsyncStorage.getItem('pending_decision').then(stored => {
+          const list: number[] = stored ? JSON.parse(stored) : [];
+          const updated = list.filter(id => id !== order.order_id);
+          if (updated.length !== list.length) {
+            AsyncStorage.setItem('pending_decision', JSON.stringify(updated)).catch(() => {});
+            AsyncStorage.setItem('pending_decision_refresh', String(Date.now())).catch(() => {});
+          }
+        }).catch(() => {});
+        return;
+      }
+    }
     AsyncStorage.getItem('pending_decision').then(stored => {
       debugLog(`ENQUEUE order:${order.order_id} pending:${JSON.stringify(stored ? JSON.parse(stored) : [])}`);
     }).catch(() => {});
@@ -352,7 +378,7 @@ export default function RootLayout() {
             }
           }).catch(() => {});
           debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
-          enqueueOrder(newOrder, true);
+          enqueueOrder(newOrder, true, true);
         }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
@@ -402,7 +428,7 @@ export default function RootLayout() {
           orderable_order_date: data.orderable_order_date || '',
         };
         debugLog(`SRC:tap order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
-        enqueueOrder(newOrder, false);
+        enqueueOrder(newOrder, false, true);
       }
     });
 

@@ -172,7 +172,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <div class="divider"></div>
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
           ${order.shipping_address ? `<p style="margin:4px 0; font-size:20px;">${formatAddress(order.shipping_address)}</p>` : ''}
-          ${order.customer_email ? `<p style="margin:4px 0; font-size:20px;">${order.customer_email}</p>` : ''}
+          ${order.customer_email ? `<p style="margin:4px 0; font-size:20px; word-break:break-all;">${order.customer_email}</p>` : ''}
           ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${(() => {
             let p = order.customer_phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
             if (p.startsWith('+41')) p = '0' + p.slice(3);
