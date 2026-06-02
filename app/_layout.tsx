@@ -96,7 +96,7 @@ export default function RootLayout() {
 
   const debugLog = (message: string) => {
     console.log(`[DBG] ${message}`);
-    const shouldSendToBackend = ['SRC:', 'DROP', 'SHOW', 'QUEUED', 'SKIP_DUP', 'ENQUEUE'].some(keyword => message.includes(keyword));
+    const shouldSendToBackend = ['SRC:', 'DROP', 'SHOW', 'QUEUED', 'SKIP_DUP', 'ENQUEUE', 'PAYLOAD'].some(keyword => message.includes(keyword));
     if (shouldSendToBackend) {
       AsyncStorage.getItem('restaurant_code').then(code => {
         if (!code) return;
@@ -351,6 +351,7 @@ export default function RootLayout() {
             orderable_order_date: data.orderable_order_date || '',
           };
           
+          debugLog(`PAYLOAD order:${newOrder.order_id} date_created:${data.date_created} sent_at:${data.sent_at || 'none'} timestamp:${newOrder.timestamp} now:${Date.now()} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
           // Save pending_decision BEFORE enqueue so it persists even on force close
           AsyncStorage.getItem('pending_decision').then(stored => {
             const list: number[] = stored ? JSON.parse(stored) : [];
@@ -412,6 +413,7 @@ export default function RootLayout() {
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
+        debugLog(`PAYLOAD order:${newOrder.order_id} date_created:${data.date_created} sent_at:${data.sent_at || 'none'} timestamp:${newOrder.timestamp} now:${Date.now()} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
         debugLog(`SRC:tap order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
         enqueueOrder(newOrder, false, true);
       }
