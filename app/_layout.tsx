@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -84,6 +85,7 @@ async function registerForPushNotifications() {
 }
 
 export default function RootLayout() {
+  useKeepAwake();
   const router = useRouter();
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
