@@ -5,7 +5,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler, Platform, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, BackHandler, Platform, StatusBar, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
@@ -94,18 +94,8 @@ export default function RootLayout() {
   const orderQueueRef = useRef<any[]>([]);
   const modalOpenRef = useRef(false);
 
-  // ─── DEBUG PANEL START ───────────────────────────────────────────
-  const [debugVisible, setDebugVisible] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-
   const debugLog = (message: string) => {
-    const entry = `${new Date().toLocaleTimeString()} ${message}`;
-    console.log(`[DBG] ${entry}`);
-    setDebugLogs(prev => {
-      const updated = [...prev, entry].slice(-20);
-      AsyncStorage.setItem('debug_log', JSON.stringify(updated)).catch(() => {});
-      return updated;
-    });
+    console.log(`[DBG] ${message}`);
     const shouldSendToBackend = ['SRC:', 'DROP', 'SHOW', 'QUEUED', 'SKIP_DUP', 'ENQUEUE'].some(keyword => message.includes(keyword));
     if (shouldSendToBackend) {
       AsyncStorage.getItem('restaurant_code').then(code => {
@@ -118,13 +108,6 @@ export default function RootLayout() {
       }).catch(() => {});
     }
   };
-
-  useEffect(() => {
-    AsyncStorage.getItem('debug_log').then(stored => {
-      if (stored) setDebugLogs(JSON.parse(stored));
-    }).catch(() => {});
-  }, []);
-  // ─── DEBUG PANEL END ─────────────────────────────────────────────
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -470,32 +453,7 @@ export default function RootLayout() {
           />
         </View>
       )}
-    {/* ─── DEBUG PANEL START ─────────────────────────────────────── */}
-      <TouchableOpacity
-        onPress={() => setDebugVisible(v => !v)}
-        style={{ position: 'absolute', bottom: 40, left: 12, zIndex: 99999, backgroundColor: '#8B38CB', borderRadius: 18, width: 32, height: 32, justifyContent: 'center', alignItems: 'center', opacity: 0.75 }}
-      >
-        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>D</Text>
-      </TouchableOpacity>
-      {debugVisible && (
-        <View style={{ position: 'absolute', bottom: 80, left: 12, right: 12, zIndex: 99999, backgroundColor: '#111', borderRadius: 12, padding: 10, maxHeight: 380 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Debug ({debugLogs.length})</Text>
-            <TouchableOpacity onPress={() => {
-              setDebugLogs([]);
-              AsyncStorage.removeItem('debug_log').catch(() => {});
-            }}>
-              <Text style={{ color: '#e74c3c', fontSize: 12, fontWeight: '600' }}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ maxHeight: 330 }}>
-            {debugLogs.slice().reverse().map((log, i) => (
-              <Text key={i} style={{ color: '#eee', fontSize: 10, marginBottom: 2, fontFamily: 'monospace' }}>{log}</Text>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-      {/* ─── DEBUG PANEL END ───────────────────────────────────────── */}
+    
     </GestureHandlerRootView>
   );
 }
