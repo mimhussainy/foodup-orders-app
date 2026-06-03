@@ -316,7 +316,7 @@ useFocusEffect(
                               </View>
                             ))}
                             {inProgressCash.length === 0 && (
-                              <Text style={{ fontSize: 13, color: '#999' }}>No cash orders in progress</Text>
+                              <Text style={{ fontSize: 13, color: '#999' }}>{t.noCashInProgress || 'No cash orders in progress'}</Text>
                             )}
                             {inProgressCash.length > 0 && (
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: '#f39c12' }}>
@@ -333,7 +333,7 @@ useFocusEffect(
                             {t.today} — {t.delivered || 'Delivered'}
                           </Text>
                           {todayCashOrders.length === 0 ? (
-                            <Text style={{ fontSize: 13, color: '#999' }}>No cash deliveries today</Text>
+                            <Text style={{ fontSize: 13, color: '#999' }}>{t.noDeliveriesToday || 'No cash deliveries today'}</Text>
                           ) : (
                             <>
                               {todayCashOrders.map((o: any, oi: number) => (
@@ -343,7 +343,7 @@ useFocusEffect(
                                 </View>
                               ))}
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#111' }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Cash Collected</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{t.cashCollected || 'Cash Collected'}</Text>
                                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{currency} {todayCashTotal.toFixed(2)}</Text>
                               </View>
                             </>
@@ -352,7 +352,7 @@ useFocusEffect(
 
                         {/* Grand Total Owed */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1.5, borderTopColor: '#8B38CB' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>Total to Submit</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{t.totalToSubmit || 'Total to Submit'}</Text>
                           <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{currency} {totalOwed.toFixed(2)}</Text>
                         </View>
                       </>

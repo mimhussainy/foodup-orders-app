@@ -180,6 +180,10 @@ export const translations = {
     tabOrders: 'Orders',
     tabStatistics: 'Statistics',
     tabSettings: 'Settings',
+    totalToSubmit: 'Total to Submit',
+    cashCollected: 'Cash Collected',
+    noDeliveriesToday: 'No cash deliveries today',
+    noCashInProgress: 'No cash orders in progress',
   },
 
 
@@ -363,6 +367,10 @@ export const translations = {
     tabOrders: 'Bestellungen',
     tabStatistics: 'Statistiken',
     tabSettings: 'Einstellungen',
+    totalToSubmit: 'Abzurechnen',
+    cashCollected: 'Bargeld erhalten',
+    noDeliveriesToday: 'Keine Barzahlungen heute',
+    noCashInProgress: 'Keine offenen Barzahlungen',
   },
 };
 
