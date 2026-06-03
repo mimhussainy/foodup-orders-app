@@ -268,163 +268,93 @@ useFocusEffect(
                 const isCash = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
                 const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 
-                const makeDayGroup = (label: string, from: Date, to?: Date, dateRange?: string) => {
-                  const filtered = orders.filter((o: any) => {
-                    let d = new Date(o.delivered_at);
-                    if (isNaN(d.getTime())) {
-                      const parts = (o.delivered_at || '').match(/(\d+)\/(\d+)\/(\d+)/);
-                      if (parts) d = new Date(`${parts[3]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`);
-                    }
-                    d.setHours(0,0,0,0);
-                    if (to) return d >= from && d < to;
-                    return d.getTime() === from.getTime();
-                  });
-                  const cashOrders = filtered.filter((o: any) => isCash(o.payment_method));
-                  const totalCash = cashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                  return { label, dateRange, orders: filtered, cashOrders, totalCash, currency: filtered[0]?.currency || 'CHF' };
-                };
-
-                const groups = [
-                  makeDayGroup('Today', today),
-                ].filter(g => g.orders.length > 0);
-
-                const totalOrders = orders.length;
-                const totalCashAll = orders.filter((o: any) => isCash(o.payment_method)).reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                const currency = orders[0]?.currency || 'CHF';
+                const todayCashOrders = orders.filter((o: any) => {
+                  if (!isCash(o.payment_method)) return false;
+                  let d = new Date(o.delivered_at);
+                  if (isNaN(d.getTime())) {
+                    const parts = (o.delivered_at || '').match(/(\d+)\/(\d+)\/(\d+)/);
+                    if (parts) d = new Date(`${parts[3]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`);
+                  }
+                  d.setHours(0,0,0,0);
+                  return d.getTime() === today.getTime();
+                });
+                const todayCashTotal = todayCashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                const inProgress = courierClaims[name] || [];
+                const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
+                const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
+                const totalOwed = todayCashTotal + inProgressCashTotal;
+                const currency = orders[0]?.currency || inProgressCash[0]?.currency || 'CHF';
 
                 return (
                   <View key={name} style={[styles.section, { marginBottom: 10 }]}>
                     <TouchableOpacity
                       style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
-                      onPress={() => {
-                        const opening = !isOpen;
-                        setExpandedCourier(opening ? name : null);
-                        setExpandedCourierDay(opening ? `${name}-0` : null);
-                      }}
+                      onPress={() => setExpandedCourier(isOpen ? null : name)}
                     >
                       <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
                       <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
-                      {!isOpen && (() => {
-                        const inProgress = courierClaims[name] || [];
-                        const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
-                        const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                        return (
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 12, color: '#666' }}>{totalOrders} {t.delivered || 'delivered'} · {currency} {totalCashAll.toFixed(2)}</Text>
-                            {inProgress.length > 0 && (
-                              <Text style={{ fontSize: 12, color: '#f39c12', fontWeight: '600' }}>{inProgress.length} {t.openOrders || 'open'} · {currency} {inProgressCashTotal.toFixed(2)}</Text>
-                            )}
-                            <Text style={{ fontSize: 12, color: '#111', fontWeight: '700', marginTop: 2 }}>
-                              {t.total || 'Total'}: {currency} {(totalCashAll + inProgressCashTotal).toFixed(2)}
-                            </Text>
-                          </View>
-                        );
-                      })()}
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: totalOwed > 0 ? '#e74c3c' : '#2ecc71' }}>
+                          {t.total || 'Total'}: {currency} {totalOwed.toFixed(2)}
+                        </Text>
+                      </View>
                       <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
                     </TouchableOpacity>
 
                     {isOpen && (
                       <>
-                        {(() => {
-                          const inProgress = courierClaims[name] || [];
-                          const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
-                          const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                          if (inProgress.length === 0) return null;
-                          const openOrders = expandedOpenOrders === name;
-                          return (
-                            <View style={{ marginHorizontal: -20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
-                              <TouchableOpacity
-                                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fffbeb' }}
-                                onPress={() => setExpandedOpenOrders(openOrders ? null : name)}
-                              >
-                                <Ionicons name="time-outline" size={13} color="#f39c12" />
-                                <View style={{ flex: 1, marginLeft: 6 }}>
-                                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>
-                                    {t.openOrders || 'Open Orders'} · {inProgress.length} · {inProgressCash[0]?.currency || 'CHF'} {inProgressCashTotal.toFixed(2)}
-                                  </Text>
-                                </View>
-                                <Ionicons name={openOrders ? 'chevron-up' : 'chevron-down'} size={13} color="#f39c12" />
-                              </TouchableOpacity>
-                              {openOrders && (
-                                <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 20, paddingBottom: 8 }}>
-                                  {inProgress.map((o: any, oi: number) => (
-                                    <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5, borderBottomWidth: oi === inProgress.length - 1 ? 0 : 1, borderBottomColor: '#fde68a' }}>
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
-                                        <View style={{ backgroundColor: o.status === 'delivering' ? '#fff3e0' : '#e3f2fd', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                          <Text style={{ fontSize: 11, fontWeight: '600', color: o.status === 'delivering' ? '#f39c12' : '#2980b9' }}>
-                                            {o.status === 'delivering' ? (t.delivering || 'Delivering') : (t.inBag || 'In Bag')}
-                                          </Text>
-                                        </View>
-                                      </View>
-                                      {isCash(o.payment_method) ? (
-                                        <Text style={{ fontSize: 13, color: '#e74c3c', fontWeight: '600' }}>{o.currency} {parseFloat(o.total).toFixed(2)}</Text>
-                                      ) : (
-                                        <Text style={{ fontSize: 13, color: '#999' }}>Online</Text>
-                                      )}
-                                    </View>
-                                  ))}
-                                  {inProgressCash.length > 0 && (
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#f39c12' }}>
-                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
-                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{inProgressCash[0]?.currency} {inProgressCashTotal.toFixed(2)}</Text>
-                                    </View>
-                                  )}
-                                </View>
-                              )}
-                            </View>
-                          );
-                        })()}
-                        {groups.length === 0 ? (
-                          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 13, color: '#999' }}>No deliveries yet</Text>
-                            <Text style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Total Orders: 0 · Total Cash: {currency} 0.00</Text>
-                          </View>
-                        ) : (
-                          groups.map((group, gi) => {
-                            const dayKey = `${name}-${gi}`;
-                            const isDayOpen = expandedCourierDay === dayKey;
-                            return (
-                              <View key={gi}>
-                                <TouchableOpacity
-                                  style={[styles.row, { borderBottomWidth: isDayOpen ? 1 : 0 }]}
-                                  onPress={() => setExpandedCourierDay(isDayOpen ? null : dayKey)}
-                                >
-                                  <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111' }}>{group.label}</Text>
-                                      {group.dateRange && <Text style={{ fontSize: 11, color: '#999' }}>{group.dateRange}</Text>}
-                                    </View>
-                                    <Text style={{ fontSize: 12, color: '#666' }}>
-                                      {group.orders.length} orders · {group.cashOrders.length} cash · {group.currency} {group.totalCash.toFixed(2)}
-                                    </Text>
-                                  </View>
-                                  <Ionicons name={isDayOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#999" />
-                                </TouchableOpacity>
-                                {isDayOpen && (
-                                  <View style={{ paddingLeft: 8, paddingBottom: 8 }}>
-                                    {group.cashOrders.length === 0 ? (
-                                      <Text style={{ fontSize: 13, color: '#999', paddingVertical: 8 }}>No cash orders</Text>
-                                    ) : (
-                                      <>
-                                        {group.cashOrders.map((order: any) => (
-                                          <View key={order.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' }}>
-                                            <Text style={{ fontSize: 13, color: '#666' }}>#{order.order_id}</Text>
-                                            <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{order.currency} {parseFloat(order.total).toFixed(2)}</Text>
-                                          </View>
-                                        ))}
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1.5, borderTopColor: '#111', marginTop: 4 }}>
-                                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Total Cash</Text>
-                                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{group.currency} {group.totalCash.toFixed(2)}</Text>
-                                        </View>
-                                      </>
-                                    )}
-                                  </View>
-                                )}
+                        {/* In Progress / Open Orders */}
+                        {inProgress.length > 0 && (
+                          <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f39c12', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                              {t.openOrders || 'Open Orders'}
+                            </Text>
+                            {inProgressCash.map((o: any, oi: number) => (
+                              <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === inProgressCash.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
+                                <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
+                                <Text style={{ fontSize: 13, color: '#f39c12', fontWeight: '600' }}>{currency} {parseFloat(o.total).toFixed(2)}</Text>
                               </View>
-                            );
-                          })
+                            ))}
+                            {inProgressCash.length === 0 && (
+                              <Text style={{ fontSize: 13, color: '#999' }}>No cash orders in progress</Text>
+                            )}
+                            {inProgressCash.length > 0 && (
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: '#f39c12' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{currency} {inProgressCashTotal.toFixed(2)}</Text>
+                              </View>
+                            )}
+                          </View>
                         )}
+
+                        {/* Today Delivered Cash */}
+                        <View style={{ paddingVertical: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B38CB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                            {t.today} — {t.delivered || 'Delivered'}
+                          </Text>
+                          {todayCashOrders.length === 0 ? (
+                            <Text style={{ fontSize: 13, color: '#999' }}>No cash deliveries today</Text>
+                          ) : (
+                            <>
+                              {todayCashOrders.map((o: any, oi: number) => (
+                                <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === todayCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
+                                  <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
+                                  <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{currency} {parseFloat(o.total).toFixed(2)}</Text>
+                                </View>
+                              ))}
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#111' }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>Cash Collected</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{currency} {todayCashTotal.toFixed(2)}</Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+
+                        {/* Grand Total Owed */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1.5, borderTopColor: '#8B38CB' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>Total to Submit</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{currency} {totalOwed.toFixed(2)}</Text>
+                        </View>
                       </>
                     )}
                   </View>

@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import AcceptRejectModal from '../../components/AcceptRejectModal';
 import CustomAlert from '../../components/CustomAlert';
+import { formatDate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
@@ -237,7 +238,10 @@ function getDateLabel(timestamp: number, t: any) {
   yesterday.setDate(today.getDate() - 1);
   if (date.toDateString() === today.toDateString()) return t.today;
   if (date.toDateString() === yesterday.toDateString()) return t.yesterday;
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function groupOrdersByDate(orders: Order[], t: any) {
@@ -516,8 +520,8 @@ useEffect(() => {
           items: o.items || [],
           payment_method: o.payment_method || '',
           note: o.note || '',
-          date: o.date_created ? new Date(o.date_created).toLocaleString() : new Date().toLocaleString(),
-          timestamp: o.date_created ? new Date(o.date_created).getTime() : Date.now(),
+          date: o.date_created ? formatDate(o.date_created) : formatDate(new Date().toISOString()),
+          timestamp: o.date_created ? wcDateToMs(o.date_created) : Date.now(),
           shipping_method: o.shipping?.method || '',
           shipping_address: o.shipping?.address || '',
           restaurant_code: o.restaurant_code || '',
@@ -595,8 +599,8 @@ useEffect(() => {
         items: JSON.parse(data.items || '[]'),
         payment_method: data.payment_method,
         note: data.note,
-        date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-        timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? new Date(data.date_created).getTime() : Date.now()),
+        date: data.date_created ? formatDate(data.date_created) : formatDate(new Date().toISOString()),
+        timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? wcDateToMs(data.date_created) : Date.now()),
         shipping_method: data.shipping_method || '',
         shipping_address: data.shipping_address || '',
         restaurant_code: data.restaurant_code || '',
@@ -928,7 +932,7 @@ const flatData: FlatItem[] = [
                     <>
                       <View style={styles.row}>
                         <Ionicons name="time-outline" size={14} color="#999" />
-                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{t.createdAt || 'Created'}: {new Date(selectedOrder.date_created).toLocaleString()}</Text>
+                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14 }]}>{t.createdAt || 'Created'}: {formatDate(selectedOrder.date_created || selectedOrder.date || '')}</Text>
                       </View>
                       {selectedOrder.note ? <View style={styles.divider} /> : null}
                     </>

@@ -9,6 +9,7 @@ import { AppState, BackHandler, Platform, StatusBar, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
+import { formatDate, wcDateToMs } from '../lib/dateUtils';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -267,8 +268,8 @@ export default function RootLayout() {
                 items: latestOrder.items || [],
                 payment_method: latestOrder.payment_method || '',
                 note: latestOrder.note || '',
-                date: latestOrder.date_created ? new Date(latestOrder.date_created).toLocaleString() : new Date().toLocaleString(),
-                timestamp: latestOrder.date_created ? new Date(latestOrder.date_created).getTime() : Date.now(),
+                date: latestOrder.date_created ? formatDate(latestOrder.date_created) : formatDate(new Date().toISOString()),
+                timestamp: latestOrder.date_created ? wcDateToMs(latestOrder.date_created) : Date.now(),
                 shipping_method: latestOrder.shipping?.method || '',
                 shipping_address: latestOrder.shipping?.address || '',
                 restaurant_code: latestOrder.restaurant_code || '',
@@ -342,8 +343,8 @@ export default function RootLayout() {
             items: JSON.parse(data.items || '[]'),
             payment_method: data.payment_method || '',
             note: data.note || '',
-            date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-            timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? new Date(data.date_created).getTime() : Date.now()),
+            date: data.date_created ? formatDate(data.date_created) : formatDate(new Date().toISOString()),
+            timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? wcDateToMs(data.date_created) : Date.now()),
             shipping_method: data.shipping_method || '',
             shipping_address: data.shipping_address || '',
             restaurant_code: data.restaurant_code || '',
@@ -404,8 +405,8 @@ export default function RootLayout() {
           items: JSON.parse(data.items || '[]'),
           payment_method: data.payment_method || '',
           note: data.note || '',
-          date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-          timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? new Date(data.date_created).getTime() : Date.now()),
+          date: data.date_created ? formatDate(data.date_created) : formatDate(new Date().toISOString()),
+          timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? wcDateToMs(data.date_created) : Date.now()),
           shipping_method: data.shipping_method || '',
           shipping_address: data.shipping_address || '',
           restaurant_code: data.restaurant_code || '',
