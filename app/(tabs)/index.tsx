@@ -596,12 +596,13 @@ useEffect(() => {
         payment_method: data.payment_method,
         note: data.note,
         date: data.date_created ? new Date(data.date_created).toLocaleString() : new Date().toLocaleString(),
-        timestamp: data.date_created ? new Date(data.date_created).getTime() : Date.now(),
+        timestamp: data.sent_at ? new Date(data.sent_at).getTime() : (data.date_created ? new Date(data.date_created).getTime() : Date.now()),
         shipping_method: data.shipping_method || '',
         shipping_address: data.shipping_address || '',
         restaurant_code: data.restaurant_code || '',
         orderable_order_time: data.orderable_order_time || '',
         orderable_order_date: data.orderable_order_date || '',
+        date_created: data.date_created || '',
         };
 
         if (data.event_type === 'status_update') {
