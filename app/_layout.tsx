@@ -248,13 +248,15 @@ export default function RootLayout() {
                 const acceptedResult = await acceptedRes.json();
                 if (acceptedResult.success && acceptedResult.accepted_time) return;
               } catch(e) {}
-            AsyncStorage.getItem('pending_decision').then(stored => {
+            if (Platform.OS !== 'ios') {
+              AsyncStorage.getItem('pending_decision').then(stored => {
                 const list: number[] = stored ? JSON.parse(stored) : [];
                 if (!list.includes(parseInt(latestOrder.order_id))) {
                   list.push(parseInt(latestOrder.order_id));
                   AsyncStorage.setItem('pending_decision', JSON.stringify(list));
                 }
               }).catch(() => {});
+            }
               debugLog(`SRC:AppState order:${latestOrder.order_id}`);
               enqueueOrder({
                 order_id: parseInt(latestOrder.order_id),
@@ -353,16 +355,19 @@ export default function RootLayout() {
           };
           
           // Save pending_decision BEFORE enqueue so it persists even on force close
-          AsyncStorage.getItem('pending_decision').then(stored => {
-            const list: number[] = stored ? JSON.parse(stored) : [];
-            if (!list.includes(newOrder.order_id)) {
-              list.push(newOrder.order_id);
-              AsyncStorage.setItem('pending_decision', JSON.stringify(list));
-              console.log(`[pending_decision] ADDED via notification: ${newOrder.order_id} — list now:`, list);
-            } else {
-              console.log(`[pending_decision] SKIPPED duplicate via notification: ${newOrder.order_id}`);
-            }
-          }).catch(() => {});
+          // iOS does not have the AcceptRejectModal so never write to pending_decision there
+          if (Platform.OS !== 'ios') {
+            AsyncStorage.getItem('pending_decision').then(stored => {
+              const list: number[] = stored ? JSON.parse(stored) : [];
+              if (!list.includes(newOrder.order_id)) {
+                list.push(newOrder.order_id);
+                AsyncStorage.setItem('pending_decision', JSON.stringify(list));
+                console.log(`[pending_decision] ADDED via notification: ${newOrder.order_id} — list now:`, list);
+              } else {
+                console.log(`[pending_decision] SKIPPED duplicate via notification: ${newOrder.order_id}`);
+              }
+            }).catch(() => {});
+          }
           debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
           enqueueOrder(newOrder, true, true);
         }
