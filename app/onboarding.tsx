@@ -22,9 +22,20 @@ export default function OnboardingScreen() {
   const { t } = useLanguage();
   const [step, setStep] = useState<'restaurant' | 'pin'>('restaurant');
   const [restaurantCode, setRestaurantCode] = useState('');
+  const [restaurantLogo, setRestaurantLogo] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const loadRestaurantLogo = async (code: string) => {
+    try {
+      const profileRes = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`);
+      const profileData = await profileRes.json();
+      if (profileData.success && (profileData.profile?.email_logo_url || profileData.profile?.print_logo_url)) {
+        setRestaurantLogo(profileData.profile.email_logo_url || profileData.profile.print_logo_url);
+      }
+    } catch (e) {}
+  };
 
   useEffect(() => {
     AsyncStorage.multiGet(['restaurant_code', 'user_role', 'owner_pin']).then(([codeEntry, roleEntry, pinEntry]) => {
@@ -32,6 +43,7 @@ export default function OnboardingScreen() {
         router.replace('/(tabs)');
       } else if (codeEntry[1]) {
         setStep('pin');
+        loadRestaurantLogo(codeEntry[1]);
       }
     });
   }, []);
@@ -50,6 +62,7 @@ export default function OnboardingScreen() {
       if (result.success) {
         const oldCode = await AsyncStorage.getItem('restaurant_code') || '';
         const newCode = restaurantCode.trim().toLowerCase();
+        await loadRestaurantLogo(newCode);
         if (oldCode && oldCode !== newCode) {
           try {
             const { default: Notifications } = require('expo-notifications');
@@ -154,7 +167,14 @@ export default function OnboardingScreen() {
 
         {step === 'pin' && (
           <View style={styles.section}>
-            <Text style={styles.title}>{t.ownerLogin}</Text>
+            {restaurantLogo ? (
+              <Image
+                source={{ uri: restaurantLogo }}
+                style={{ width: '100%', height: 80, marginBottom: 16 }}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Text style={{ fontSize: Platform.OS === 'android' ? 18 : 20, fontWeight: '700', color: '#111', marginBottom: 6, letterSpacing: -0.5 }}>{t.ownerLogin}</Text>
             <Text style={styles.subtitle}>{t.enterPin}</Text>
             <TextInput
               style={styles.input}
@@ -186,7 +206,7 @@ const styles = StyleSheet.create({
   backCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center', paddingBottom: 0 },
   backCirclePlaceholder: { width: 36, height: 36 },
   backArrow: { fontSize: 24, color: '#111', textAlign: 'center', lineHeight: 24 },
-  inner: { flex: 1, paddingHorizontal: 28, paddingTop: 36 },
+  inner: { flex: 1, paddingHorizontal: 28, paddingTop: 16 },
   section: { flex: 1 },
   title: { fontSize: Platform.OS === 'android' ? 26 : 28, fontWeight: '700', color: '#111', marginBottom: 6, letterSpacing: -0.5 },
   subtitle: { fontSize: Platform.OS === 'android' ? 14 : 15, color: '#999', marginBottom: 36 },
