@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   inner: { flex: 1, paddingHorizontal: 28, paddingTop: 16 },
   section: { flex: 1 },
   title: { fontSize: Platform.OS === 'android' ? 26 : 28, fontWeight: '700', color: '#111', marginBottom: 6, letterSpacing: -0.5 },
-  subtitle: { fontSize: Platform.OS === 'android' ? 14 : 15, color: '#999', marginBottom: 36 },
+  subtitle: { fontSize: Platform.OS === 'android' ? 14 : 15, color: '#999', marginBottom: 16 },
   input: { borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, padding: 16, fontSize: Platform.OS === 'android' ? 16 : 18, color: '#111' },
   error: { color: '#e74c3c', marginTop: 10, fontSize: Platform.OS === 'android' ? 13 : 14 },
   submitBtn: { backgroundColor: '#111', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 16 },
