@@ -270,6 +270,39 @@ export default function RootLayout() {
               break;
             }
 
+            // For orders already accepted (auto or manual), restore auto_print key if missing
+            for (const candidate of result.orders.slice(0, 20)) {
+              try {
+                const existing = await AsyncStorage.getItem(`auto_print_${candidate.order_id}`);
+                if (existing) continue;
+                const autoRes = await fetch(`${BACKEND_URL}/check-auto-accepted/${code}/${candidate.order_id}`);
+                const autoResult = await autoRes.json();
+                if (!autoResult.auto_accepted) continue;
+                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${candidate.order_id}`);
+                const acceptedResult = await acceptedRes.json();
+                if (!acceptedResult.success || !acceptedResult.accepted_time) continue;
+                await AsyncStorage.setItem(`auto_print_${candidate.order_id}`, JSON.stringify({
+                  accepted_time: acceptedResult.accepted_time,
+                  order_id: candidate.order_id,
+                  customer_name: candidate.customer_name || '',
+                  customer_email: candidate.customer_email || '',
+                  customer_phone: candidate.customer_phone || '',
+                  total: String(candidate.total || ''),
+                  currency: candidate.currency || 'CHF',
+                  payment_method: candidate.payment_method || '',
+                  note: candidate.note || '',
+                  shipping_method: candidate.shipping?.method || '',
+                  shipping_address: candidate.shipping?.address || '',
+                  orderable_order_time: candidate.orderable_order_time || '',
+                  orderable_order_date: candidate.orderable_order_date || '',
+                  date_created: candidate.date_created || '',
+                  items: typeof candidate.items === 'string' ? candidate.items : JSON.stringify(candidate.items || []),
+                }));
+                await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
+                debugLog(`SRC:AppState-resume restored auto_print for order:${candidate.order_id}`);
+              } catch(e) {}
+            }
+
             if (!orderToShow) {
               debugLog(`SRC:AppState-resume no-pending-orders scanned:${Math.min(result.orders.length, 20)}`);
             } else {
