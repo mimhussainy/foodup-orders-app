@@ -228,6 +228,7 @@ export default function RootLayout() {
       if (nextState === 'active') {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
         const role = await AsyncStorage.getItem('user_role') || '';
+        debugLog(`SRC:AppState-wake code:${code || 'none'} role:${role || 'none'}`);
         if (!code || role !== 'owner') return;
         const debugStored = await AsyncStorage.getItem('pending_decision');
         console.log(`[pending_decision] ON RESUME:`, debugStored ? JSON.parse(debugStored) : []);
