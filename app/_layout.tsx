@@ -238,15 +238,31 @@ export default function RootLayout() {
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             const pendingStored = await AsyncStorage.getItem('pending_decision');
-              const pendingList: number[] = pendingStored ? JSON.parse(pendingStored) : [];
-              const isPending = pendingList.includes(parseInt(latestOrder.order_id));
+            const pendingList: number[] = pendingStored ? JSON.parse(pendingStored) : [];
+            const isPending = pendingList.includes(parseInt(latestOrder.order_id));
+            const isNewOrder = String(latestOrder.order_id) !== lastSeenId;
+
+            let acceptedTime = null;
+            try {
+              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
+              const acceptedResult = await acceptedRes.json();
+              acceptedTime = acceptedResult.accepted_time || null;
+            } catch(e) {}
+
+            const resumeAction = latestOrder.status === 'cancelled' ? 'SKIP-cancelled'
+              : acceptedTime ? 'SKIP-accepted'
+              : (!isNewOrder && !isPending) ? 'SKIP-already-seen'
+              : 'ENQUEUE';
+
+            debugLog(`SRC:AppState-resume order:${latestOrder.order_id} lastSeen:${lastSeenId ?? 'null'} pending:${JSON.stringify(pendingList)} accepted:${acceptedTime ?? 'none'} isNew:${isNewOrder} isPending:${isPending} action:${resumeAction}`);
+
               if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
               await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
               // Check if already accepted before showing modal
               try {
-                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
-                const acceptedResult = await acceptedRes.json();
-                if (acceptedResult.success && acceptedResult.accepted_time) return;
+                const acceptedRes2 = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
+                const acceptedResult2 = await acceptedRes2.json();
+                if (acceptedResult2.success && acceptedResult2.accepted_time) return;
               } catch(e) {}
             if (Platform.OS !== 'ios') {
               AsyncStorage.getItem('pending_decision').then(stored => {
