@@ -236,6 +236,7 @@ export default function RootLayout() {
           const response = await fetch(`${BACKEND_URL}/orders/${code}`);
           const result = await response.json();
           if (result.success && result.orders && result.orders.length > 0) {
+            debugLog(`SRC:orders-list ${result.orders.slice(0,5).map((o: any) => `${o.order_id}:${o.status}`).join(',')}`);
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             const pendingStored = await AsyncStorage.getItem('pending_decision');
