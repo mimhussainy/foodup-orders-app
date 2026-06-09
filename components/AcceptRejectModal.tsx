@@ -104,11 +104,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     });
   }, [visible, showCountdown]);
 
-  // Countdown timer
+  // Countdown timer — display only, backend handles the actual auto-action
   useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
-      handleAutoAction();
+      setCountdown(null);
+      onClose();
       return;
     }
     const timer = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
@@ -125,35 +126,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     }
   }, [visible]);
 
-  const handleAutoAction = async () => {
-    if (!order || !autoSettings || step !== 'main') return;
-    if (autoSettings.auto_action === 'accept') {
-      const acceptTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : autoSettings.accept_time;
-      // Save auto_print data so pill shows immediately
-      const printData = {
-        accepted_time: acceptTime,
-        order_id: order.order_id,
-        customer_name: order.customer_name || '',
-        customer_email: order.customer_email || '',
-        customer_phone: order.customer_phone || '',
-        total: order.total || '',
-        currency: order.currency || 'CHF',
-        payment_method: order.payment_method || '',
-        note: order.note || '',
-        shipping_method: order.shipping_method || '',
-        shipping_address: order.shipping_address || '',
-        orderable_order_time: order.orderable_order_time || '',
-        orderable_order_date: order.orderable_order_date || '',
-        date_created: order.date_created || '',
-        items: typeof order.items === 'string' ? order.items : JSON.stringify(order.items || []),
-      };
-      await AsyncStorage.setItem(`auto_print_${order.order_id}`, JSON.stringify(printData));
-      await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
-      await handleConfirmAcceptWithTime(acceptTime);
-    } else if (autoSettings.auto_action === 'reject') {
-      await handleConfirmRejectWithReason(autoSettings.reject_reason);
-    }
-  };
+  
 
   const removePendingDecision = async (orderId: number) => {
     try {
@@ -224,6 +197,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       // Owner took control — cancel backend auto-action
       fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
+      // Guard against backend race — mirrors accepted_time protection for accept
+      fetch(`${BACKEND_URL}/rejected-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
@@ -332,6 +311,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       // Owner took control — cancel backend auto-action
       fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
+      // Guard against backend race — mirrors accepted_time protection for accept
+      fetch(`${BACKEND_URL}/rejected-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
