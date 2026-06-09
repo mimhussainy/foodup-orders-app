@@ -88,19 +88,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       return;
     }
 
-    // Always cancel backend auto-action when modal opens
-    // This prevents backend from auto-accepting while owner has modal open
-    AsyncStorage.getItem('restaurant_code').then(async code => {
-      if (!code || !order) return;
-      try {
-        await fetch(`${BACKEND_URL}/cancel-auto-action`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
-        });
-      } catch (e) {}
-    });
-
     // Only show countdown if this is a live foreground notification
     if (!showCountdown) return;
 
@@ -185,6 +172,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+      // Owner took control — cancel backend auto-action
+      fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
       fetch(`${BACKEND_URL}/accepted-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,6 +222,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+      // Owner took control — cancel backend auto-action
+      fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (website) {
@@ -279,6 +278,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+      // Owner took control — cancel backend auto-action
+      fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} Minutes`;
       fetch(`${BACKEND_URL}/accepted-time`, {
         method: 'POST',
@@ -325,6 +330,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+      // Owner took control — cancel backend auto-action
+      fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
       const stored = await AsyncStorage.getItem('foodup_orders');
       const existing = stored ? JSON.parse(stored) : [];
       const updated = existing.map((o: any) =>
