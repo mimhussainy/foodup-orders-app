@@ -29,16 +29,29 @@ async function registerForPushNotifications() {
   }
 
   if (Platform.OS === 'android') {
-    await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'FoodUp Orders',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#8B38CB',
-      sound: 'default',
-      enableVibrate: true,
-      showBadge: true,
-    });
+    const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
+
+    // Create one channel per sound so Android caches them all
+    const soundChannels = [
+      { id: 'foodup_default', sound: 'default' },
+      { id: 'foodup_data_scanner', sound: 'data_scanner' },
+      { id: 'foodup_security_alarm', sound: 'security_alarm' },
+      { id: 'foodup_tick_tock', sound: 'tick_tock' },
+      { id: 'foodup_classic_alarm', sound: 'classic_alarm' },
+      { id: 'foodup_slot_machine', sound: 'slot_machine' },
+    ];
+
+    for (const ch of soundChannels) {
+      await Notifications.setNotificationChannelAsync(ch.id, {
+        name: `FoodUp Orders (${ch.id})`,
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#8B38CB',
+        sound: ch.sound === 'default' ? 'default' : `${ch.sound}.wav`,
+        enableVibrate: true,
+        showBadge: true,
+      });
+    }
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -73,13 +86,15 @@ async function registerForPushNotifications() {
   console.log('=== DEVICE TOKEN:', token);
 
   try {
+    const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
+    const channelId = selectedSound === 'default' ? 'foodup_default' : `foodup_${selectedSound}`;
     const response = await fetch(`${BACKEND_URL}/register-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, restaurant_code: code }),
+      body: JSON.stringify({ token, restaurant_code: code, channel_id: channelId }),
     });
     const result = await response.json();
-    console.log('=== REGISTER RESULT:', result);
+    console.log('=== REGISTER RESULT:', result, 'channel:', channelId);
   } catch (fetchError: any) {
     console.log('=== REGISTER FETCH ERROR:', fetchError?.message || String(fetchError));
   }
