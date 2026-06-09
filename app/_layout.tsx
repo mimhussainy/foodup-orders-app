@@ -239,79 +239,69 @@ export default function RootLayout() {
           const result = await response.json();
           debugLog(`SRC:orders-list ${result.orders ? result.orders.slice(0,5).map((o: any) => `${o.order_id}:${o.status}`).join(',') : 'no-orders'}`);
           if (result.success && result.orders && result.orders.length > 0) {
-            const latestOrder = result.orders[0];
-            const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            const pendingStored = await AsyncStorage.getItem('pending_decision');
-            const pendingList: number[] = pendingStored ? JSON.parse(pendingStored) : [];
-            const isPending = pendingList.includes(parseInt(latestOrder.order_id));
-            const isNewOrder = String(latestOrder.order_id) !== lastSeenId;
+            // Always update last_seen_order_id to newest order
+            await AsyncStorage.setItem('last_seen_order_id', String(result.orders[0].order_id));
 
-            let acceptedTime = null;
-            try {
-              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
-              const acceptedResult = await acceptedRes.json();
-              acceptedTime = acceptedResult.accepted_time || null;
-            } catch(e) {}
-
-            const resumeAction = latestOrder.status === 'cancelled' ? 'SKIP-cancelled'
-              : acceptedTime ? 'SKIP-accepted'
-              : (!isNewOrder && !isPending) ? 'SKIP-already-seen'
-              : 'ENQUEUE';
-
-            debugLog(`SRC:AppState-resume order:${latestOrder.order_id} lastSeen:${lastSeenId ?? 'null'} pending:${JSON.stringify(pendingList)} accepted:${acceptedTime ?? 'none'} isNew:${isNewOrder} isPending:${isPending} action:${resumeAction}`);
-
-              if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
-              await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
-              // Check if already accepted before showing modal
+            // Scan all recent orders for one that needs a decision
+            let orderToShow = null;
+            for (const candidate of result.orders.slice(0, 20)) {
+              if (candidate.status === 'cancelled' || candidate.status === 'completed') continue;
               try {
-                const acceptedRes2 = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
-                const acceptedResult2 = await acceptedRes2.json();
-                if (acceptedResult2.success && acceptedResult2.accepted_time) return;
+                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${candidate.order_id}`);
+                const acceptedResult = await acceptedRes.json();
+                if (acceptedResult.success && acceptedResult.accepted_time) continue;
               } catch(e) {}
-            if (Platform.OS !== 'ios') {
-              AsyncStorage.getItem('pending_decision').then(stored => {
-                const list: number[] = stored ? JSON.parse(stored) : [];
-                if (!list.includes(parseInt(latestOrder.order_id))) {
-                  list.push(parseInt(latestOrder.order_id));
-                  AsyncStorage.setItem('pending_decision', JSON.stringify(list));
-                }
-              }).catch(() => {});
+              orderToShow = candidate;
+              break;
             }
-              debugLog(`SRC:AppState order:${latestOrder.order_id}`);
-              enqueueOrder({
-                order_id: parseInt(latestOrder.order_id),
-                customer_name: latestOrder.customer_name || '',
-                customer_email: latestOrder.customer_email || '',
-                customer_phone: latestOrder.customer_phone || '',
-                total: String(latestOrder.total || ''),
-                currency: latestOrder.currency || 'CHF',
-                status: latestOrder.status || '',
-                event_type: 'new_order',
-                items: latestOrder.items || [],
-                payment_method: latestOrder.payment_method || '',
-                note: latestOrder.note || '',
-                date: latestOrder.date_created ? formatDate(latestOrder.date_created) : formatDate(new Date().toISOString()),
-                timestamp: latestOrder.date_created ? wcDateToMs(latestOrder.date_created) : Date.now(),
-                shipping_method: latestOrder.shipping?.method || '',
-                shipping_address: latestOrder.shipping?.address || '',
-                restaurant_code: latestOrder.restaurant_code || '',
-                orderable_order_date: latestOrder.orderable_order_date || '',
-                orderable_order_time: latestOrder.orderable_order_time || '',
-              }, true);
-            // Check in background if already accepted, close modal if so
-            setTimeout(() => {
-              fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
-                .then(r => r.json())
-                .then(result => {
-                  if (result.success && result.accepted_time) {
-                    setShowOrderModal(false);
-                    setNewOrderModal(null);
+
+            if (!orderToShow) {
+              debugLog(`SRC:AppState-resume no-pending-orders scanned:${Math.min(result.orders.length, 20)}`);
+            } else {
+              debugLog(`SRC:AppState-resume found order:${orderToShow.order_id} status:${orderToShow.status} action:ENQUEUE`);
+              if (Platform.OS !== 'ios') {
+                AsyncStorage.getItem('pending_decision').then(stored => {
+                  const list: number[] = stored ? JSON.parse(stored) : [];
+                  if (!list.includes(parseInt(orderToShow.order_id))) {
+                    list.push(parseInt(orderToShow.order_id));
+                    AsyncStorage.setItem('pending_decision', JSON.stringify(list));
                   }
                 }).catch(() => {});
-            }, 3000);
+              }
+              debugLog(`SRC:AppState order:${orderToShow.order_id}`);
+              enqueueOrder({
+                order_id: parseInt(orderToShow.order_id),
+                customer_name: orderToShow.customer_name || '',
+                customer_email: orderToShow.customer_email || '',
+                customer_phone: orderToShow.customer_phone || '',
+                total: String(orderToShow.total || ''),
+                currency: orderToShow.currency || 'CHF',
+                status: orderToShow.status || '',
+                event_type: 'new_order',
+                items: orderToShow.items || [],
+                payment_method: orderToShow.payment_method || '',
+                note: orderToShow.note || '',
+                date: orderToShow.date_created ? formatDate(orderToShow.date_created) : formatDate(new Date().toISOString()),
+                timestamp: orderToShow.date_created ? wcDateToMs(orderToShow.date_created) : Date.now(),
+                shipping_method: orderToShow.shipping?.method || '',
+                shipping_address: orderToShow.shipping?.address || '',
+                restaurant_code: orderToShow.restaurant_code || '',
+                orderable_order_date: orderToShow.orderable_order_date || '',
+                orderable_order_time: orderToShow.orderable_order_time || '',
+              }, true);
+              setTimeout(() => {
+                fetch(`${BACKEND_URL}/accepted-time/${code}/${orderToShow.order_id}`)
+                  .then(r => r.json())
+                  .then(r => {
+                    if (r.success && r.accepted_time) {
+                      setShowOrderModal(false);
+                      setNewOrderModal(null);
+                    }
+                  }).catch(() => {});
+              }, 3000);
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
       }
     });
 
