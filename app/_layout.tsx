@@ -233,10 +233,12 @@ export default function RootLayout() {
         const debugStored = await AsyncStorage.getItem('pending_decision');
         console.log(`[pending_decision] ON RESUME:`, debugStored ? JSON.parse(debugStored) : []);
         try {
+          debugLog(`SRC:AppState-before-fetch code:${code}`);
           const response = await fetch(`${BACKEND_URL}/orders/${code}`);
+          debugLog(`SRC:AppState-after-fetch status:${response.status}`);
           const result = await response.json();
+          debugLog(`SRC:orders-list ${result.orders ? result.orders.slice(0,5).map((o: any) => `${o.order_id}:${o.status}`).join(',') : 'no-orders'}`);
           if (result.success && result.orders && result.orders.length > 0) {
-            debugLog(`SRC:orders-list ${result.orders.slice(0,5).map((o: any) => `${o.order_id}:${o.status}`).join(',')}`);
             const latestOrder = result.orders[0];
             const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
             const pendingStored = await AsyncStorage.getItem('pending_decision');
