@@ -297,7 +297,7 @@ export default function RootLayout() {
                 restaurant_code: latestOrder.restaurant_code || '',
                 orderable_order_date: latestOrder.orderable_order_date || '',
                 orderable_order_time: latestOrder.orderable_order_time || '',
-              }, false);
+              }, true);
             // Check in background if already accepted, close modal if so
             setTimeout(() => {
               fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`)
