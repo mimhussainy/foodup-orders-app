@@ -380,9 +380,9 @@ useEffect(() => {
       }
     });
 
-    const claimsInterval = setInterval(() => fetchClaims(), 10000);
-    const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 30000);
-    const storeInterval = setInterval(() => fetchStoreStatus(), 15000);
+    const claimsInterval = setInterval(() => fetchClaims(), 60000);
+    const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 60000);
+    const storeInterval = setInterval(() => fetchStoreStatus(), 60000);
     let lastAutoRefresh = '';
     const autoRefreshInterval = setInterval(async () => {
       const flag = await AsyncStorage.getItem('auto_accepted_refresh');
