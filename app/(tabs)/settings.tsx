@@ -116,6 +116,12 @@ export default function SettingsScreen() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState('');
 
+  const getPin = async () => {
+    const iosPin = await AsyncStorage.getItem('ios_pin') || '';
+    const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
+    return iosPin || ownerPin;
+  };
+
   useEffect(() => {
     AsyncStorage.getItem('restaurant_code').then(c => {
       setRestaurantCode(c || '');
@@ -159,13 +165,15 @@ export default function SettingsScreen() {
   }, []);
 
   const loadAccounts = async () => {
-    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
+    const iosPin = await AsyncStorage.getItem('ios_pin') || '';
+    const pin = iosPin || ownerPin;
     const code = await AsyncStorage.getItem('restaurant_code') || '';
 
     try {
       const endpoint = Platform.OS === 'ios'
         ? `${BACKEND_URL}/delivery-accounts-ios?ios_pin=${pin}&restaurant_code=${code}`
-        : `${BACKEND_URL}/delivery-accounts?owner_pin=${pin}&restaurant_code=${code}`;
+        : `${BACKEND_URL}/delivery-accounts?owner_pin=${ownerPin}&restaurant_code=${code}`;
       const response = await fetch(endpoint);
       const result = await response.json();
       if (result.success) setAccounts(result.accounts);
@@ -238,7 +246,7 @@ export default function SettingsScreen() {
     setError('');
     setSuccess('');
 
-    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const pin = await getPin();
     const code = await AsyncStorage.getItem('restaurant_code') || '';
 
     try {
@@ -279,7 +287,7 @@ export default function SettingsScreen() {
     setProfileError('');
     setProfileSuccess('');
 
-    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const pin = await getPin();
     const code = await AsyncStorage.getItem('restaurant_code') || '';
 
     try {
@@ -323,7 +331,7 @@ export default function SettingsScreen() {
           text: t.remove,
           style: 'destructive',
           onPress: async () => {
-            const pin = await AsyncStorage.getItem('owner_pin') || '';
+            const pin = await getPin();
             const code = await AsyncStorage.getItem('restaurant_code') || '';
 
             try {
@@ -355,7 +363,7 @@ export default function SettingsScreen() {
     setResetError('');
     setResetSuccess('');
 
-    const pin = await AsyncStorage.getItem('owner_pin') || '';
+    const pin = await getPin();
     const code = await AsyncStorage.getItem('restaurant_code') || '';
 
     try {
@@ -1056,7 +1064,7 @@ const stopPreviewSound = async () => {
                         <TouchableOpacity onPress={async () => {
                           const updated = acceptanceTimes.filter((_, idx) => idx !== i);
                           setAcceptanceTimes(updated);
-                          const pin = await AsyncStorage.getItem('owner_pin') || '';
+                          const pin = await getPin();
                           const code = await AsyncStorage.getItem('restaurant_code') || '';
                           try {
                             await fetch(`${BACKEND_URL}/acceptance-times`, {
@@ -1088,7 +1096,7 @@ const stopPreviewSound = async () => {
                           const updated = [...acceptanceTimes, num].sort((a, b) => a - b);
                           setAcceptanceTimes(updated);
                           setNewAcceptanceTime('');
-                          const pin = await AsyncStorage.getItem('owner_pin') || '';
+                          const pin = await getPin();
                           const code = await AsyncStorage.getItem('restaurant_code') || '';
                           try {
                             await fetch(`${BACKEND_URL}/acceptance-times`, {
@@ -1118,7 +1126,7 @@ const stopPreviewSound = async () => {
                           text: t.clear,
                           style: 'destructive',
                           onPress: async () => {
-                            const pin = await AsyncStorage.getItem('owner_pin') || '';
+                            const pin = await getPin();
                             const code = await AsyncStorage.getItem('restaurant_code') || '';
                             try {
                               await fetch(`${BACKEND_URL}/clear-orders/${code}`, {
