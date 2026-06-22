@@ -143,15 +143,24 @@ useFocusEffect(
   );
 
   const handlePinSubmit = async () => {
-    const iosPin = await AsyncStorage.getItem('ios_pin') || '';
-    const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
-    const correctPin = iosPin || ownerPin;
-    if (pinInput === correctPin) {
-      lastUnlockedAt = Date.now();
-      setPinUnlocked(true);
-      setPinError('');
-    } else {
-      setPinError('Incorrect PIN');
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const res = await fetch(`${BACKEND_URL}/verify-ios-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ios_pin: pinInput, restaurant_code: code }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        lastUnlockedAt = Date.now();
+        setPinUnlocked(true);
+        setPinError('');
+      } else {
+        setPinError('Incorrect PIN');
+        setPinInput('');
+      }
+    } catch (e) {
+      setPinError('Connection error');
       setPinInput('');
     }
   };
