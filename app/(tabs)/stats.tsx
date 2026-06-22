@@ -257,8 +257,9 @@ useFocusEffect(
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 40, paddingTop: Platform.OS === 'ios' ? 160 : 60 }}>
-          <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16 }} />
+        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 60 : 60 }}>
+          <View style={{ width: '100%', paddingHorizontal: 40 }}>
+          <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16, alignSelf: 'center' }} />
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.tabStatistics}</Text>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 24, textAlign: 'center' }}>{t.enterPin}</Text>
           <View style={{ width: '100%', borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, backgroundColor: '#FAFAFA', marginBottom: 12 }}>
@@ -281,6 +282,7 @@ useFocusEffect(
           >
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t.continue}</Text>
           </TouchableOpacity>
+        </View>
         </SafeAreaView>
       </View>
     );
