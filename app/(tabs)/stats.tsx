@@ -67,20 +67,20 @@ export default function StatsScreen() {
   const fetchAllStats = useCallback(async () => {
     const code = await AsyncStorage.getItem('restaurant_code') || '';
     if (!code) return;
-    const [ordersResult, deliveredResult, claimsResult, ordersForClaims] = await Promise.all([
+    const [ordersResult, deliveredResult, claimsResult] = await Promise.all([
       fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
       fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`).then(r => r.json()).catch(() => ({})),
       fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()).catch(() => ({})),
-      fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
     ]);
+    const ordersForClaims = ordersResult;
     if (ordersResult.success) {
-      const validOrders = ordersResult.orders.filter((o: any) => o.date_created).map((o: any) => ({
+      const validOrders = ordersResult.orders.filter((o: any) => o.received_at || o.date_created).map((o: any) => ({
         order_id: parseInt(o.order_id),
         total: String(o.total || ''),
         currency: o.currency || 'CHF',
         status: o.status || '',
         payment_method: o.payment_method || '',
-        timestamp: new Date(o.date_created).getTime(),
+        timestamp: new Date(o.received_at || o.date_created).getTime(),
         shipping_method: o.shipping?.method || '',
       }));
       setOrders(validOrders);

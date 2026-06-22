@@ -212,7 +212,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           ${order.shipping_address ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <div style="text-align:center; margin:8px 0;">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('https://www.google.com/maps/search/?api=1&query=' + order.shipping_address)}" width="180" height="180" />
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('FOODUP:' + order.order_id)}" width="180" height="180" />
           </div>
           <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
           ` : ''}
