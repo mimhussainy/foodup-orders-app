@@ -214,7 +214,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <div style="text-align:center; margin:8px 0;">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('FOODUP:' + order.order_id)}" width="180" height="180" />
           </div>
-          <p style="text-align:center; font-size:14px; color:#666; margin:4px 0; width:100%; display:block;">${labels.scanQr}</p>
+          
           ` : ''}
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <p style="text-align:center; font-size:12px; color:#000000; margin:4px 0;">Powered by: foodup.ch</p>
