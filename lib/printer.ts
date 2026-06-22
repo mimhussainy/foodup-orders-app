@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
-import { formatAddress } from './formatters';
 
 let isPrinting = false;
 
@@ -171,15 +170,21 @@ const acceptanceHtml = resolvedScheduledStr ? `
           </table>
           <div class="divider"></div>
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
-          ${order.shipping_address ? `<p style="margin:4px 0; font-size:20px;">${formatAddress(order.shipping_address)}</p>` : ''}
-          ${order.customer_email ? `<p style="margin:4px 0; font-size:20px; word-break:break-all;">${order.customer_email}</p>` : ''}
-          ${order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${(() => {
-            let p = order.customer_phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-            if (p.startsWith('+41')) p = '0' + p.slice(3);
-            else if (p.startsWith('41')) p = '0' + p.slice(2);
-            if (p.length === 10) p = p.slice(0,3) + ' ' + p.slice(3,6) + ' ' + p.slice(6,8) + ' ' + p.slice(8,10);
-            return p;
-          })()}</p>` : ''}
+          ${order.shipping_address ? `${(() => {
+            const parts = order.shipping_address.split(',').map((s: string) => s.trim());
+            let street = '';
+            let zipCity = '';
+            if (parts.length >= 3) {
+              street = parts[0].replace(/\s+\d+[a-zA-Z]?$/, '').trim();
+              zipCity = parts[2] + ' ' + parts[1];
+            } else if (parts.length === 2) {
+              street = parts[0].replace(/\s+\d+[a-zA-Z]?$/, '').trim();
+              zipCity = parts[1];
+            } else {
+              street = order.shipping_address;
+            }
+            return `<p style="margin:4px 0; font-size:20px;">${street}</p>${zipCity ? `<p style="margin:4px 0; font-size:20px;">${zipCity}</p>` : ''}`;
+          })()}` : ''}
           <div class="divider"></div>
           <table>${itemsHtml}</table>
           <div class="divider"></div>
