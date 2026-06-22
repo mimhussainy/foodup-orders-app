@@ -257,7 +257,7 @@ useFocusEffect(
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 40, paddingTop: Platform.OS === 'ios' ? 100 : 60 }}>
+        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 40, paddingTop: Platform.OS === 'ios' ? 160 : 60 }}>
           <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.tabStatistics}</Text>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 24, textAlign: 'center' }}>{t.enterPin}</Text>
