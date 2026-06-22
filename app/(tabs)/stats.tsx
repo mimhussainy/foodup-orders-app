@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   Image, Platform,
   RefreshControl, SafeAreaView, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View
+  StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -60,10 +60,16 @@ function getEndOfPastYear() {
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
+const PIN_UNLOCK_MS = 5 * 60 * 1000;
+let lastUnlockedAt: number | null = null;
+
 export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
   const fetchAllStats = useCallback(async () => {
     const code = await AsyncStorage.getItem('restaurant_code') || '';
     if (!code) return;
@@ -119,6 +125,14 @@ export default function StatsScreen() {
 
 useFocusEffect(
     useCallback(() => {
+      const now = Date.now();
+      if (lastUnlockedAt && now - lastUnlockedAt < PIN_UNLOCK_MS) {
+        setPinUnlocked(true);
+      } else {
+        setPinUnlocked(false);
+        setPinInput('');
+        setPinError('');
+      }
       setTimeout(() => {
         try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
       }, 300);
@@ -127,6 +141,20 @@ useFocusEffect(
       return () => clearInterval(interval);
     }, [fetchAllStats])
   );
+
+  const handlePinSubmit = async () => {
+    const iosPin = await AsyncStorage.getItem('ios_pin') || '';
+    const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
+    const correctPin = iosPin || ownerPin;
+    if (pinInput === correctPin) {
+      lastUnlockedAt = Date.now();
+      setPinUnlocked(true);
+      setPinError('');
+    } else {
+      setPinError('Incorrect PIN');
+      setPinInput('');
+    }
+  };
   const toggleExpand = (key: string) => {
     setExpanded(prev => prev === key ? null : key);
   };
@@ -213,6 +241,42 @@ useFocusEffect(
       </>
     );
   };
+
+  if (!pinUnlocked) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+        </View>
+        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 }}>
+          <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.tabStatistics}</Text>
+          <Text style={{ fontSize: 14, color: '#999', marginBottom: 24, textAlign: 'center' }}>{t.enterPin}</Text>
+          <View style={{ width: '100%', borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, padding: 16, backgroundColor: '#FAFAFA', marginBottom: 12 }}>
+            <TextInput
+              style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8 }}
+              placeholder="••••••"
+              placeholderTextColor="#ccc"
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={6}
+              value={pinInput}
+              onChangeText={setPinInput}
+              autoFocus
+              onSubmitEditing={handlePinSubmit}
+            />
+          </View>
+          {pinError ? <Text style={{ color: '#e74c3c', marginBottom: 12 }}>{pinError}</Text> : null}
+          <TouchableOpacity
+            style={{ backgroundColor: '#8B38CB', borderRadius: 12, padding: 16, width: '100%', alignItems: 'center' }}
+            onPress={handlePinSubmit}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t.continue}</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
