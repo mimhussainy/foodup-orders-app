@@ -257,33 +257,50 @@ useFocusEffect(
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'ios' ? 60 : 60 }}>
-          <View style={{ width: '100%', paddingHorizontal: 40 }}>
+        <View style={{ flex: 1, paddingTop: Platform.OS === 'ios' ? 40 : 24, paddingHorizontal: 16 }}>
           <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16, alignSelf: 'center' }} />
-          <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.tabStatistics}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8, textAlign: 'center', width: '100%' }}>{t.tabStatistics}</Text>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 24, textAlign: 'center' }}>{t.enterPin}</Text>
-          <View style={{ width: '100%', borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, backgroundColor: '#FAFAFA', marginBottom: 12 }}>
-            <TextInput
-              style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8, padding: 16, height: Platform.OS === 'android' ? 56 : undefined }}
-              placeholder=""
-              keyboardType="numeric"
-              secureTextEntry
-              maxLength={6}
-              value={pinInput}
-              onChangeText={setPinInput}
-              autoFocus
-              onSubmitEditing={handlePinSubmit}
-            />
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+            <View style={{ flex: 1, borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, backgroundColor: '#FAFAFA' }}>
+              <TextInput
+                style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8, padding: 16, height: Platform.OS === 'android' ? 56 : undefined }}
+                placeholder=""
+                keyboardType="numeric"
+                secureTextEntry
+                maxLength={6}
+                value={pinInput}
+                onChangeText={async (text) => {
+                  setPinInput(text);
+                  if (text.length >= 4) {
+                    const code = await AsyncStorage.getItem('restaurant_code') || '';
+                    try {
+                      const res = await fetch(`${BACKEND_URL}/verify-ios-pin`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ios_pin: text, restaurant_code: code }),
+                      });
+                      const result = await res.json();
+                      if (result.success) {
+                        lastUnlockedAt = Date.now();
+                        setPinUnlocked(true);
+                        setPinError('');
+                      }
+                    } catch (e) {}
+                  }
+                }}
+                onSubmitEditing={handlePinSubmit}
+              />
+            </View>
+            <TouchableOpacity
+              style={{ backgroundColor: '#111', borderRadius: 12, width: 52, height: Platform.OS === 'android' ? 56 : 58, justifyContent: 'center', alignItems: 'center' }}
+              onPress={handlePinSubmit}
+            >
+              <Ionicons name="arrow-forward" size={22} color="#fff" />
+            </TouchableOpacity>
           </View>
           {pinError ? <Text style={{ color: '#e74c3c', marginBottom: 12 }}>{pinError}</Text> : null}
-          <TouchableOpacity
-            style={{ backgroundColor: '#8B38CB', borderRadius: 12, padding: 16, width: '100%', alignItems: 'center' }}
-            onPress={handlePinSubmit}
-          >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t.continue}</Text>
-          </TouchableOpacity>
         </View>
-        </SafeAreaView>
       </View>
     );
   }
