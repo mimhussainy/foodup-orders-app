@@ -265,7 +265,7 @@ export default function OrdersScreen() {
   const [role, setRole] = useState<string | null>(null);
   const [claims, setClaims] = useState<{ [key: string]: any }>({});
 const [acceptedTimes, setAcceptedTimes] = useState<{ [key: string]: any }>({});
-const [filter, setFilter] = useState<string>('all');
+const [filter, setFilter] = useState<string>('today');
 const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
@@ -693,6 +693,10 @@ useEffect(() => {
 
   const filteredOrders = orders
     .filter(o => {
+      if (filter === 'today') {
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        return new Date(o.timestamp) >= todayStart;
+      }
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
       if (filter === 'auto') return !!autoPrintOrders[String(o.order_id)];
       return filter === 'all' || getDeliveryStatus(o) === filter;
@@ -740,7 +744,8 @@ const flatData: FlatItem[] = [
     pickedUp: todayOrders.filter(o => getDeliveryStatus(o) === 'pickedUp').length,
     cancelled: todayOrders.filter(o => getDeliveryStatus(o) === 'cancelled').length,
     auto: todayOrders.filter(o => !!autoPrintOrders[String(o.order_id)]).length,
-    all: todayOrders.length,
+    all: orders.length,
+    today: todayOrders.length,
   };
 
   if (role === 'delivery') return null;
@@ -1119,7 +1124,7 @@ const flatData: FlatItem[] = [
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     data={[
-                      { key: 'all', label: t.all, color: '#111' },
+                      { key: 'today', label: t.today || 'Today', color: '#8B38CB' },
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
                       { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
                       { key: 'in_bag', label: t.inBag, color: '#2980b9' },
@@ -1128,6 +1133,7 @@ const flatData: FlatItem[] = [
                       { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#E91E63' },
                       { key: 'auto', label: 'Auto', color: '#795548' },
                       { key: 'cancelled', label: t.cancelled, color: '#e74c3c' },
+                      { key: 'all', label: t.all, color: '#111' },
                     ]}
                     keyExtractor={f => f.key}
                     contentContainerStyle={{ paddingLeft: 10, paddingRight: 8, gap: 5, alignItems: 'center', paddingVertical: 10 }}
