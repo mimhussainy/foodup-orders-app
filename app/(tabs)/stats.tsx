@@ -143,7 +143,9 @@ useFocusEffect(
   );
 
   const handlePinSubmit = async () => {
-    const correctPin = await AsyncStorage.getItem('ios_pin') || '';
+    const iosPin = await AsyncStorage.getItem('ios_pin') || '';
+    const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
+    const correctPin = iosPin || ownerPin;
     if (pinInput === correctPin) {
       lastUnlockedAt = Date.now();
       setPinUnlocked(true);
@@ -246,13 +248,13 @@ useFocusEffect(
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
-        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 40, paddingTop: 60 }}>
+        <SafeAreaView style={{ flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingHorizontal: 40, paddingTop: Platform.OS === 'ios' ? 100 : 60 }}>
           <Ionicons name="lock-closed-outline" size={48} color="#8B38CB" style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 }}>{t.tabStatistics}</Text>
           <Text style={{ fontSize: 14, color: '#999', marginBottom: 24, textAlign: 'center' }}>{t.enterPin}</Text>
-          <View style={{ width: '100%', borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, padding: 16, backgroundColor: '#FAFAFA', marginBottom: 12 }}>
+          <View style={{ width: '100%', borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, backgroundColor: '#FAFAFA', marginBottom: 12 }}>
             <TextInput
-              style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8 }}
+              style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8, padding: 16, height: Platform.OS === 'android' ? 56 : undefined }}
               placeholder=""
               keyboardType="numeric"
               secureTextEntry
