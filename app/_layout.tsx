@@ -88,6 +88,21 @@ async function registerForPushNotifications() {
   try {
     const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
     const channelId = selectedSound === 'default' ? 'foodup_default' : `foodup_${selectedSound}`;
+
+    // Unregister from previous restaurant if different
+    const lastRegisteredCode = await AsyncStorage.getItem('last_registered_code') || '';
+    const lastRegisteredToken = await AsyncStorage.getItem('last_registered_token') || '';
+    if (lastRegisteredCode && lastRegisteredCode !== code && lastRegisteredToken) {
+      try {
+        await fetch(`${BACKEND_URL}/unregister-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: lastRegisteredToken, restaurant_code: lastRegisteredCode }),
+        });
+        console.log('=== UNREGISTERED from old restaurant:', lastRegisteredCode);
+      } catch (e) {}
+    }
+
     const response = await fetch(`${BACKEND_URL}/register-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,6 +110,10 @@ async function registerForPushNotifications() {
     });
     const result = await response.json();
     console.log('=== REGISTER RESULT:', result, 'channel:', channelId);
+
+    // Save current registration info
+    await AsyncStorage.setItem('last_registered_code', code);
+    await AsyncStorage.setItem('last_registered_token', token);
   } catch (fetchError: any) {
     console.log('=== REGISTER FETCH ERROR:', fetchError?.message || String(fetchError));
   }
@@ -384,9 +403,16 @@ export default function RootLayout() {
       if (data.event_type === 'new_order') {
         const role = await AsyncStorage.getItem('user_role');
         if (role === 'owner') {
+          // Drop notification if it belongs to a different restaurant
+          const currentCode = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+          const incomingCode = String(data.restaurant_code || '').toLowerCase().trim();
+          if (incomingCode && incomingCode !== currentCode) {
+            debugLog(`DROP cross-restaurant notification order:${data.order_id} from:${incomingCode} current:${currentCode}`);
+            return;
+          }
           // Check if already accepted before showing modal
           try {
-            const code = await AsyncStorage.getItem('restaurant_code') || '';
+            const code = currentCode;
             const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${data.order_id}`);
             const acceptedResult = await acceptedRes.json();
             if (acceptedResult.success && acceptedResult.accepted_time) return;
@@ -453,9 +479,15 @@ export default function RootLayout() {
       }
     });
 
-    const tapSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const tapSubscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const data = response.notification.request.content.data as any;
       if (data.order_id && Platform.OS !== 'ios' && data.event_type === 'new_order') {
+        const currentCode = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+        const incomingCode = String(data.restaurant_code || '').toLowerCase().trim();
+        if (incomingCode && incomingCode !== currentCode) {
+          debugLog(`DROP cross-restaurant tap order:${data.order_id} from:${incomingCode} current:${currentCode}`);
+          return;
+        }
         const newOrder = {
           order_id: parseInt(data.order_id),
           customer_name: data.customer_name || '',
