@@ -676,7 +676,11 @@ useEffect(() => {
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
     if (order.status === 'cancelled') return 'cancelled';
-    if (!claim) return 'new';
+    if (!claim) {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      if (new Date(order.timestamp) < todayStart) return 'completed';
+      return 'new';
+    }
     const status = typeof claim === 'string' ? 'delivering' : claim.status;
     const isPickup = (() => { const m = (order.shipping_method || '').toLowerCase().trim(); return m.includes('abholung') || m.includes('abholen') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('orderable_pickup') || m.includes('takeaway'); })();
     if (status === 'delivered' && isPickup) return 'pickedUp';
