@@ -278,6 +278,8 @@ export default function RootLayout() {
 
             // Scan all recent orders for one that needs a decision
             let orderToShow = null;
+            const claimsRes = await fetch(`${BACKEND_URL}/claims/${code}`).catch(() => null);
+            const claimsResult = claimsRes ? await claimsRes.json().catch(() => ({})) : {};
             for (const candidate of result.orders.slice(0, 20)) {
               if (candidate.status === 'cancelled' || candidate.status === 'completed') continue;
               try {
@@ -285,6 +287,8 @@ export default function RootLayout() {
                 const acceptedResult = await acceptedRes.json();
                 if (acceptedResult.success && acceptedResult.accepted_time) continue;
               } catch(e) {}
+              // Skip if already delivered
+              if (claimsResult.success && claimsResult.claims?.[String(candidate.order_id)]?.status === 'delivered') continue;
               orderToShow = candidate;
               break;
             }
