@@ -23,8 +23,11 @@ import {
 } from 'react-native';
 import AcceptRejectModal from '../../components/AcceptRejectModal';
 import CustomAlert from '../../components/CustomAlert';
+import OrderCountdown from '../../components/OrderCountdown';
+import ScheduledCountdown from '../../components/ScheduledCountdown';
 import { formatDate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
+import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -61,130 +64,8 @@ interface Order {
   orderable_order_time?: string;
   date_created?: string;
 }
-function ScheduledCountdown({ scheduledMs, at }: { scheduledMs: number; at: string }) {
-  const [now, setNow] = useState(Date.now());
-  const { t, language } = useLanguage();
 
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
-  const remainingMs = scheduledMs - now;
-  const isOverdue = remainingMs < 0;
-  const absMs = Math.abs(remainingMs);
-  const hours = Math.floor(absMs / 3600000);
-  const mins = Math.floor((absMs % 3600000) / 60000);
-  const secs = Math.floor((absMs % 60000) / 1000);
-  const barColor = isOverdue ? '#e74c3c' : remainingMs < 30 * 60000 ? '#f39c12' : '#8B38CB';
-  const showBar = isOverdue || remainingMs <= 3600000;
-  const countdownProgress = Math.max(0, Math.min(1, remainingMs / 3600000));
-  
-  const label = isOverdue ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : hours >= 1 ? `${hours}h ${mins}m ${t.remaining || 'remaining'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`;
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="time-outline" size={14} color={barColor} />
-          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color: barColor }}>{label}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="calendar-outline" size={14} color="#8B38CB" />
-          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>
-          {(() => {
-            const parts = at.split('—');
-            if (parts.length < 2) return at;
-            const timePart = parts[0].trim();
-            const datePart = parts[1].trim();
-            const dateSections = datePart.split('/');
-            if (dateSections.length < 3) return at;
-            const scheduledDate = new Date(`${dateSections[2]}-${dateSections[1]}-${dateSections[0]}`);
-            const today = new Date();
-            const isToday = scheduledDate.toDateString() === today.toDateString();
-            return isToday ? timePart : at;
-          })()}
-          </Text>
-        </View>
-      </View>
-      {showBar && (
-        <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-          <View style={{ height: 4, width: `${countdownProgress * 100}%`, backgroundColor: barColor, borderRadius: 2 }} />
-        </View>
-      )}
-    </View>
-  );
-}
-function OrderCountdown({ accepted_at, accepted_time }: { accepted_at: string; accepted_time: string }) {
-  const [remaining, setRemaining] = useState<number | null>(null);
-  const [totalSeconds, setTotalSeconds] = useState<number>(0);
-  const { t } = useLanguage();
-  
-
-  useEffect(() => {
-    if (!accepted_at || !accepted_time) return;
-    // If accepted_time contains ':' and '—' it's a scheduled time string, not minutes
-    if (accepted_time.includes('—') || accepted_time.includes(':')) return;
-    const minutes = parseInt(accepted_time.replace(/[^0-9]/g, ''));
-    if (isNaN(minutes)) return;
-    const acceptedDate = new Date(accepted_at);
-    if (isNaN(acceptedDate.getTime())) return;
-    const deadlineMs = acceptedDate.getTime() + minutes * 60 * 1000;
-    const total = minutes * 60;
-    setTotalSeconds(total);
-    const update = () => {
-      const diff = Math.floor((deadlineMs - Date.now()) / 1000);
-      setRemaining(diff);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [accepted_at, accepted_time]);
-
-  if (remaining === null || totalSeconds === 0) return null;
-
-  const mins = Math.floor(Math.abs(remaining) / 60);
-  const secs = Math.abs(remaining) % 60;
-  const isLate = remaining < 0;
-  const percentage = remaining / totalSeconds;
-  const color = isLate ? '#e74c3c' : percentage < 0.25 ? '#e74c3c' : percentage < 0.50 ? '#f39c12' : '#2ecc71';
-  const progress = Math.max(0, Math.min(1, remaining / totalSeconds));
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="hourglass-outline" size={14} color={color} />
-          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '700', color }}>
-            {isLate ? `${mins}m ${secs}s ${t.overdue || 'overdue'}` : `${mins}m ${secs}s ${t.remaining || 'remaining'}`}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="checkmark-circle-outline" size={14} color="#8B38CB" />
-          <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>
-            {accepted_time.replace('Minutes', 'mins')}
-          </Text>
-          {(() => {
-            try {
-              const deadlineDate = new Date(new Date(accepted_at).getTime() + parseInt(accepted_time.replace(/[^0-9]/g, '')) * 60000);
-              const hours = String(deadlineDate.getHours()).padStart(2, '0');
-              const minutes = String(deadlineDate.getMinutes()).padStart(2, '0');
-              return (
-                <>
-                  <Ionicons name="flash-outline" size={14} color="#8B38CB" />
-                  <Text style={{ fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '600', color: '#8B38CB' }}>{hours}:{minutes}</Text>
-                </>
-              );
-            } catch (e) { return null; }
-          })()}
-        </View>
-      </View>
-      <View style={{ height: 4, backgroundColor: '#F0F0F0', borderRadius: 2, overflow: 'hidden' }}>
-        <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: color, borderRadius: 2 }} />
-      </View>
-    </View>
-  );
-}
 function getStatusColor(status: string) {
   switch (status) {
     case 'processing': return '#2ecc71';
@@ -229,29 +110,6 @@ function getDeliveryStatusLabel(claim: any, item: any, t: any) {
     case 'in_bag': return t.inBag;
     default: return t.newOrder;
   }
-}
-
-function getDateLabel(timestamp: number, t: any) {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return t.today;
-  if (date.toDateString() === yesterday.toDateString()) return t.yesterday;
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-function groupOrdersByDate(orders: Order[], t: any) {
-  const groups: { [key: string]: Order[] } = {};
-  orders.forEach(order => {
-    const label = getDateLabel(order.timestamp, t);
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(order);
-  });
-  return Object.keys(groups).map(title => ({ title, data: groups[title] }));
 }
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
@@ -676,27 +534,21 @@ useEffect(() => {
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
     if (order.status === 'cancelled') return 'cancelled';
-    if (!claim) {
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      if (new Date(order.timestamp) < todayStart) return 'completed';
-      return 'new';
-    }
+    // Orders placed today before 03:00 are treated as done
+    if (isTodayBeforeThreeAM(order.timestamp) && !claim) return 'delivered';
+    if (!claim) return 'new';
     const status = typeof claim === 'string' ? 'delivering' : claim.status;
-    const isPickup = (() => { const m = (order.shipping_method || '').toLowerCase().trim(); return m.includes('abholung') || m.includes('abholen') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('orderable_pickup') || m.includes('takeaway'); })();
+    const isPickup = isPickupMethod(order.shipping_method);
     if (status === 'delivered' && isPickup) return 'pickedUp';
     return status;
   };
 
-  const isScheduledOrder = (o: Order) => {
-    return !!o.orderable_order_time &&
-      o.orderable_order_time.trim() !== '' &&
-      !o.orderable_order_time.toLowerCase().includes('as soon as possible') &&
-      !o.orderable_order_time.toLowerCase().includes('asap') &&
-      !o.orderable_order_time.includes('(');
-  };
+  
 
   const filteredOrders = orders
     .filter(o => {
+      // Orders older than today only appear in the "All" filter
+      if (isOlderThanToday(o.timestamp) && filter !== 'all') return false;
       if (filter === 'today') {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
         return new Date(o.timestamp) >= todayStart;
@@ -986,10 +838,6 @@ const flatData: FlatItem[] = [
 
             {/* ── MARK DELIVERED / PICKUP BUTTON ── */}
             {(() => {
-              const isPickupMethod = (method?: string) => {
-                const m = (method || '').toLowerCase().trim();
-                return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
-              };
               const claim = claims[String(selectedOrder.order_id)];
               const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
               const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
@@ -1162,10 +1010,6 @@ const flatData: FlatItem[] = [
               return <Text style={styles.groupLabel}>{item.title}</Text>;
             }
             const order = item.item;
-            const isPickupMethod = (method?: string) => {
-              const m = (method || '').toLowerCase().trim();
-              return m.includes('abholung') || m.includes('abholen') || m.includes('selbstabholung') || m.includes('pickup') || m.includes('pick up') || m.includes('local_pickup') || m.includes('local pickup') || m.includes('orderable_pickup') || m.includes('takeaway') || m.includes('take away');
-            };
             return (
               <TouchableOpacity
                 style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}
