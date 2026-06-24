@@ -862,7 +862,9 @@ const flatData: FlatItem[] = [
                   <View style={styles.orderMeta}>
                     {(() => {
                       const claim = claims[String(selectedOrder.order_id)];
-                      const name = (() => { const raw = typeof claim === 'string' ? claim : claim.name; if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; if (raw === 'Owner' || raw === '__owner__') { const m = (selectedOrder.shipping_method || '').toLowerCase().trim(); const isPickup = m.includes('abholung') || m.includes('pickup') || m.includes('takeaway'); return isPickup ? t.pickedUp : t.delivered; } return raw; })();
+                      const raw = typeof claim === 'string' ? claim : claim.name;
+                      if (raw === 'Owner' || raw === '__owner__') return null;
+                      const name = (() => { if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; return raw; })();
                       const status = typeof claim === 'string' ? 'delivering' : claim.status;
                       const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
                       return (
@@ -1268,7 +1270,9 @@ const flatData: FlatItem[] = [
                     <View style={styles.orderMeta}>
                       {(() => {
                         const claim = claims[String(order.order_id)];
-                        const name = (() => { const raw = typeof claim === 'string' ? claim : claim.name; if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; if (raw === 'Owner' || raw === '__owner__') return isPickupMethod(order.shipping_method) ? t.pickedUp : t.delivered; return raw; })();
+                        const raw = typeof claim === 'string' ? claim : claim.name;
+                        if (raw === 'Owner' || raw === '__owner__') return null;
+                        const name = (() => { if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; return raw; })();
                         const status = typeof claim === 'string' ? 'delivering' : claim.status;
                         const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
                         return (
