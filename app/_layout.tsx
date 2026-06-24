@@ -213,6 +213,49 @@ export default function RootLayout() {
     setShowCountdown(withCountdown);
   };
 
+  const autoMarkOldOrdersDelivered = async () => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const role = await AsyncStorage.getItem('user_role') || '';
+      if (!code || role !== 'owner') return;
+
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+      const [ordersRes, claimsRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
+        fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()).catch(() => ({})),
+      ]);
+
+      if (!ordersRes.success) return;
+
+      const claims = claimsRes.success ? claimsRes.claims : {};
+
+      for (const order of ordersRes.orders) {
+        if (order.status === 'cancelled' || order.status === 'completed' || order.status === 'refunded' || order.status === 'failed') continue;
+
+        const orderDate = new Date(order.received_at || order.date_created || '');
+        if (isNaN(orderDate.getTime())) continue;
+        if (orderDate >= todayStart) continue;
+
+        const claim = claims[String(order.order_id)];
+        if (claim && claim.status === 'delivered') continue;
+        if (claim && (claim.status === 'in_bag' || claim.status === 'delivering')) continue;
+
+        const method = (order.shipping?.method || '').toLowerCase().trim();
+        const isPickup = method.includes('abholung') || method.includes('pickup') || method.includes('takeaway');
+        const deliveryName = isPickup ? '__pickup__' : '__owner__';
+
+        await fetch(`${BACKEND_URL}/mark-delivered`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: order.order_id, delivery_name: deliveryName, restaurant_code: code }),
+        }).catch(() => {});
+
+        console.log(`Auto marked old order ${order.order_id} as ${isPickup ? 'picked up' : 'delivered'}`);
+      }
+    } catch (e) {}
+  };
+
   const checkUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('user_role');
@@ -223,6 +266,7 @@ export default function RootLayout() {
       }
       if (role === 'owner') {
         registerForPushNotifications();
+        autoMarkOldOrdersDelivered();
       }
       setTimeout(() => {
         router.replace('/(tabs)');
@@ -260,6 +304,7 @@ export default function RootLayout() {
 
     const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
+        autoMarkOldOrdersDelivered();
         const code = await AsyncStorage.getItem('restaurant_code') || '';
         const role = await AsyncStorage.getItem('user_role') || '';
         debugLog(`SRC:AppState-wake code:${code || 'none'} role:${role || 'none'}`);
