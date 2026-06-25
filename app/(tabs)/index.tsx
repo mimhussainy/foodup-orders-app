@@ -1076,6 +1076,12 @@ const flatData: FlatItem[] = [
                     );
                   })()}
                 </View>
+                {order.note ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: '#fffbeb', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
+                    <Ionicons name="alert-circle-outline" size={13} color="#f39c12" />
+                    <Text style={{ fontSize: 12, color: '#111', fontWeight: '600', flex: 1 }} numberOfLines={1}>{order.note}</Text>
+                  </View>
+                ) : null}
                 {acceptedTimes[String(order.order_id)] && (() => {
                   const claim = claims[String(order.order_id)];
                   const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
@@ -1093,10 +1099,12 @@ const flatData: FlatItem[] = [
                   return <OrderCountdown accepted_at={acceptedTimes[String(order.order_id)].accepted_at} accepted_time={at} />;
                 })()}
                 {(() => {
-                    const claim = claims[String(order.order_id)];
-                    const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
+                    const status = getDeliveryStatus(order);
+                    if (status === 'delivered' || status === 'pickedUp' || status === 'cancelled') {
+                      return <View style={[styles.divider, { marginBottom: 0 }]} />;
+                    }
                     const at = acceptedTimes[String(order.order_id)]?.accepted_time || '';
-                    const hasCountdown = acceptedTimes[String(order.order_id)] && status !== 'delivered';
+                    const hasCountdown = !!acceptedTimes[String(order.order_id)];
                     const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                     const scheduledDateStr = at.split('—')[1]?.trim();
                     const parts = scheduledDateStr?.split('/');
