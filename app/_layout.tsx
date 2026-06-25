@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
+import { isPickupMethod } from '../lib/orderUtils';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -241,8 +242,7 @@ export default function RootLayout() {
         if (claim && claim.status === 'delivered') continue;
         if (claim && (claim.status === 'in_bag' || claim.status === 'delivering')) continue;
 
-        const method = (order.shipping?.method || '').toLowerCase().trim();
-        const isPickup = method.includes('abholung') || method.includes('pickup') || method.includes('takeaway');
+        const isPickup = isPickupMethod(order.shipping?.method);
         const deliveryName = isPickup ? '__pickup__' : '__owner__';
 
         await fetch(`${BACKEND_URL}/mark-delivered`, {
