@@ -184,6 +184,7 @@ export const translations = {
     cashCollected: 'Cash Collected',
     noDeliveriesToday: 'No cash deliveries today',
     noCashInProgress: 'No cash orders in progress',
+    refunded: 'Refunded',
   },
 
 
@@ -371,6 +372,7 @@ export const translations = {
     cashCollected: 'Bargeld erhalten',
     noDeliveriesToday: 'Keine Barzahlungen heute',
     noCashInProgress: 'Keine offenen Barzahlungen',
+    refunded: 'Rückerstattet',  
   },
 };
 
