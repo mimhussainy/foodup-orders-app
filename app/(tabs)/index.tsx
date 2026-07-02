@@ -25,11 +25,12 @@ import AcceptRejectModal from '../../components/AcceptRejectModal';
 import CustomAlert from '../../components/CustomAlert';
 import OrderCountdown from '../../components/OrderCountdown';
 import ScheduledCountdown from '../../components/ScheduledCountdown';
-import { formatDate, wcDateToMs } from '../../lib/dateUtils';
+import { formatDate, formatISODate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
+
 
 interface OrderAddon {
   label: string;
@@ -88,7 +89,8 @@ function getStatusLabel(status: string, t: any) {
   }
 }
 
-function getDeliveryStatusColor(claim: any) {
+function getDeliveryStatusColor(claim: any, orderStatus?: string) {
+  if (orderStatus === 'refunded') return '#e67e22';
   if (!claim) return '#f39c12';
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   switch (status) {
@@ -100,6 +102,7 @@ function getDeliveryStatusColor(claim: any) {
 }
 
 function getDeliveryStatusLabel(claim: any, item: any, t: any) {
+  if (item.status === 'refunded') return t.refunded;
   if (item.status === 'cancelled') return t.cancelled;
   if (!claim) return t.newOrder;
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
@@ -396,8 +399,8 @@ useEffect(() => {
               merged.push(bo);
               hasChanges = true;
             } else {
-              if (bo.status === 'cancelled' && merged[exists].status !== 'cancelled') {
-                merged[exists] = { ...merged[exists], status: 'cancelled' };
+              if (bo.status && bo.status !== merged[exists].status) {
+                merged[exists] = { ...merged[exists], status: bo.status };
                 hasChanges = true;
               }
             }
@@ -642,8 +645,8 @@ const flatData: FlatItem[] = [
             <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
               <View style={styles.orderTopRow}>
                 <Text style={styles.orderId}>Order #{selectedOrder.order_id}</Text>
-                <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) + '20' }]}>
-                  <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)]) }]}>
+                <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) + '20' }]}>
+                  <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) }]}>
                     {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
                   </Text>
                 </View>
@@ -756,7 +759,7 @@ const flatData: FlatItem[] = [
                         <>
                           <View style={styles.row}>
                             <Ionicons name="checkmark-circle-outline" size={14} color="#3498db" />
-                            <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#3498db' }]}>{t.deliveredAt} {claim.delivered_at}</Text>
+                            <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#3498db' }]}>{t.deliveredAt} {formatISODate(claim.delivered_at)}</Text>
                           </View>
                           <View style={styles.divider} />
                         </>
@@ -1039,8 +1042,8 @@ const flatData: FlatItem[] = [
                         </Text>
                       </TouchableOpacity>
                     )}
-                    <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)]) + '20' }]}>
-                      <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)]) }]}>
+                    <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)], order.status) + '20' }]}>
+                      <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)], order.status) }]}>
                         {getDeliveryStatusLabel(claims[String(order.order_id)], order, t)}
                       </Text>
                     </View>
