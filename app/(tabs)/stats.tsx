@@ -3,9 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
-  Image, Platform,
+  Image, Keyboard, Platform,
   RefreshControl, SafeAreaView, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View
+  StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 
@@ -262,6 +262,7 @@ useFocusEffect(
 
   if (!pinUnlocked) {
     return (
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
@@ -312,6 +313,7 @@ useFocusEffect(
           {pinError ? <Text style={{ color: '#e74c3c', marginBottom: 12 }}>{pinError}</Text> : null}
         </View>
       </View>
+      </TouchableWithoutFeedback>
     );
   }
 

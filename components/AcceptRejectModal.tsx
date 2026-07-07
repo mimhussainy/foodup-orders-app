@@ -303,7 +303,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
   };
 
   const handleConfirmReject = async () => {
-    const reason = selectedReason === 'Other' ? customReason : selectedReason;
+    const reason = selectedReason === t.other ? customReason : selectedReason;
     if (!reason) return;
     setLoading(true);
     setCountdown(null);
@@ -528,7 +528,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                   </TouchableOpacity>
                 ))}
               </View>
-              {selectedReason === 'Other' && (
+              {selectedReason === t.other && (
                 <TextInput
                   style={{ borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, padding: 14, fontSize: 15, color: '#111', marginBottom: 16 }}
                   placeholder={t.enterReason}
@@ -540,7 +540,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
               <TouchableOpacity
                 style={{ backgroundColor: selectedReason ? '#e74c3c' : '#ccc', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                 onPress={handleConfirmReject}
-                disabled={!selectedReason || loading || (selectedReason === 'Other' && !customReason)}
+                disabled={!selectedReason || loading || (selectedReason === t.other && !customReason)}
               >
                 <Ionicons name="print-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{loading ? t.printing : t.confirmAndPrint}</Text>

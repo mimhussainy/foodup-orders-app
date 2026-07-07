@@ -23,7 +23,7 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     } catch (e) {}
 
     const items = order.items || [];
-    const isPaid = !order.payment_method?.toLowerCase().includes('bar');
+    const isPaid = !(order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash'));
 
     let itemsHtml = '';
     items.forEach((item: any) => {

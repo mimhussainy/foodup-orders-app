@@ -112,6 +112,7 @@ export default function SettingsScreen() {
   const [togglingProduct, setTogglingProduct] = useState<number | null>(null);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState('');
+  const [checkingPrinter, setCheckingPrinter] = useState(false);
 
   const getPin = async () => {
     const iosPin = await AsyncStorage.getItem('ios_pin') || '';
@@ -395,6 +396,46 @@ export default function SettingsScreen() {
     setResetLoading(false);
   };
 
+  const checkPrinterPairing = async () => {
+    setCheckingPrinter(true);
+    try {
+      const Application = require('expo-application');
+      const currentDeviceId = Application.getAndroidId() || '';
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
+      const result = await res.json();
+      const registeredDeviceId = result.success ? (result.device_id || '') : '';
+
+      if (registeredDeviceId && registeredDeviceId === currentDeviceId) {
+        Alert.alert(
+          '✅ Printer Paired',
+          `This device is registered as the printer for ${restaurantName || 'this restaurant'}.`
+        );
+      } else {
+        Alert.alert(
+          '⚠️ Not Registered as Printer',
+          `This device is not registered as the printer.\n\nRegistered ID: ${registeredDeviceId || 'none'}\nThis device's ID: ${currentDeviceId}`,
+          [
+            { text: 'Close', style: 'cancel' },
+            {
+              text: 'Email Device ID',
+              onPress: () => {
+                const subject = encodeURIComponent(`Printer Device ID Update - ${code}`);
+                const body = encodeURIComponent(
+                  `Restaurant Code: ${code}\nRestaurant Name: ${restaurantName || ''}\n\nRegistered Device ID: ${registeredDeviceId || 'none'}\nCurrent Device ID: ${currentDeviceId}`
+                );
+                Linking.openURL(`mailto:info@foodup.ch?subject=${subject}&body=${body}`);
+              },
+            },
+          ]
+        );
+      }
+    } catch (e) {
+      Alert.alert('Error', t.connectionError);
+    }
+    setCheckingPrinter(false);
+  };
+
   const handleLogout = async () => {
     // Unregister push token before logout
     try {
@@ -415,6 +456,9 @@ export default function SettingsScreen() {
     const ordersHistory = await AsyncStorage.getItem('foodup_orders');
     const deliveryHistory = await AsyncStorage.getItem('delivery_history');
     const restaurantCode = await AsyncStorage.getItem('restaurant_code');
+    const notificationSoundPref = await AsyncStorage.getItem('notification_sound');
+    const pickupReadyOrders = await AsyncStorage.getItem('pickup_ready_orders');
+    const pendingDecision = await AsyncStorage.getItem('pending_decision');
 
     // Save all delivery bags before clearing
     const allKeys = await AsyncStorage.getAllKeys();
@@ -430,6 +474,9 @@ export default function SettingsScreen() {
     if (ordersHistory) await AsyncStorage.setItem('foodup_orders', ordersHistory);
     if (deliveryHistory) await AsyncStorage.setItem('delivery_history', deliveryHistory);
     if (restaurantCode) await AsyncStorage.setItem('restaurant_code', restaurantCode);
+    if (notificationSoundPref) await AsyncStorage.setItem('notification_sound', notificationSoundPref);
+    if (pickupReadyOrders) await AsyncStorage.setItem('pickup_ready_orders', pickupReadyOrders);
+    if (pendingDecision) await AsyncStorage.setItem('pending_decision', pendingDecision);
     for (const [key, val] of bagEntries) {
       await AsyncStorage.setItem(key, val);
     }
@@ -1144,6 +1191,24 @@ const stopPreviewSound = async () => {
                   style={{ paddingVertical: 14, alignItems: 'center' }}
                 >
                   <Text style={{ color: '#e74c3c', fontSize: 15, fontWeight: '500' }}>{t.clearOrders}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && Platform.OS === 'android' && (
+            <>
+              <Text style={styles.groupLabel}>Printer</Text>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  onPress={checkPrinterPairing}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 }}
+                  disabled={checkingPrinter}
+                >
+                  <Ionicons name="print-outline" size={18} color="#111" />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>
+                    {checkingPrinter ? 'Checking...' : 'Check Printer Pairing'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </>

@@ -536,7 +536,7 @@ useEffect(() => {
 
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
-    if (order.status === 'cancelled') return 'cancelled';
+    if (order.status === 'cancelled' || order.status === 'refunded') return 'cancelled';
     // Orders placed today before 03:00 are treated as done
     if (isTodayBeforeThreeAM(order.timestamp) && !claim) return 'delivered';
     if (!claim) return 'new';
@@ -686,7 +686,7 @@ const flatData: FlatItem[] = [
                 const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                 const at = acceptedTimes[String(selectedOrder.order_id)].accepted_time || '';
                 const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                if (status === 'delivered') return null;
+                if (status === 'delivered' || selectedOrder.status === 'cancelled' || selectedOrder.status === 'refunded') return null;
                 if (isItemScheduled) {
                   const scheduledStr = at.split('—')[0].trim();
                   const scheduledDateStr = at.split('—')[1]?.trim();
@@ -698,6 +698,9 @@ const flatData: FlatItem[] = [
                 return <OrderCountdown accepted_at={acceptedTimes[String(selectedOrder.order_id)].accepted_at} accepted_time={at} />;
               })()}
               {(() => {
+                if (selectedOrder.status === 'cancelled' || selectedOrder.status === 'refunded') {
+                  return <View style={[styles.divider, { marginBottom: 0 }]} />;
+                }
                 const claim = claims[String(selectedOrder.order_id)];
                 const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                 const at = acceptedTimes[String(selectedOrder.order_id)]?.accepted_time || '';
@@ -1090,7 +1093,7 @@ const flatData: FlatItem[] = [
                   const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                   const at = acceptedTimes[String(order.order_id)].accepted_time || '';
                   const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                  if (status === 'delivered') return null;
+                  if (status === 'delivered' || order.status === 'cancelled' || order.status === 'refunded') return null;
                   if (isItemScheduled) {
                     const scheduledStr = at.split('—')[0].trim();
                     const scheduledDateStr = at.split('—')[1]?.trim();

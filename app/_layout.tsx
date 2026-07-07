@@ -506,11 +506,11 @@ export default function RootLayout() {
         }
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
-          if (selectedSound === 'default') return;
           const soundMap: { [key: string]: string } = {
+            default: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
+            tick_tock: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
             data_scanner: 'https://assets.mixkit.co/active_storage/sfx/2847/2847.wav',
             security_alarm: 'https://assets.mixkit.co/active_storage/sfx/994/994.wav',
-            tick_tock: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
             classic_alarm: 'https://assets.mixkit.co/active_storage/sfx/995/995.wav',
             slot_machine: 'https://assets.mixkit.co/active_storage/sfx/1995/1995.wav',
           };
