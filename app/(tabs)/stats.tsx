@@ -43,7 +43,12 @@ function getStartOfDay() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
 }
 function getStartOfWeek() {
-  const d = new Date(); d.setDate(d.getDate() - 7); d.setHours(0, 0, 0, 0); return d;
+  const d = new Date();
+  const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const diff = day === 0 ? 6 : day - 1; // days since most recent Monday
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 function getStartOfMonth() {
   const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d;
@@ -122,6 +127,7 @@ export default function StatsScreen() {
   const [expandedOpenOrders, setExpandedOpenOrders] = useState<string | null>(null);
   const { t } = useLanguage();
   const scrollRef = useRef<any>(null);
+  const pinInputRef = useRef<TextInput>(null);
 
 useFocusEffect(
     useCallback(() => {
@@ -132,6 +138,9 @@ useFocusEffect(
         setPinUnlocked(false);
         setPinInput('');
         setPinError('');
+        setTimeout(() => {
+          pinInputRef.current?.focus();
+        }, 300);
       }
       setTimeout(() => {
         try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
@@ -264,6 +273,7 @@ useFocusEffect(
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
             <View style={{ flex: 1, borderWidth: 1, borderColor: '#E8E8E8', borderRadius: 12, backgroundColor: '#FAFAFA' }}>
               <TextInput
+                ref={pinInputRef}
                 style={{ fontSize: 24, color: '#111', textAlign: 'center', letterSpacing: 8, padding: 16, height: Platform.OS === 'android' ? 56 : undefined }}
                 placeholder=""
                 keyboardType="numeric"

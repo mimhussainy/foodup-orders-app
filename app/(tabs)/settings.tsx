@@ -13,17 +13,15 @@ import { useLanguage } from '../../lib/useLanguage';
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
 const SOUND_MAP: { [key: string]: string } = {
+  default: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
   data_scanner: 'https://assets.mixkit.co/active_storage/sfx/2847/2847.wav',
   security_alarm: 'https://assets.mixkit.co/active_storage/sfx/994/994.wav',
-  tick_tock: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
   classic_alarm: 'https://assets.mixkit.co/active_storage/sfx/995/995.wav',
   slot_machine: 'https://assets.mixkit.co/active_storage/sfx/1995/1995.wav',
 };
 let previewSoundRef: any = null;
 
 async function previewSound(key: string) {
-  if (key === 'default') return;
-
   try {
     if (previewSoundRef) {
       await previewSoundRef.stopAsync().catch(() => {});
@@ -55,7 +53,6 @@ export default function SettingsScreen() {
     { key: 'default', label: t.default, icon: 'notifications-outline' },
     { key: 'data_scanner', label: 'Data Scanner', icon: 'scan-outline' },
     { key: 'security_alarm', label: 'Security Alarm', icon: 'shield-outline' },
-    { key: 'tick_tock', label: 'Tick Tock', icon: 'time-outline' },
     { key: 'classic_alarm', label: 'Classic Alarm', icon: 'alarm-outline' },
     { key: 'slot_machine', label: 'Slot Machine', icon: 'musical-notes-outline' },
   ];
