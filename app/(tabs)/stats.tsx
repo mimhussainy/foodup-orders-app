@@ -165,7 +165,7 @@ useFocusEffect(
         setPinUnlocked(true);
         setPinError('');
       } else {
-        setPinError('Incorrect PIN');
+        setPinError(result.message || 'Incorrect PIN');
         setPinInput('');
       }
     } catch (e) {
@@ -279,26 +279,11 @@ useFocusEffect(
                 placeholder=""
                 keyboardType="numeric"
                 secureTextEntry
-                maxLength={6}
+                maxLength={10}
                 value={pinInput}
-                onChangeText={async (text) => {
+                onChangeText={(text) => {
                   setPinInput(text);
-                  if (text.length >= 4) {
-                    const code = await AsyncStorage.getItem('restaurant_code') || '';
-                    try {
-                      const res = await fetch(`${BACKEND_URL}/verify-ios-pin`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ios_pin: text, restaurant_code: code }),
-                      });
-                      const result = await res.json();
-                      if (result.success) {
-                        lastUnlockedAt = Date.now();
-                        setPinUnlocked(true);
-                        setPinError('');
-                      }
-                    } catch (e) {}
-                  }
+                  setPinError('');
                 }}
                 onSubmitEditing={handlePinSubmit}
               />
