@@ -113,7 +113,7 @@ export default function OnboardingScreen() {
         }
         router.replace('/(tabs)');
       } else {
-        setError(t.incorrectPin);
+        setError(result.message || t.incorrectPin);
         setPin('');
       }
     } catch (e) {
