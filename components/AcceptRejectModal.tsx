@@ -7,8 +7,8 @@ import {
   ScrollView, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { formatAddress } from '../lib/formatters';
+import { getTranslation, Language } from '../lib/i18n';
 import { printOrder } from '../lib/printer';
-import { useLanguage } from '../lib/useLanguage';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -55,7 +55,20 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
   const [times, setTimes] = useState<number[]>([15, 20, 25, 30, 45, 60]);
   const [autoSettings, setAutoSettings] = useState<any>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const { t } = useLanguage();
+  const [modalLang, setModalLang] = useState<Language>('en');
+
+  useEffect(() => {
+    if (!visible) return;
+
+    AsyncStorage.getItem('app_language').then(async appLang => {
+      const fallbackLang = await AsyncStorage.getItem('language');
+      const rawLang = String(appLang || fallbackLang || 'en').toLowerCase();
+
+      setModalLang(rawLang === 'de' ? 'de' : 'en');
+    }).catch(() => {});
+  }, [visible]);
+
+  const t = getTranslation(modalLang);
 
   const isScheduled = order ? (
     !!order.orderable_order_time &&
