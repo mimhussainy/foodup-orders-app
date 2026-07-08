@@ -92,7 +92,7 @@ function getStatusLabel(status: string, t: any) {
 function getDeliveryStatusColor(claim: any, orderStatus?: string) {
   if (orderStatus === 'refunded') return '#e67e22';
   if (orderStatus === 'cancelled') return '#e74c3c';
-  if (!claim && orderStatus === 'kitchen') return '#00e5ff';
+  if (!claim && orderStatus === 'kitchen') return '#1976D2';
   if (!claim) return '#f39c12';
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   switch (status) {
@@ -1084,7 +1084,7 @@ const flatData: FlatItem[] = [
                     data={[
                       { key: 'today', label: t.today || 'Today', color: '#8B38CB' },
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
-                      { key: 'kitchen', label: t.kitchen || 'Kitchen', color: '#00e5ff' },
+                      { key: 'kitchen', label: t.kitchen || 'Kitchen', color: '#1976D2' },
                       { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
                       { key: 'in_bag', label: t.inBag, color: '#2980b9' },
                       { key: 'delivering', label: t.delivering, color: '#16a085' },
@@ -1262,10 +1262,10 @@ const flatData: FlatItem[] = [
                           e.stopPropagation();
                           moveOrderToKitchen(order);
                         }}
-                        style={{ backgroundColor: '#00e5ff20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        style={{ backgroundColor: '#E3F2FD', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
-                        <Ionicons name="arrow-forward" size={13} color="#00b8cc" />
-                        <Text style={{ color: '#00b8cc', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
+                        <Ionicons name="arrow-forward" size={13} color="#1565C0" />
+                        <Text style={{ color: '#1565C0', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
                           {t.kitchen || 'Kitchen'}
                         </Text>
                       </TouchableOpacity>
