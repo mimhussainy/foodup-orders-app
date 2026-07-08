@@ -606,6 +606,40 @@ useEffect(() => {
     return status;
   };
 
+  const shouldShowKitchenButton = (order: Order) => {
+    if (!canPrint) return false;
+
+    const currentStatus = getDeliveryStatus(order);
+    const acceptedData = acceptedTimes[String(order.order_id)];
+
+    if (!acceptedData) return false;
+    if (order.status === 'cancelled' || order.status === 'refunded') return false;
+    if (
+      currentStatus === 'kitchen' ||
+      currentStatus === 'in_bag' ||
+      currentStatus === 'delivering' ||
+      currentStatus === 'delivered' ||
+      currentStatus === 'pickedUp'
+    ) return false;
+
+    const at = acceptedData.accepted_time || '';
+    const isScheduledTime = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
+
+    if (!isScheduledTime) return true;
+
+    const parts = at.split('—');
+    if (parts.length < 2) return false;
+
+    const timePart = parts[0].trim();
+    const dateParts = parts[1].trim().split('/');
+    if (dateParts.length < 3) return false;
+
+    const scheduledMs = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}T${timePart}:00`).getTime();
+    if (!scheduledMs) return false;
+
+    return scheduledMs - Date.now() <= 60 * 60 * 1000;
+  };
+
   
 
   const filteredOrders = orders
@@ -1220,19 +1254,7 @@ const flatData: FlatItem[] = [
                       );
                     }
 
-                    const currentStatus = getDeliveryStatus(order);
-                    const hasAccepted = !!acceptedTimes[String(order.order_id)];
-
-                    if (!canPrint) return null;
-                    if (!hasAccepted) return null;
-                    if (order.status === 'cancelled' || order.status === 'refunded') return null;
-                    if (
-                      currentStatus === 'kitchen' ||
-                      currentStatus === 'in_bag' ||
-                      currentStatus === 'delivering' ||
-                      currentStatus === 'delivered' ||
-                      currentStatus === 'pickedUp'
-                    ) return null;
+                    if (!shouldShowKitchenButton(order)) return null;
 
                     return (
                       <TouchableOpacity
