@@ -509,6 +509,8 @@ useEffect(() => {
 
   const moveOrderToKitchen = async (order: Order) => {
     try {
+      if (!canPrint) return;
+
       const code = await AsyncStorage.getItem('restaurant_code') || '';
 
       await fetch(`${BACKEND_URL}/status-update`, {
@@ -1221,6 +1223,7 @@ const flatData: FlatItem[] = [
                     const currentStatus = getDeliveryStatus(order);
                     const hasAccepted = !!acceptedTimes[String(order.order_id)];
 
+                    if (!canPrint) return null;
                     if (!hasAccepted) return null;
                     if (order.status === 'cancelled' || order.status === 'refunded') return null;
                     if (
