@@ -51,10 +51,10 @@ export default function SettingsScreen() {
 
   const SOUNDS = [
     { key: 'default', label: t.default, icon: 'notifications-outline' },
-    { key: 'data_scanner', label: 'Data Scanner', icon: 'scan-outline' },
-    { key: 'security_alarm', label: 'Security Alarm', icon: 'shield-outline' },
-    { key: 'classic_alarm', label: 'Classic Alarm', icon: 'alarm-outline' },
-    { key: 'slot_machine', label: 'Slot Machine', icon: 'musical-notes-outline' },
+    { key: 'data_scanner', label: t.dataScanner, icon: 'scan-outline' },
+    { key: 'security_alarm', label: t.securityAlarm, icon: 'shield-outline' },
+    { key: 'classic_alarm', label: t.classicAlarm, icon: 'alarm-outline' },
+    { key: 'slot_machine', label: t.slotMachine, icon: 'musical-notes-outline' },
   ];
 
   const [role, setRole] = useState('');
@@ -740,7 +740,7 @@ const stopPreviewSound = async () => {
                             </Text>
                           </TouchableOpacity>
                         ) : (
-                          <Text style={{ fontSize: 12, color: '#e74c3c', marginTop: 2 }}>No phone set</Text>
+                          <Text style={{ fontSize: 12, color: '#e74c3c', marginTop: 2 }}>{t.noPhoneSet}</Text>
                         )}
                       </View>
 
@@ -797,7 +797,7 @@ const stopPreviewSound = async () => {
 
           {role === 'owner' && restaurantWebsite ? (
             <>
-              <Text style={styles.groupLabel}>Product Management</Text>
+              <Text style={styles.groupLabel}>{t.productManagement}</Text>
               <View style={styles.section}>
                 <TouchableOpacity
                   style={[styles.row, { borderBottomWidth: openSection === 'products' ? 1 : 0 }]}
@@ -807,13 +807,13 @@ const stopPreviewSound = async () => {
                   }}
                 >
                   <Ionicons name="fast-food-outline" size={18} color="#999" />
-                  <Text style={[styles.rowValue, { flex: 1 }]}>Manage Products</Text>
-                  {productsLoading && <Text style={{ color: '#999', fontSize: 13 }}>Loading...</Text>}
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{t.manageProducts}</Text>
+                  {productsLoading && <Text style={{ color: '#999', fontSize: 13 }}>{t.loading}</Text>}
                   <Text style={styles.chevron}>{openSection === 'products' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
                 {openSection === 'products' && (() => {
-                  const categories = [...new Set(products.map(p => p.category || 'Other'))];
+                  const categories = [...new Set(products.map(p => p.category || t.otherCategory))];
                   return categories.map((cat, ci) => {
                     const catProducts = products.filter(p => (p.category || 'Other') === cat);
                     const isOpen = openCategory === cat;
@@ -996,7 +996,7 @@ const stopPreviewSound = async () => {
 
             {openSection === 'about' && (
               <>
-                <Text style={styles.aboutTagline}>Online-Bestellsystem für Restaurants</Text>
+                <Text style={styles.aboutTagline}>{t.aboutTagline}</Text>
 
                 <TouchableOpacity style={styles.row} onPress={() => Linking.openURL('https://www.foodup.ch')}>
                   <Ionicons name="globe-outline" size={18} color="#999" />
@@ -1044,9 +1044,13 @@ const stopPreviewSound = async () => {
                   style={[styles.row, { borderBottomWidth: 1 }]}
                   onPress={async () => {
                     setChangingLanguage(true);
+                    await AsyncStorage.multiSet([
+                      ['app_language', 'en'],
+                      ['language', 'en'],
+                    ]);
                     await changeLanguage('en');
                     setChangingLanguage(false);
-                    setShowLanguage(false);
+                    setOpenSection(null);
                   }}
                 >
                   <Text style={styles.flagText}>🇬🇧</Text>
@@ -1065,9 +1069,13 @@ const stopPreviewSound = async () => {
                   style={[styles.row, { borderBottomWidth: 0 }]}
                   onPress={async () => {
                     setChangingLanguage(true);
+                    await AsyncStorage.multiSet([
+                      ['app_language', 'de'],
+                      ['language', 'de'],
+                    ]);
                     await changeLanguage('de');
                     setChangingLanguage(false);
-                    setShowLanguage(false);
+                    setOpenSection(null);
                   }}
                 >
                   <Text style={styles.flagText}>🇩🇪</Text>
@@ -1087,19 +1095,19 @@ const stopPreviewSound = async () => {
 
 {role === 'owner' && (
             <>
-              <Text style={styles.groupLabel}>Acceptance Times</Text>
+              <Text style={styles.groupLabel}>{t.acceptanceTimes}</Text>
               <View style={styles.section}>
                 <TouchableOpacity
                   style={[styles.row, { borderBottomWidth: openSection === 'acceptanceTimes' ? 1 : 0 }]}
                   onPress={() => toggleSection('acceptanceTimes')}
                 >
                   <Ionicons name="time-outline" size={18} color="#999" />
-                  <Text style={[styles.rowValue, { flex: 1 }]}>Acceptance Times</Text>
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{t.acceptanceTimes}</Text>
                   <Text style={styles.chevron}>{openSection === 'acceptanceTimes' ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
                 {openSection === 'acceptanceTimes' && <View style={{ paddingVertical: 14 }}>
                   <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
-                    Set the time options shown when accepting orders
+                    {t.acceptanceTimesSub}
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                     {acceptanceTimes.map((time, i) => (
@@ -1126,7 +1134,7 @@ const stopPreviewSound = async () => {
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <TextInput
                       style={[styles.input, { flex: 1, marginTop: 0 }]}
-                      placeholder="Add time (e.g. 20)"
+                      placeholder={t.addTimePlaceholder}
                       placeholderTextColor={Platform.OS === 'ios' ? '#ADADAD' : '#C0C0C0'}
                       keyboardType="numeric"
                       value={newAcceptanceTime}
@@ -1152,7 +1160,7 @@ const stopPreviewSound = async () => {
                         }
                       }}
                     >
-                      <Text style={{ color: '#fff', fontWeight: '600' }}>Add</Text>
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>{t.add}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>}
@@ -1198,7 +1206,7 @@ const stopPreviewSound = async () => {
 
           {role === 'owner' && Platform.OS === 'android' && (
             <>
-              <Text style={styles.groupLabel}>Printer</Text>
+              <Text style={styles.groupLabel}>{t.printer}</Text>
               <View style={styles.section}>
                 <TouchableOpacity
                   onPress={checkPrinterPairing}
@@ -1207,7 +1215,7 @@ const stopPreviewSound = async () => {
                 >
                   <Ionicons name="print-outline" size={18} color="#111" />
                   <Text style={{ fontSize: 15, fontWeight: '600', color: '#111' }}>
-                    {checkingPrinter ? 'Checking...' : 'Check Printer Pairing'}
+                    {checkingPrinter ? t.checking : t.checkPrinterPairing}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1216,7 +1224,7 @@ const stopPreviewSound = async () => {
 
           {Platform.OS === 'android' && deviceId ? (
             <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 8 }}>
-              Device ID: {deviceId}
+              {t.deviceId}: {deviceId}
             </Text>
           ) : null}
           <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 4 }}>v1.0.0 — build bc20cba</Text>

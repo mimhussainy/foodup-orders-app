@@ -118,6 +118,18 @@ function getDeliveryStatusLabel(claim: any, item: any, t: any) {
   }
 }
 
+function formatAcceptedTimeCompact(value: string) {
+  const text = String(value || '').trim();
+
+  if (!text) return '';
+  if (text.includes('—')) return text;
+
+  const match = text.match(/^(\d+)\s*(minutes|minuten|min|m)?$/i);
+  if (!match) return text;
+
+  return `${match[1]}m`;
+}
+
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
@@ -792,7 +804,7 @@ const flatData: FlatItem[] = [
                   if (!scheduledMs) return null;
                   return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
                 }
-                return <OrderCountdown accepted_at={acceptedTimes[String(selectedOrder.order_id)].accepted_at} accepted_time={at} />;
+                return <OrderCountdown accepted_at={acceptedTimes[String(selectedOrder.order_id)].accepted_at} accepted_time={formatAcceptedTimeCompact(at)} />;
               })()}
               {(() => {
                 if (selectedOrder.status === 'cancelled' || selectedOrder.status === 'refunded') {
@@ -847,7 +859,7 @@ const flatData: FlatItem[] = [
                     <>
                       <View style={styles.row}>
                         <Ionicons name="flash-outline" size={14} color="#8B38CB" />
-                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB' }]}>Auto accepted: {autoPrintOrders[String(selectedOrder.order_id)].accepted_time}</Text>
+                        <Text style={[styles.rowValue, { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB' }]}>Auto accepted: {formatAcceptedTimeCompact(autoPrintOrders[String(selectedOrder.order_id)].accepted_time)}</Text>
                       </View>
                       <View style={styles.divider} />
                     </>
@@ -1204,7 +1216,7 @@ const flatData: FlatItem[] = [
                     if (!scheduledMs) return null;
                     return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
                   }
-                  return <OrderCountdown accepted_at={acceptedTimes[String(order.order_id)].accepted_at} accepted_time={at} />;
+                  return <OrderCountdown accepted_at={acceptedTimes[String(order.order_id)].accepted_at} accepted_time={formatAcceptedTimeCompact(at)} />;
                 })()}
                 {(() => {
                     const status = getDeliveryStatus(order);

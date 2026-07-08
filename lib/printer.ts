@@ -14,11 +14,29 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     let logoHtml = '';
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
-      const profileRes = await fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`);
-      const profileData = await profileRes.json();
-      const logoUrl = profileData?.profile?.print_logo_url;
-      if (logoUrl) {
-        logoHtml = `<img src="${logoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
+      const cacheKey = `foodup_print_logo_url_${code}`;
+      const cachedLogoUrl = await AsyncStorage.getItem(cacheKey);
+
+      if (cachedLogoUrl) {
+        logoHtml = `<img src="${cachedLogoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
+
+        fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`)
+          .then(r => r.json())
+          .then(async profileData => {
+            const freshLogoUrl = profileData?.profile?.print_logo_url || '';
+            if (freshLogoUrl) {
+              await AsyncStorage.setItem(cacheKey, freshLogoUrl);
+            }
+          })
+          .catch(() => {});
+      } else {
+        const profileRes = await fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`);
+        const profileData = await profileRes.json();
+        const logoUrl = profileData?.profile?.print_logo_url;
+        if (logoUrl) {
+          await AsyncStorage.setItem(cacheKey, logoUrl);
+          logoHtml = `<img src="${logoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
+        }
       }
     } catch (e) {}
 

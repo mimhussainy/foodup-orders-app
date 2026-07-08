@@ -197,7 +197,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           const mins = parseInt(acceptTime);
           printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
         }
-      }, 2000);
+      }, 300);
     } catch (e) {
       setLoading(false);
     }
