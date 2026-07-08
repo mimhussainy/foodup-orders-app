@@ -91,6 +91,8 @@ function getStatusLabel(status: string, t: any) {
 
 function getDeliveryStatusColor(claim: any, orderStatus?: string) {
   if (orderStatus === 'refunded') return '#e67e22';
+  if (orderStatus === 'cancelled') return '#e74c3c';
+  if (!claim && orderStatus === 'kitchen') return '#f39c12';
   if (!claim) return '#f39c12';
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   switch (status) {
@@ -104,6 +106,7 @@ function getDeliveryStatusColor(claim: any, orderStatus?: string) {
 function getDeliveryStatusLabel(claim: any, item: any, t: any) {
   if (item.status === 'refunded') return t.refunded;
   if (item.status === 'cancelled') return t.cancelled;
+  if (!claim && item.status === 'kitchen') return t.kitchen || 'Kitchen';
   if (!claim) return t.newOrder;
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   const isPickup = item.shipping_method === 'Abholung' || item.shipping_method?.toLowerCase().includes('pickup');
@@ -474,7 +477,7 @@ useEffect(() => {
           setPendingDecisionOrders(prev => prev.filter(id => id !== newOrder.order_id));
           setOrders(prev => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
-            if (exists >= 0 && data.status === 'cancelled') {
+            if (exists >= 0 && data.status) {
               const updated = [...prev];
               updated[exists] = { ...updated[exists], status: data.status };
               return updated;
@@ -503,6 +506,60 @@ useEffect(() => {
     await fetchClaims();
     setTimeout(() => setRefreshing(false), 500);
   };
+
+  const moveOrderToKitchen = async (order: Order) => {
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+      await fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'kitchen',
+          customer_name: order.customer_name || '',
+          customer_email: order.customer_email || '',
+          customer_phone: order.customer_phone || '',
+          total: order.total || '',
+          currency: order.currency || 'CHF',
+          items: order.items || [],
+          payment_method: order.payment_method || '',
+          note: order.note || '',
+          shipping: {
+            method: order.shipping_method || '',
+            address: order.shipping_address || '',
+          },
+          event_type: 'status_update',
+          sound: false,
+        }),
+      });
+
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        fetch(`${baseUrl}/wp-json/foodup/v1/order-kitchen`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id }),
+        }).catch(() => {});
+      }
+
+      const updatedOrder = { ...order, status: 'kitchen' };
+
+      setOrders(prev => prev.map(o =>
+        o.order_id === order.order_id ? updatedOrder : o
+      ));
+
+      setSelectedOrder(prev =>
+        prev && prev.order_id === order.order_id ? updatedOrder : prev
+      );
+    } catch (e) {}
+  };
+
+
 
   const loadPickupReadyOrders = async () => {
     const stored = await AsyncStorage.getItem('pickup_ready_orders');
@@ -537,6 +594,7 @@ useEffect(() => {
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
     if (order.status === 'cancelled' || order.status === 'refunded') return 'cancelled';
+    if (order.status === 'kitchen' && !claim) return 'kitchen';
     // Orders placed today before 03:00 are treated as done
     if (isTodayBeforeThreeAM(order.timestamp) && !claim) return 'delivered';
     if (!claim) return 'new';
@@ -557,10 +615,12 @@ useEffect(() => {
         return new Date(o.timestamp) >= todayStart;
       }
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
+      if (filter === 'kitchen') return getDeliveryStatus(o) === 'kitchen';
       if (filter === 'auto') return !!autoPrintOrders[String(o.order_id)];
       return filter === 'all' || getDeliveryStatus(o) === filter;
     })
     .filter(o => {
+      if (filter !== 'all') return true;
       if (!search.trim()) return true;
       const s = search.toLowerCase();
       return (
@@ -582,7 +642,7 @@ type FlatItem = { type: 'storeStatus' } | { type: 'searchBar' } | { type: 'filte
 
 const flatData: FlatItem[] = [
   { type: 'storeStatus' },
-  { type: 'searchBar' },
+  ...(filter === 'all' ? [{ type: 'searchBar' as const }] : []),
   { type: 'filterTabs' },
   ...sections.flatMap(section => [
     { type: 'header' as const, title: section.title },
@@ -597,6 +657,7 @@ const flatData: FlatItem[] = [
   const filterCounts = {
     new: todayOrders.filter(o => getDeliveryStatus(o) === 'new').length,
     scheduled: todayOrders.filter(o => isScheduledOrder(o) && o.status !== 'cancelled').length,
+    kitchen: todayOrders.filter(o => getDeliveryStatus(o) === 'kitchen').length,
     in_bag: todayOrders.filter(o => getDeliveryStatus(o) === 'in_bag').length,
     delivering: todayOrders.filter(o => getDeliveryStatus(o) === 'delivering').length,
     delivered: todayOrders.filter(o => getDeliveryStatus(o) === 'delivered').length,
@@ -842,6 +903,7 @@ const flatData: FlatItem[] = [
               </>
             )}
 
+
             {/* ── MARK DELIVERED / PICKUP BUTTON ── */}
             {(() => {
               const claim = claims[String(selectedOrder.order_id)];
@@ -959,7 +1021,7 @@ const flatData: FlatItem[] = [
           data={flatData}
           keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
           contentContainerStyle={styles.scrollContent}
-          stickyHeaderIndices={[2]}
+          stickyHeaderIndices={[filter === 'all' ? 2 : 1]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
           }
@@ -987,6 +1049,7 @@ const flatData: FlatItem[] = [
                       { key: 'today', label: t.today || 'Today', color: '#8B38CB' },
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
                       { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
+                      { key: 'kitchen', label: t.kitchen || 'Kitchen', color: '#f39c12' },
                       { key: 'in_bag', label: t.inBag, color: '#2980b9' },
                       { key: 'delivering', label: t.delivering, color: '#16a085' },
                       { key: 'delivered', label: t.delivered, color: '#2fc053' },
@@ -999,7 +1062,10 @@ const flatData: FlatItem[] = [
                     contentContainerStyle={{ paddingLeft: 10, paddingRight: 8, gap: 5, alignItems: 'center', paddingVertical: 10 }}
                     renderItem={({ item: f }) => (
                       <TouchableOpacity
-                        onPress={() => setFilter(f.key)}
+                        onPress={() => {
+                          setFilter(f.key);
+                          if (f.key !== 'all') setSearch('');
+                        }}
                         style={{ paddingLeft: 8, paddingRight: 5, paddingVertical: 5, borderRadius: 6, backgroundColor: filter === f.key ? f.color : f.key === 'all' ? '#F5F5F5' : f.color + '20', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
                         <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
@@ -1128,24 +1194,58 @@ const flatData: FlatItem[] = [
                       <Text style={styles.orderShipping}>{order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}</Text>
                     </View>
                   ) : <View />}
-                  {claims[String(order.order_id)] ? (
-                    <View style={styles.orderMeta}>
-                      {(() => {
-                        const claim = claims[String(order.order_id)];
-                        const raw = typeof claim === 'string' ? claim : claim.name;
-                        if (raw === 'Owner' || raw === '__owner__') return null;
-                        const name = (() => { if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp; return raw; })();
-                        const status = typeof claim === 'string' ? 'delivering' : claim.status;
-                        const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
-                        return (
-                          <>
-                            <Ionicons name={status === 'delivered' ? 'checkmark-circle-outline' : status === 'delivering' ? 'car-outline' : 'bag-outline'} size={14} color={color} />
-                            <Text style={[styles.courierName, { color: '#111' }]}>{name}</Text>
-                          </>
-                        );
-                      })()}
-                    </View>
-                  ) : null}
+
+                  {(() => {
+                    const claim = claims[String(order.order_id)];
+
+                    if (claim) {
+                      const raw = typeof claim === 'string' ? claim : claim.name;
+                      if (raw === 'Owner' || raw === '__owner__') return null;
+
+                      const name = (() => {
+                        if (raw === 'Abgeholt' || raw === 'Picked Up' || raw === '__pickup__') return t.pickedUp;
+                        return raw;
+                      })();
+
+                      const status = typeof claim === 'string' ? 'delivering' : claim.status;
+                      const color = status === 'delivered' ? '#2fc053' : status === 'delivering' ? '#16a085' : '#2980b9';
+
+                      return (
+                        <View style={styles.orderMeta}>
+                          <Ionicons name={status === 'delivered' ? 'checkmark-circle-outline' : status === 'delivering' ? 'car-outline' : 'bag-outline'} size={14} color={color} />
+                          <Text style={[styles.courierName, { color: '#111' }]} numberOfLines={1}>{name}</Text>
+                        </View>
+                      );
+                    }
+
+                    const currentStatus = getDeliveryStatus(order);
+                    const hasAccepted = !!acceptedTimes[String(order.order_id)];
+
+                    if (!hasAccepted) return null;
+                    if (order.status === 'cancelled' || order.status === 'refunded') return null;
+                    if (
+                      currentStatus === 'kitchen' ||
+                      currentStatus === 'in_bag' ||
+                      currentStatus === 'delivering' ||
+                      currentStatus === 'delivered' ||
+                      currentStatus === 'pickedUp'
+                    ) return null;
+
+                    return (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          moveOrderToKitchen(order);
+                        }}
+                        style={{ backgroundColor: '#f39c12', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      >
+                        <Ionicons name="arrow-forward" size={13} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
+                          {t.kitchen || 'Kitchen'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
               </TouchableOpacity>
             );
@@ -1170,6 +1270,8 @@ const flatData: FlatItem[] = [
         }}
         onDecisionMade={(orderId: number) => {
           setPendingDecisionOrders(prev => prev.filter(id => id !== orderId));
+          const order = orders.find(o => o.order_id === orderId);
+          if (order) fetchAcceptedTimes([order]);
         }}
       />
     </View>
