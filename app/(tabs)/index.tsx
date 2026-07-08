@@ -1262,10 +1262,10 @@ const flatData: FlatItem[] = [
                           e.stopPropagation();
                           moveOrderToKitchen(order);
                         }}
-                        style={{ backgroundColor: '#f39c12', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        style={{ backgroundColor: '#f39c1220', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       >
-                        <Ionicons name="arrow-forward" size={13} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
+                        <Ionicons name="arrow-forward" size={13} color="#f39c12" />
+                        <Text style={{ color: '#f39c12', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
                           {t.kitchen || 'Kitchen'}
                         </Text>
                       </TouchableOpacity>
