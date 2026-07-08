@@ -27,15 +27,22 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
 
     let itemsHtml = '';
     items.forEach((item: any) => {
-      if (item.category) {
-        itemsHtml += `
-        <tr>
-          <td colspan="2" style="font-size:16px; font-weight:500; color:#333; padding-top:8px;"><b>${item.category.split(' - ')[0]}</b>${item.category.includes(' - ') ? ' - ' + item.category.split(' - ')[1] : ''}</td>
-        </tr>`;
-      }
+      const categoryText = String(item.category || '').trim();
+
+      const pizzaSizeMatch = categoryText.match(/(?:Ø\s*)?(\d+)\s*cm/i);
+      const pizzaSize = pizzaSizeMatch ? `${pizzaSizeMatch[1]}cm` : '';
+
+      const itemName = String(item.name || '').trim();
+      const itemNameLower = itemName.toLowerCase();
+      const pizzaSizeLower = pizzaSize.toLowerCase();
+
+      const displayName = pizzaSize && !itemNameLower.includes(pizzaSizeLower)
+        ? `${itemName} ${pizzaSize}`
+        : itemName;
+
       itemsHtml += `
         <tr>
-          <td style="text-align:left; padding: 0; font-size:18px; font-weight:bold;">${item.quantity}x ${item.name}</td>
+          <td style="text-align:left; padding: 0; font-size:18px; font-weight:bold;">${item.quantity}x ${displayName}</td>
           <td style="text-align:right; padding: 0; font-size:18px; font-weight:bold; white-space:nowrap;">${parseFloat(String(item.total || '0')).toFixed(2)}</td>
         </tr>`;
       if (item.addons && item.addons.length > 0) {

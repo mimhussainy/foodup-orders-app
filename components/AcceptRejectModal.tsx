@@ -12,7 +12,7 @@ import { useLanguage } from '../lib/useLanguage';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
-async function scheduleScheduledOrderReminder(order: any, acceptTime: string) {
+async function scheduleScheduledOrderReminder(order: any, acceptTime: string, t: any) {
   try {
     const parts = acceptTime.split('—');
     if (parts.length < 2) return;
@@ -26,8 +26,8 @@ async function scheduleScheduledOrderReminder(order: any, acceptTime: string) {
     const secondsUntilReminder = Math.floor((reminderMs - now) / 1000);
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: '⏰ Scheduled Order Reminder',
-        body: `Order #${order.order_id} for ${order.customer_name} is due in 30 minutes! (${timePart})`,
+        title: `⏰ ${t.scheduledOrderReminder}`,
+        body: `${t.orderNumber} #${order.order_id} ${t.scheduledReminderFor} ${order.customer_name} ${t.scheduledReminderDue} (${timePart})`,
         sound: true,
       },
       trigger: {
@@ -179,7 +179,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
         if (isScheduledTime) {
           printOrder(order, undefined, false, '', acceptTime).catch(() => {});
-          scheduleScheduledOrderReminder(order, acceptTime).catch(() => {});
+          scheduleScheduledOrderReminder(order, acceptTime, t).catch(() => {});
         } else {
           const mins = parseInt(acceptTime);
           printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
@@ -263,7 +263,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
-      const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} Minutes`;
+      const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
       fetch(`${BACKEND_URL}/accepted-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -291,7 +291,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       setTimeout(() => {
         if (isScheduled) {
           printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
-          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`).catch(() => {});
+          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t).catch(() => {});
         } else {
           printOrder(order, selectedTime).catch(() => {});
         }
@@ -378,7 +378,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           {step === 'main' && (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>Order #{order.order_id}</Text>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>{t.orderNumber} #{order.order_id}</Text>
                 {countdown !== null && autoSettings && showCountdown && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="hourglass-outline" size={18} color={countdown < 60 ? '#e74c3c' : '#f39c12'} />
