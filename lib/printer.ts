@@ -45,17 +45,18 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
 
     let itemsHtml = '';
     items.forEach((item: any) => {
-      const categoryText = String(item.category || '').trim();
+      const itemName = String(item.name || '').trim();
+      const variationText = String(item.variation || '').trim();
 
-      const pizzaSizeMatch = categoryText.match(/(?:Ø\s*)?(\d+)\s*cm/i);
+      const pizzaSizeMatch = variationText.match(/(?:Ø\s*)?(\d{2,3})\s*cm/i);
       const pizzaSize = pizzaSizeMatch ? `${pizzaSizeMatch[1]}cm` : '';
 
-      const itemName = String(item.name || '').trim();
-      const itemNameLower = itemName.toLowerCase();
-      const pizzaSizeLower = pizzaSize.toLowerCase();
+      const itemNameHasPizzaSize = pizzaSize
+        ? itemName.replace(/\s+/g, '').toLowerCase().includes(pizzaSize.toLowerCase())
+        : false;
 
-      const displayName = pizzaSize && !itemNameLower.includes(pizzaSizeLower)
-        ? `${itemName} ${pizzaSize}`
+      const displayName = pizzaSize && !itemNameHasPizzaSize
+        ? `${pizzaSize} ${itemName}`
         : itemName;
 
       itemsHtml += `
