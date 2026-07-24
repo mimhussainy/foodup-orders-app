@@ -5,12 +5,11 @@ import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler, Platform, StatusBar, View } from 'react-native';
+import { BackHandler, Platform, StatusBar, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
-import { isPickupMethod } from '../lib/orderUtils';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -131,18 +130,9 @@ export default function RootLayout() {
   const modalOpenRef = useRef(false);
 
   const debugLog = (message: string) => {
+    // Production diagnostics stay on the device. Routine UI events no longer
+    // create a Render request plus Redis writes through POST /log.
     console.log(`[DBG] ${message}`);
-    const shouldSendToBackend = ['SRC:', 'DROP', 'SHOW', 'QUEUED', 'SKIP_DUP', 'ENQUEUE', 'PAYLOAD'].some(keyword => message.includes(keyword));
-    if (shouldSendToBackend) {
-      AsyncStorage.getItem('restaurant_code').then(code => {
-        if (!code) return;
-        fetch(`${BACKEND_URL}/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, restaurant_code: code }),
-        }).catch(() => {});
-      }).catch(() => {});
-    }
   };
 
   useEffect(() => {
@@ -168,45 +158,54 @@ export default function RootLayout() {
     }, 400);
   };
 
-  const enqueueOrder = (order: any, withCountdown: boolean, fromNotification: boolean = false) => {
+  const enqueueOrder = async (order: any, withCountdown: boolean, fromNotification: boolean = false) => {
     if (fromNotification && order.timestamp) {
       const ageMin = Math.floor((Date.now() - order.timestamp) / 60000);
       if (ageMin > 15) {
         debugLog(`DROP old notification order:${order.order_id} age_min:${ageMin}`);
-        AsyncStorage.getItem('pending_decision').then(stored => {
-          const list: number[] = stored ? JSON.parse(stored) : [];
-          const updated = list.filter(id => id !== order.order_id);
-          if (updated.length !== list.length) {
-            AsyncStorage.setItem('pending_decision', JSON.stringify(updated)).catch(() => {});
-            AsyncStorage.setItem('pending_decision_refresh', String(Date.now())).catch(() => {});
-          }
-        }).catch(() => {});
+        const stored = await AsyncStorage.getItem('pending_decision').catch(() => null);
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        const updated = list.filter(id => id !== order.order_id);
+        if (updated.length !== list.length) {
+          await AsyncStorage.setItem('pending_decision', JSON.stringify(updated)).catch(() => {});
+          await AsyncStorage.setItem('pending_decision_refresh', String(Date.now())).catch(() => {});
+        }
         return;
       }
     }
-    AsyncStorage.getItem('pending_decision').then(stored => {
-      debugLog(`ENQUEUE order:${order.order_id} pending:${JSON.stringify(stored ? JSON.parse(stored) : [])}`);
-    }).catch(() => {});
-    AsyncStorage.getItem('restaurant_code').then(async code => {
-      if (!code) return;
+
+    // A delayed notification must never reopen an order that the server already
+    // knows was accepted. Do this check before touching the modal queue.
+    const code = await AsyncStorage.getItem('restaurant_code').catch(() => '') || '';
+    if (code) {
       try {
         const res = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
         const result = await res.json();
-        debugLog(`ENQUEUE order:${order.order_id} server_accepted:${result.accepted_time || 'none'}`);
+        if (result.success && result.accepted_time) {
+          debugLog(`DROP accepted order:${order.order_id}`);
+          const stored = await AsyncStorage.getItem('pending_decision').catch(() => null);
+          const list: number[] = stored ? JSON.parse(stored) : [];
+          const updated = list.filter(id => id !== order.order_id);
+          await AsyncStorage.setItem('pending_decision', JSON.stringify(updated)).catch(() => {});
+          await AsyncStorage.setItem('pending_decision_refresh', String(Date.now())).catch(() => {});
+          return;
+        }
       } catch (e) {
-        debugLog(`ENQUEUE order:${order.order_id} server_check_failed`);
+        // Push delivery must still work if this safety check temporarily fails.
       }
-    }).catch(() => {});
+    }
+
     if (modalOpenRef.current) {
       const alreadyQueued = orderQueueRef.current.some(q => q.order.order_id === order.order_id);
       if (!alreadyQueued) {
         orderQueueRef.current.push({ order, showCountdown: withCountdown });
-        debugLog(`QUEUED order:${order.order_id} queue:${JSON.stringify(orderQueueRef.current.map(q => q.order.order_id))}`);
+        debugLog(`QUEUED order:${order.order_id}`);
       } else {
         debugLog(`SKIP_DUP order:${order.order_id}`);
       }
       return;
     }
+
     debugLog(`SHOW order:${order.order_id}`);
     modalOpenRef.current = true;
     setNewOrderModal(order);
@@ -214,47 +213,7 @@ export default function RootLayout() {
     setShowCountdown(withCountdown);
   };
 
-  const autoMarkOldOrdersDelivered = async () => {
-    try {
-      const code = await AsyncStorage.getItem('restaurant_code') || '';
-      const role = await AsyncStorage.getItem('user_role') || '';
-      if (!code || role !== 'owner') return;
 
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-
-      const [ordersRes, claimsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
-        fetch(`${BACKEND_URL}/claims/${code}`).then(r => r.json()).catch(() => ({})),
-      ]);
-
-      if (!ordersRes.success) return;
-
-      const claims = claimsRes.success ? claimsRes.claims : {};
-
-      for (const order of ordersRes.orders) {
-        if (order.status === 'cancelled' || order.status === 'completed' || order.status === 'refunded' || order.status === 'failed') continue;
-
-        const orderDate = new Date(order.received_at || order.date_created || '');
-        if (isNaN(orderDate.getTime())) continue;
-        if (orderDate >= todayStart) continue;
-
-        const claim = claims[String(order.order_id)];
-        if (claim && claim.status === 'delivered') continue;
-        if (claim && (claim.status === 'in_bag' || claim.status === 'delivering')) continue;
-
-        const isPickup = isPickupMethod(order.shipping?.method);
-        const deliveryName = isPickup ? '__pickup__' : '__owner__';
-
-        await fetch(`${BACKEND_URL}/mark-delivered`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: order.order_id, delivery_name: deliveryName, restaurant_code: code }),
-        }).catch(() => {});
-
-        console.log(`Auto marked old order ${order.order_id} as ${isPickup ? 'picked up' : 'delivered'}`);
-      }
-    } catch (e) {}
-  };
 
   const checkUserRole = async () => {
     try {
@@ -266,7 +225,6 @@ export default function RootLayout() {
       }
       if (role === 'owner') {
         registerForPushNotifications();
-        autoMarkOldOrdersDelivered();
       }
       setTimeout(() => {
         router.replace('/(tabs)');
@@ -301,125 +259,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     checkUserRole();
-
-    const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
-      if (nextState === 'active') {
-        autoMarkOldOrdersDelivered();
-        const code = await AsyncStorage.getItem('restaurant_code') || '';
-        const role = await AsyncStorage.getItem('user_role') || '';
-        debugLog(`SRC:AppState-wake code:${code || 'none'} role:${role || 'none'}`);
-        if (!code || role !== 'owner') return;
-        const debugStored = await AsyncStorage.getItem('pending_decision');
-        console.log(`[pending_decision] ON RESUME:`, debugStored ? JSON.parse(debugStored) : []);
-        try {
-          debugLog(`SRC:AppState-before-fetch code:${code}`);
-          const response = await fetch(`${BACKEND_URL}/orders/${code}`);
-          debugLog(`SRC:AppState-after-fetch status:${response.status}`);
-          const result = await response.json();
-          debugLog(`SRC:orders-list ${result.orders ? result.orders.slice(0,5).map((o: any) => `${o.order_id}:${o.status}`).join(',') : 'no-orders'}`);
-          if (result.success && result.orders && result.orders.length > 0) {
-            // Always update last_seen_order_id to newest order
-            await AsyncStorage.setItem('last_seen_order_id', String(result.orders[0].order_id));
-
-            // Scan all recent orders for one that needs a decision
-            let orderToShow = null;
-            const claimsRes = await fetch(`${BACKEND_URL}/claims/${code}`).catch(() => null);
-            const claimsResult = claimsRes ? await claimsRes.json().catch(() => ({})) : {};
-            for (const candidate of result.orders.slice(0, 20)) {
-              if (candidate.status === 'cancelled' || candidate.status === 'completed') continue;
-              try {
-                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${candidate.order_id}`);
-                const acceptedResult = await acceptedRes.json();
-                if (acceptedResult.success && acceptedResult.accepted_time) continue;
-              } catch(e) {}
-              // Skip if already delivered
-              if (claimsResult.success && claimsResult.claims?.[String(candidate.order_id)]?.status === 'delivered') continue;
-              orderToShow = candidate;
-              break;
-            }
-
-            // For orders already accepted (auto or manual), restore auto_print key if missing
-            for (const candidate of result.orders.slice(0, 20)) {
-              try {
-                const existing = await AsyncStorage.getItem(`auto_print_${candidate.order_id}`);
-                if (existing) continue;
-                const autoRes = await fetch(`${BACKEND_URL}/check-auto-accepted/${code}/${candidate.order_id}`);
-                const autoResult = await autoRes.json();
-                if (!autoResult.auto_accepted) continue;
-                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${candidate.order_id}`);
-                const acceptedResult = await acceptedRes.json();
-                if (!acceptedResult.success || !acceptedResult.accepted_time) continue;
-                await AsyncStorage.setItem(`auto_print_${candidate.order_id}`, JSON.stringify({
-                  accepted_time: acceptedResult.accepted_time,
-                  order_id: candidate.order_id,
-                  customer_name: candidate.customer_name || '',
-                  customer_email: candidate.customer_email || '',
-                  customer_phone: candidate.customer_phone || '',
-                  total: String(candidate.total || ''),
-                  currency: candidate.currency || 'CHF',
-                  payment_method: candidate.payment_method || '',
-                  note: candidate.note || '',
-                  shipping_method: candidate.shipping?.method || '',
-                  shipping_address: candidate.shipping?.address || '',
-                  orderable_order_time: candidate.orderable_order_time || '',
-                  orderable_order_date: candidate.orderable_order_date || '',
-                  date_created: candidate.date_created || '',
-                  items: typeof candidate.items === 'string' ? candidate.items : JSON.stringify(candidate.items || []),
-                }));
-                await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
-                debugLog(`SRC:AppState-resume restored auto_print for order:${candidate.order_id}`);
-              } catch(e) {}
-            }
-
-            if (!orderToShow) {
-              debugLog(`SRC:AppState-resume no-pending-orders scanned:${Math.min(result.orders.length, 20)}`);
-            } else {
-              debugLog(`SRC:AppState-resume found order:${orderToShow.order_id} status:${orderToShow.status} action:ENQUEUE`);
-              if (Platform.OS !== 'ios') {
-                AsyncStorage.getItem('pending_decision').then(stored => {
-                  const list: number[] = stored ? JSON.parse(stored) : [];
-                  if (!list.includes(parseInt(orderToShow.order_id))) {
-                    list.push(parseInt(orderToShow.order_id));
-                    AsyncStorage.setItem('pending_decision', JSON.stringify(list));
-                  }
-                }).catch(() => {});
-              }
-              debugLog(`SRC:AppState order:${orderToShow.order_id}`);
-              enqueueOrder({
-                order_id: parseInt(orderToShow.order_id),
-                customer_name: orderToShow.customer_name || '',
-                customer_email: orderToShow.customer_email || '',
-                customer_phone: orderToShow.customer_phone || '',
-                total: String(orderToShow.total || ''),
-                currency: orderToShow.currency || 'CHF',
-                status: orderToShow.status || '',
-                event_type: 'new_order',
-                items: orderToShow.items || [],
-                payment_method: orderToShow.payment_method || '',
-                note: orderToShow.note || '',
-                date: orderToShow.date_created ? formatDate(orderToShow.date_created) : formatDate(new Date().toISOString()),
-                timestamp: orderToShow.date_created ? wcDateToMs(orderToShow.date_created) : Date.now(),
-                shipping_method: orderToShow.shipping?.method || '',
-                shipping_address: orderToShow.shipping?.address || '',
-                restaurant_code: orderToShow.restaurant_code || '',
-                orderable_order_date: orderToShow.orderable_order_date || '',
-                orderable_order_time: orderToShow.orderable_order_time || '',
-              }, true);
-              setTimeout(() => {
-                fetch(`${BACKEND_URL}/accepted-time/${code}/${orderToShow.order_id}`)
-                  .then(r => r.json())
-                  .then(r => {
-                    if (r.success && r.accepted_time) {
-                      setShowOrderModal(false);
-                      setNewOrderModal(null);
-                    }
-                  }).catch(() => {});
-              }, 3000);
-            }
-          }
-        } catch (e) {}
-      }
-    });
 
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
       const data = notification.request.content.data as any;
@@ -459,13 +298,6 @@ export default function RootLayout() {
             debugLog(`DROP cross-restaurant notification order:${data.order_id} from:${incomingCode} current:${currentCode}`);
             return;
           }
-          // Check if already accepted before showing modal
-          try {
-            const code = currentCode;
-            const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${data.order_id}`);
-            const acceptedResult = await acceptedRes.json();
-            if (acceptedResult.success && acceptedResult.accepted_time) return;
-          } catch(e) {}
           const newOrder = {
             order_id: parseInt(data.order_id),
             customer_name: data.customer_name || '',
@@ -565,7 +397,6 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
       tapSubscription.remove();
-      appStateSubscription.remove();
     };
   }, []);
 

@@ -6,7 +6,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  AppState,
   BackHandler,
   FlatList,
   Image,
@@ -178,8 +177,10 @@ useEffect(() => {
 
   useFocusEffect(
     useCallback(() => {
+      // One synchronization when the Orders tab gains focus.
       fetchOrdersFromBackend();
       fetchClaims();
+      fetchStoreStatus();
       loadAutoPrintOrders();
       loadPendingDecision();
       setTimeout(() => {
@@ -203,62 +204,10 @@ useEffect(() => {
     AsyncStorage.getItem('user_role').then(r => {
       setRole(r);
     });
-    fetchOrdersFromBackend();
-    fetchClaims();
-    fetchStoreStatus();
     checkPrintPermission();
 
-    const appStateSubscription = AppState.addEventListener('change', async (nextState) => {
-      if (nextState === 'active') {
-        fetchOrdersFromBackend();
-        fetchClaims();
-        fetchStoreStatus();
-        loadAutoPrintOrders();
-        loadPendingDecision();
-        // Check for background auto-accepts
-        try {
-          const code = await AsyncStorage.getItem('restaurant_code') || '';
-          if (!code) return;
-          const ordersRes = await fetch(`${BACKEND_URL}/orders/${code}`);
-          const ordersResult = await ordersRes.json();
-          if (ordersResult.success) {
-            for (const o of ordersResult.orders.slice(0, 10)) {
-              const existing = await AsyncStorage.getItem(`auto_print_${o.order_id}`);
-              if (existing) continue;
-              const autoRes = await fetch(`${BACKEND_URL}/check-auto-accepted/${code}/${o.order_id}`);
-              const autoResult = await autoRes.json();
-              if (autoResult.auto_accepted) {
-                const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${o.order_id}`);
-                const acceptedResult = await acceptedRes.json();
-                const printData = {
-                  accepted_time: acceptedResult.accepted_time || '',
-                  order_id: o.order_id,
-                  customer_name: o.customer_name || '',
-                  customer_email: o.customer_email || '',
-                  customer_phone: o.customer_phone || '',
-                  total: String(o.total || ''),
-                  currency: o.currency || 'CHF',
-                  payment_method: o.payment_method || '',
-                  note: o.note || '',
-                  shipping_method: o.shipping?.method || '',
-                  shipping_address: o.shipping?.address || '',
-                  orderable_order_time: o.orderable_order_time || '',
-                  orderable_order_date: o.orderable_order_date || '',
-                  date_created: o.date_created || '',
-                  items: JSON.stringify(o.items || []),
-                };
-                await AsyncStorage.setItem(`auto_print_${o.order_id}`, JSON.stringify(printData));
-                await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
-              }
-            }
-          }
-        } catch (e) {}
-      }
-    });
-
-    const claimsInterval = setInterval(() => fetchClaims(), 60000);
-    const ordersInterval = setInterval(() => fetchOrdersFromBackend(), 60000);
-    const storeInterval = setInterval(() => fetchStoreStatus(), 60000);
+    // These two timers only inspect local AsyncStorage. They make no Render calls
+    // and keep notification-created local state visible while this tab is open.
     let lastAutoRefresh = '';
     const autoRefreshInterval = setInterval(async () => {
       const flag = await AsyncStorage.getItem('auto_accepted_refresh');
@@ -267,6 +216,7 @@ useEffect(() => {
         loadAutoPrintOrders();
       }
     }, 2000);
+
     let lastPendingRefresh = '';
     const pendingRefreshInterval = setInterval(async () => {
       const flag = await AsyncStorage.getItem('pending_decision_refresh');
@@ -275,37 +225,8 @@ useEffect(() => {
         loadPendingDecision();
       }
     }, 2000);
-    const newOrderInterval = setInterval(async () => {
-      if (Platform.OS !== 'ios') {
-        const code = await AsyncStorage.getItem('restaurant_code') || '';
-        const role = await AsyncStorage.getItem('user_role') || '';
-        if (!code || role !== 'owner') return;
-        try {
-          const response = await fetch(`${BACKEND_URL}/orders/${code}`);
-          const result = await response.json();
-          if (result.success && result.orders && result.orders.length > 0) {
-            const latestOrder = result.orders[0];
-            const lastSeenId = await AsyncStorage.getItem('last_seen_order_id');
-            if (String(latestOrder.order_id) !== lastSeenId && latestOrder.status !== 'cancelled') {
-              await AsyncStorage.setItem('last_seen_order_id', String(latestOrder.order_id));
-              // Check if already accepted
-              const acceptedRes = await fetch(`${BACKEND_URL}/accepted-time/${code}/${latestOrder.order_id}`);
-              const acceptedResult = await acceptedRes.json();
-              if (acceptedResult.success && acceptedResult.accepted_time) return;
-              // New order detected - fetchOrdersFromBackend will pick it up
-              fetchOrdersFromBackend();
-            }
-          }
-        } catch (e) {}
-      }
-    }, 5000);
 
     return () => {
-      appStateSubscription.remove();
-      clearInterval(claimsInterval);
-      clearInterval(ordersInterval);
-      clearInterval(storeInterval);
-      clearInterval(newOrderInterval);
       clearInterval(autoRefreshInterval);
       clearInterval(pendingRefreshInterval);
     };
@@ -363,18 +284,21 @@ useEffect(() => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       if (!code) return;
-      const processingOrders = orderList.filter(o => o.status !== 'cancelled');
-      const times: { [key: string]: any } = {};
-      await Promise.all(processingOrders.map(async (order) => {
-        try {
-          const res = await fetch(`${BACKEND_URL}/accepted-time/${code}/${order.order_id}`);
-          const result = await res.json();
-          if (result.success) {
-            times[String(order.order_id)] = result;
-          }
-        } catch (e) {}
-      }));
-      setAcceptedTimes(prev => ({ ...prev, ...times }));
+
+      const orderIds = orderList
+        .filter(o => o.status !== 'cancelled')
+        .map(o => String(o.order_id));
+      if (orderIds.length === 0) return;
+
+      const res = await fetch(`${BACKEND_URL}/accepted-times/${code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_ids: orderIds }),
+      });
+      const result = await res.json();
+      if (result.success && result.times) {
+        setAcceptedTimes(prev => ({ ...prev, ...result.times }));
+      }
     } catch (e) {}
   };
   const fetchOrdersFromBackend = async () => {
@@ -514,9 +438,16 @@ useEffect(() => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchOrdersFromBackend();
-    await fetchClaims();
-    setTimeout(() => setRefreshing(false), 500);
+    await Promise.all([
+      fetchOrdersFromBackend(),
+      fetchClaims(),
+      fetchStoreStatus(),
+    ]);
+    await Promise.all([
+      loadAutoPrintOrders(),
+      loadPendingDecision(),
+    ]);
+    setRefreshing(false);
   };
 
   const moveOrderToKitchen = async (order: Order) => {
