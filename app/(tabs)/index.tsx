@@ -756,8 +756,8 @@ const flatData: FlatItem[] = [
               <View style={styles.orderBottomRow}>
                 {selectedOrder.shipping_method ? (
                   <View style={styles.orderMeta}>
-                    <Ionicons name={selectedOrder.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
-                    <Text style={styles.orderShipping}>{selectedOrder.shipping_method === 'Abholung' ? t.pickupLabel : selectedOrder.shipping_method === 'Lieferung' ? t.deliveryLabel : selectedOrder.shipping_method}</Text>
+                    <Ionicons name={isPickupMethod(selectedOrder.shipping_method) ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                    <Text style={styles.orderShipping}>{isPickupMethod(selectedOrder.shipping_method) ? t.pickupLabel : t.deliveryLabel}</Text>
                   </View>
                 ) : <View />}
                 {claims[String(selectedOrder.order_id)] ? (
@@ -1169,8 +1169,8 @@ const flatData: FlatItem[] = [
                 <View style={styles.orderBottomRow}>
                   {order.shipping_method ? (
                     <View style={styles.orderMeta}>
-                      <Ionicons name={order.shipping_method === 'Abholung' ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
-                      <Text style={styles.orderShipping}>{order.shipping_method === 'Abholung' ? t.pickupLabel : order.shipping_method === 'Lieferung' ? t.deliveryLabel : order.shipping_method}</Text>
+                      <Ionicons name={isPickupMethod(order.shipping_method) ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
+                      <Text style={styles.orderShipping}>{isPickupMethod(order.shipping_method) ? t.pickupLabel : t.deliveryLabel}</Text>
                     </View>
                   ) : <View />}
 
