@@ -914,6 +914,38 @@ const flatData: FlatItem[] = [
                     onPress={async () => {
                       const isPickupReady = pickupReadyOrders[String(selectedOrder.order_id)];
                       if (isPickup && !isPickupReady) {
+                        const markPickupReady = async (sendEmail: boolean) => {
+                          const code = await AsyncStorage.getItem('restaurant_code') || '';
+                          const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+                          const website = restaurantProfile?.profile?.website;
+
+                          if (!website) {
+                            Alert.alert('Error', 'Restaurant website could not be loaded.');
+                            return;
+                          }
+
+                          const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+                          const response = await fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              secret: 'foodup2026',
+                              order_id: selectedOrder.order_id,
+                              send_email: sendEmail,
+                            }),
+                          });
+
+                          const result = await response.json().catch(() => ({}));
+                          if (!response.ok || result?.success === false) {
+                            Alert.alert('Error', result?.message || 'Could not update order status.');
+                            return;
+                          }
+
+                          const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
+                          setPickupReadyOrders(updated);
+                          await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
+                        };
+
                         setAlertConfig({
                           visible: true,
                           title: t.readyForPickup || 'Ready for Pickup',
@@ -921,16 +953,8 @@ const flatData: FlatItem[] = [
                           icon: 'bag-check-outline',
                           iconColor: '#2ecc71',
                           buttons: [
-                            { text: t.sendEmail || 'Send Email', color: '#2ecc71', onPress: async () => {
-                              const code = await AsyncStorage.getItem('restaurant_code') || '';
-                              const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-                              const website = restaurantProfile?.profile?.website;
-                              if (website) { const baseUrl = website.startsWith('http') ? website : `https://${website}`; fetch(`${baseUrl}/wp-json/foodup/v1/order-ready-pickup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: 'foodup2026', order_id: selectedOrder.order_id }) }).catch(() => {}); }
-                              const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true };
-                              setPickupReadyOrders(updated);
-                              await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated));
-                            }},
-                            { text: t.skipEmail || 'Skip Email', color: '#e74c3c', onPress: async () => { const updated = { ...pickupReadyOrders, [String(selectedOrder.order_id)]: true }; setPickupReadyOrders(updated); await AsyncStorage.setItem('pickup_ready_orders', JSON.stringify(updated)); }},
+                            { text: t.sendEmail || 'Send Email', color: '#2ecc71', onPress: async () => { await markPickupReady(true); }},
+                            { text: t.skipEmail || 'Skip Email', color: '#e74c3c', onPress: async () => { await markPickupReady(false); }},
                             { text: t.cancel || 'Cancel', style: 'cancel' },
                           ],
                         });
