@@ -165,13 +165,17 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
 
   
 
-  const removePendingDecision = async (orderId: number) => {
+  const removePendingDecision = async (orderId: number, refreshDelayMs = 0) => {
     try {
       const stored = await AsyncStorage.getItem('pending_decision');
       const list: number[] = stored ? JSON.parse(stored) : [];
       await AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== orderId)));
       await AsyncStorage.setItem('pending_decision_refresh', String(Date.now()));
-      onDecisionMade?.(orderId);
+      if (refreshDelayMs > 0) {
+        setTimeout(() => onDecisionMade?.(orderId), refreshDelayMs);
+      } else {
+        onDecisionMade?.(orderId);
+      }
     } catch (e) {}
   };
 
@@ -205,7 +209,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
         }).catch(() => {});
       }
-      await removePendingDecision(order.order_id);
+      await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
       setTimeout(() => {
@@ -306,7 +310,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptedTime }),
         }).catch(() => {});
       }
-      await removePendingDecision(order.order_id);
+      await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
       setTimeout(() => {
