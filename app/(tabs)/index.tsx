@@ -280,6 +280,7 @@ useEffect(() => {
       if (flag && flag !== lastPendingRefresh) {
         lastPendingRefresh = flag;
         loadPendingDecision();
+        void refreshOrdersData();
       }
     }, 2000);
 
@@ -291,22 +292,40 @@ useEffect(() => {
 
   const checkPrintPermission = async (): Promise<boolean> => {
     if (Platform.OS !== 'android') return false;
+
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       const deviceId = Application.getAndroidId() || '';
-      const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
-      const result = await res.json();
-      const allowed = result.success && result.device_id && result.device_id === deviceId;
 
       const previewKitchenTester =
         Updates.channel === 'preview' &&
-        code.toLowerCase() === 'eatime' &&
-        deviceId === 'a4923a131ecbf2bd';
+        code.toLowerCase() === 'eatime';
 
+      // Kitchen is allowed for Eatime preview testing independently
+      // from printer-device permission.
+      if (previewKitchenTester) {
+        setCanUseKitchen(true);
+      }
+
+      const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
+      const result = await res.json();
+
+      const allowed =
+        result.success &&
+        result.device_id &&
+        result.device_id === deviceId;
+
+      // Printing remains restricted to the registered printer.
       setCanPrint(allowed);
+
+      // Kitchen works on the real printer OR Eatime preview.
       setCanUseKitchen(Boolean(allowed || previewKitchenTester));
 
-      await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
+      await AsyncStorage.setItem(
+        'can_print',
+        allowed ? 'true' : 'false'
+      );
+
       return allowed;
     } catch (e) {
       return false;
@@ -1324,7 +1343,6 @@ const flatData: FlatItem[] = [
         }}
         onDecisionMade={(orderId: number) => {
           setPendingDecisionOrders(prev => prev.filter(id => id !== orderId));
-          void refreshOrdersData();
         }}
       />
     </View>

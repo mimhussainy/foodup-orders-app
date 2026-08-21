@@ -195,11 +195,21 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       const stored = await AsyncStorage.getItem('pending_decision');
       const list: number[] = stored ? JSON.parse(stored) : [];
       await AsyncStorage.setItem('pending_decision', JSON.stringify(list.filter(id => id !== orderId)));
-      await AsyncStorage.setItem('pending_decision_refresh', String(Date.now()));
+      onDecisionMade?.(orderId);
+
+      const signalRefresh = async () => {
+        await AsyncStorage.setItem(
+          'pending_decision_refresh',
+          String(Date.now())
+        );
+      };
+
       if (refreshDelayMs > 0) {
-        setTimeout(() => onDecisionMade?.(orderId), refreshDelayMs);
+        setTimeout(() => {
+          void signalRefresh();
+        }, refreshDelayMs);
       } else {
-        onDecisionMade?.(orderId);
+        await signalRefresh();
       }
     } catch (e) {}
   };
