@@ -386,28 +386,11 @@ useEffect(() => {
           AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(printData)).catch(() => {});
           setAutoPrintOrders(prev => ({ ...prev, [String(data.order_id)]: printData }));
 
-          // Restore authoritative accepted time immediately after auto-accept.
-          // This is a one-time request per auto-accepted notification, not polling.
-          const autoAcceptedCode = String(data.restaurant_code || '').trim().toLowerCase();
-          const autoAcceptedOrderId = String(data.order_id || '');
-          if (autoAcceptedCode && autoAcceptedOrderId) {
-            fetch(`${BACKEND_URL}/accepted-times/${autoAcceptedCode}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ order_ids: [autoAcceptedOrderId] }),
-            })
-              .then(response => response.json())
-              .then(result => {
-                const acceptedData = result?.times?.[autoAcceptedOrderId];
-                if (result?.success && acceptedData) {
-                  setAcceptedTimes(prev => ({
-                    ...prev,
-                    [autoAcceptedOrderId]: acceptedData,
-                  }));
-                }
-              })
-              .catch(() => {});
-          }
+          // Backend auto-accept may still be writing the accepted-time state
+          // when this notification arrives. Refresh once after 7 seconds.
+          setTimeout(() => {
+            void refreshOrdersData();
+          }, 7000);
 
           return;
         }
