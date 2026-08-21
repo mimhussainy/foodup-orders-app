@@ -130,6 +130,60 @@ function formatAcceptedTimeCompact(value: string) {
   return `${match[1]}m`;
 }
 
+function parseScheduledAcceptedTime(at: string): number | null {
+  const pieces = String(at || '').split('—');
+  if (pieces.length < 2) return null;
+
+  const timeMatch = pieces[0].trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!timeMatch) return null;
+
+  const dateText = pieces[1].trim();
+
+  const dmy = dateText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const iso = dateText.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (dmy) {
+    day = Number(dmy[1]);
+    month = Number(dmy[2]);
+    year = Number(dmy[3]);
+  } else if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else {
+    return null;
+  }
+
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+
+  if (
+    month < 1 || month > 12 ||
+    day < 1 || day > 31 ||
+    hour < 0 || hour > 23 ||
+    minute < 0 || minute > 59
+  ) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hour ||
+    date.getMinutes() !== minute
+  ) {
+    return null;
+  }
+
+  return date.getTime();
+}
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
@@ -740,10 +794,7 @@ const flatData: FlatItem[] = [
                 const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                 if (status === 'delivered' || selectedOrder.status === 'cancelled' || selectedOrder.status === 'refunded') return null;
                 if (isItemScheduled) {
-                  const scheduledStr = at.split('—')[0].trim();
-                  const scheduledDateStr = at.split('—')[1]?.trim();
-                  const parts = scheduledDateStr?.split('/');
-                  const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                  const scheduledMs = parseScheduledAcceptedTime(at);
                   if (!scheduledMs) return null;
                   return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
                 }
@@ -758,9 +809,7 @@ const flatData: FlatItem[] = [
                 const at = acceptedTimes[String(selectedOrder.order_id)]?.accepted_time || '';
                 const hasCountdown = acceptedTimes[String(selectedOrder.order_id)] && status !== 'delivered';
                 const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                const scheduledDateStr = at.split('—')[1]?.trim();
-                const parts = scheduledDateStr?.split('/');
-                const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${at.split('—')[0].trim()}:00`).getTime() : null;
+                const scheduledMs = parseScheduledAcceptedTime(at);
                 const showBar = isItemScheduled ? (scheduledMs ? (Date.now() > scheduledMs || (scheduledMs - Date.now()) <= 3600000) : false) : hasCountdown;
                 if (!showBar) return <View style={[styles.divider, { marginBottom: 0 }]} />;
                 return null;
@@ -904,12 +953,8 @@ const flatData: FlatItem[] = [
                 const at = acceptedData.accepted_time || '';
                 const isScheduledTime = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                 if (isScheduledTime) {
-                  const parts = at.split('—');
-                  if (parts.length < 2) return false;
-                  const timePart = parts[0].trim();
-                  const datePart = parts[1].trim().split('/');
-                  if (datePart.length < 3) return false;
-                  const scheduledMs = new Date(`${datePart[2]}-${datePart[1]}-${datePart[0]}T${timePart}:00`).getTime();
+                  const scheduledMs = parseScheduledAcceptedTime(at);
+                  if (scheduledMs === null) return false;
                   return Date.now() > scheduledMs;
                 }
                 const minutes = parseInt(at.replace(/[^0-9]/g, '') || '0');
@@ -1176,10 +1221,7 @@ const flatData: FlatItem[] = [
                   const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
                   if (status === 'delivered' || order.status === 'cancelled' || order.status === 'refunded') return null;
                   if (isItemScheduled) {
-                    const scheduledStr = at.split('—')[0].trim();
-                    const scheduledDateStr = at.split('—')[1]?.trim();
-                    const parts = scheduledDateStr?.split('/');
-                    const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${scheduledStr}:00`).getTime() : null;
+                    const scheduledMs = parseScheduledAcceptedTime(at);
                     if (!scheduledMs) return null;
                     return <ScheduledCountdown scheduledMs={scheduledMs} at={at} />;
                   }
@@ -1193,9 +1235,7 @@ const flatData: FlatItem[] = [
                     const at = acceptedTimes[String(order.order_id)]?.accepted_time || '';
                     const hasCountdown = !!acceptedTimes[String(order.order_id)];
                     const isItemScheduled = at.includes('—') || (at.includes(':') && !at.includes('Minutes'));
-                    const scheduledDateStr = at.split('—')[1]?.trim();
-                    const parts = scheduledDateStr?.split('/');
-                    const scheduledMs = parts ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${at.split('—')[0].trim()}:00`).getTime() : null;
+                    const scheduledMs = parseScheduledAcceptedTime(at);
                     const showBar = isItemScheduled
                       ? scheduledMs ? (Date.now() > scheduledMs || (scheduledMs - Date.now()) <= 3600000) : false
                       : hasCountdown;
