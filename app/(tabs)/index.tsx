@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   BackHandler,
   FlatList,
@@ -436,8 +437,7 @@ useEffect(() => {
       return () => subscription.remove();
     }, []);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
+  const refreshOrdersData = async () => {
     await Promise.all([
       fetchOrdersFromBackend(),
       fetchClaims(),
@@ -447,6 +447,11 @@ useEffect(() => {
       loadAutoPrintOrders(),
       loadPendingDecision(),
     ]);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshOrdersData();
     setRefreshing(false);
   };
 
@@ -1262,8 +1267,7 @@ const flatData: FlatItem[] = [
         }}
         onDecisionMade={(orderId: number) => {
           setPendingDecisionOrders(prev => prev.filter(id => id !== orderId));
-          const order = orders.find(o => o.order_id === orderId);
-          if (order) fetchAcceptedTimes([order]);
+          void refreshOrdersData();
         }}
       />
     </View>

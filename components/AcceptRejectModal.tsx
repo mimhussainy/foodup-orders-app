@@ -38,6 +38,30 @@ async function scheduleScheduledOrderReminder(order: any, acceptTime: string, t:
   } catch (e) {}
 }
 
+async function postDecisionAction(path: string, body: any) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false) {
+      console.log(`Decision action failed: ${path}`, result.message || response.status);
+    }
+    return result;
+  } catch (e) {
+    console.log(`Decision action failed: ${path}`, e);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 interface AcceptRejectModalProps {
   order: any | null;
   visible: boolean;
@@ -164,17 +188,13 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
-      fetch(`${BACKEND_URL}/accepted-time`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant_code: code,
-          order_id: order.order_id,
-          accepted_time: acceptTime,
-          accepted_at: new Date().toISOString(),
-          status: 'accepted',
-        }),
-      }).catch(() => {});
+      await postDecisionAction('/accepted-time', {
+        restaurant_code: code,
+        order_id: order.order_id,
+        accepted_time: acceptTime,
+        accepted_at: new Date().toISOString(),
+        status: 'accepted',
+      });
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (website) {
@@ -215,11 +235,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
-      fetch(`${BACKEND_URL}/rejected-time`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
-      }).catch(() => {});
+      await postDecisionAction('/rejected-time', { restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' });
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (website) {
@@ -230,28 +246,24 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
         }).catch(() => {});
       }
-      fetch(`${BACKEND_URL}/status-update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant_code: code,
-          order_id: order.order_id,
-          status: 'cancelled',
-          customer_name: order.customer_name || '',
-          customer_phone: order.customer_phone || '',
-          total: order.total || '',
-          currency: order.currency || 'CHF',
-          items: order.items || [],
-          payment_method: order.payment_method || '',
-          note: order.note || '',
-          shipping: {
-            method: order.shipping_method || '',
-            address: order.shipping_address || '',
-          },
-          event_type: 'status_update',
-          sound: false,
-        }),
-      }).catch(() => {});
+      await postDecisionAction('/status-update', {
+        restaurant_code: code,
+        order_id: order.order_id,
+        status: 'cancelled',
+        customer_name: order.customer_name || '',
+        customer_phone: order.customer_phone || '',
+        total: order.total || '',
+        currency: order.currency || 'CHF',
+        items: order.items || [],
+        payment_method: order.payment_method || '',
+        note: order.note || '',
+        shipping: {
+          method: order.shipping_method || '',
+          address: order.shipping_address || '',
+        },
+        event_type: 'status_update',
+        sound: false,
+      });
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
@@ -277,17 +289,13 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
-      fetch(`${BACKEND_URL}/accepted-time`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant_code: code,
-          order_id: order.order_id,
-          accepted_time: acceptedTime,
-          accepted_at: new Date().toISOString(),
-          status: 'accepted',
-        }),
-      }).catch(() => {});
+      await postDecisionAction('/accepted-time', {
+        restaurant_code: code,
+        order_id: order.order_id,
+        accepted_time: acceptedTime,
+        accepted_at: new Date().toISOString(),
+        status: 'accepted',
+      });
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (website) {
@@ -329,11 +337,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
-      fetch(`${BACKEND_URL}/rejected-time`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
-      }).catch(() => {});
+      await postDecisionAction('/rejected-time', { restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' });
       const stored = await AsyncStorage.getItem('foodup_orders');
       const existing = stored ? JSON.parse(stored) : [];
       const updated = existing.map((o: any) =>
@@ -350,28 +354,24 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
         }).catch(() => {});
       }
-      fetch(`${BACKEND_URL}/status-update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurant_code: code,
-          order_id: order.order_id,
-          status: 'cancelled',
-          customer_name: order.customer_name || '',
-          customer_phone: order.customer_phone || '',
-          total: order.total || '',
-          currency: order.currency || 'CHF',
-          items: order.items || [],
-          payment_method: order.payment_method || '',
-          note: order.note || '',
-          shipping: {
-            method: order.shipping_method || '',
-            address: order.shipping_address || '',
-          },
-          event_type: 'status_update',
-          sound: false,
-        }),
-      }).catch(() => {});
+      await postDecisionAction('/status-update', {
+        restaurant_code: code,
+        order_id: order.order_id,
+        status: 'cancelled',
+        customer_name: order.customer_name || '',
+        customer_phone: order.customer_phone || '',
+        total: order.total || '',
+        currency: order.currency || 'CHF',
+        items: order.items || [],
+        payment_method: order.payment_method || '',
+        note: order.note || '',
+        shipping: {
+          method: order.shipping_method || '',
+          address: order.shipping_address || '',
+        },
+        event_type: 'status_update',
+        sound: false,
+      });
       await removePendingDecision(order.order_id);
       setLoading(false);
       onClose();
