@@ -146,6 +146,31 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     if (countdown === null) return;
     if (countdown <= 0) {
       setCountdown(null);
+
+      // Auto-action completed normally while the modal stayed open.
+      // Clear pending Review. If the app/modal was force-closed earlier,
+      // this code never runs and Review remains available.
+      const orderId = Number(order?.order_id);
+
+      if (Number.isFinite(orderId)) {
+        AsyncStorage.getItem('pending_decision')
+          .then(async stored => {
+            const list: number[] = stored ? JSON.parse(stored) : [];
+            const updated = list.filter(id => id !== orderId);
+
+            await AsyncStorage.setItem(
+              'pending_decision',
+              JSON.stringify(updated)
+            );
+
+            await AsyncStorage.setItem(
+              'pending_decision_refresh',
+              String(Date.now())
+            );
+          })
+          .catch(() => {});
+      }
+
       onClose();
       return;
     }
