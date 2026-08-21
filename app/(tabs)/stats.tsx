@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   Image, Keyboard, Platform,
   RefreshControl, SafeAreaView, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View
@@ -18,6 +19,55 @@ interface Order {
   payment_method: string;
   timestamp: number;
   shipping_method: string;
+}
+
+interface StatsPeriod {
+  totalOrders: number;
+  cash: number;
+  online: number;
+  total: number;
+  deliveries: number;
+  pickups: number;
+  currency: string;
+}
+
+interface CompactStatsPeriod {
+  totalOrders: number;
+  cash: number;
+  online: number;
+  total: number;
+  deliveries: number;
+  pickups: number;
+}
+
+interface CompactStatsOrder {
+  order_id: number | string;
+  total: number | string;
+}
+
+interface CompactStatsCourier {
+  name: string;
+  currency: string;
+  todayCashTotal: number;
+  inProgressCashTotal: number;
+  totalOwed: number;
+  legacySortTotal: number;
+  openOrderCount: number;
+  openCashOrders: CompactStatsOrder[];
+  todayDeliveredCashOrders: CompactStatsOrder[];
+}
+
+interface CompactStatsResponse {
+  success: true;
+  currency: string;
+  periods: {
+    today: CompactStatsPeriod;
+    week: CompactStatsPeriod;
+    month: CompactStatsPeriod;
+    year: CompactStatsPeriod;
+    previousYear: CompactStatsPeriod;
+  };
+  couriers: CompactStatsCourier[];
 }
 
 function getStats(orders: Order[], fromDate: Date, toDate?: Date) {
@@ -66,7 +116,92 @@ function getEndOfPastYear() {
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
 const PIN_UNLOCK_MS = 5 * 60 * 1000;
+const STATS_POLL_INTERVAL_MS = 60 * 1000;
+const STATS_REQUEST_TIMEOUT_MS = 8000;
 let lastUnlockedAt: number | null = null;
+
+function isFiniteNumber(value: any): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isCompactStatsPeriod(value: any): value is CompactStatsPeriod {
+  return !!value
+    && isFiniteNumber(value.totalOrders)
+    && isFiniteNumber(value.cash)
+    && isFiniteNumber(value.online)
+    && isFiniteNumber(value.total)
+    && isFiniteNumber(value.deliveries)
+    && isFiniteNumber(value.pickups);
+}
+
+function isCompactStatsOrder(value: any): value is CompactStatsOrder {
+  return !!value
+    && (typeof value.order_id === 'number' || typeof value.order_id === 'string')
+    && (typeof value.total === 'number' || typeof value.total === 'string')
+    && Number.isFinite(parseFloat(String(value.total || '0')));
+}
+
+function validateCompactStatsResponse(value: any): CompactStatsResponse {
+  if (!value || value.success !== true) throw new Error('Invalid stats response');
+  if (typeof value.currency !== 'string' || !value.currency) throw new Error('Invalid stats currency');
+  if (!value.periods
+    || !isCompactStatsPeriod(value.periods.today)
+    || !isCompactStatsPeriod(value.periods.week)
+    || !isCompactStatsPeriod(value.periods.month)
+    || !isCompactStatsPeriod(value.periods.year)
+    || !isCompactStatsPeriod(value.periods.previousYear)) {
+    throw new Error('Invalid stats periods');
+  }
+  if (!Array.isArray(value.couriers)) throw new Error('Invalid stats couriers');
+
+  value.couriers.forEach((courier: any) => {
+    if (!courier || typeof courier.name !== 'string' || !courier.name) throw new Error('Invalid courier name');
+    if (typeof courier.currency !== 'string' || !courier.currency) throw new Error('Invalid courier currency');
+    if (!isFiniteNumber(courier.todayCashTotal)
+      || !isFiniteNumber(courier.inProgressCashTotal)
+      || !isFiniteNumber(courier.totalOwed)
+      || !isFiniteNumber(courier.legacySortTotal)
+      || !isFiniteNumber(courier.openOrderCount)) {
+      throw new Error('Invalid courier totals');
+    }
+    if (!Array.isArray(courier.openCashOrders)
+      || !Array.isArray(courier.todayDeliveredCashOrders)
+      || !courier.openCashOrders.every(isCompactStatsOrder)
+      || !courier.todayDeliveredCashOrders.every(isCompactStatsOrder)) {
+      throw new Error('Invalid courier orders');
+    }
+  });
+
+  return value as CompactStatsResponse;
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildStatsQuery() {
+  return [
+    `now=${Date.now()}`,
+    `today_start=${getStartOfDay().getTime()}`,
+    `week_start=${getStartOfWeek().getTime()}`,
+    `month_start=${getStartOfMonth().getTime()}`,
+    `year_start=${getStartOfYear().getTime()}`,
+    `previous_year_start=${getStartOfPastYear().getTime()}`,
+  ].join('&');
+}
+
+function withStatsCurrency(period: CompactStatsPeriod, currency: string): StatsPeriod {
+  return { ...period, currency };
+}
 
 export default function StatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -75,9 +210,17 @@ export default function StatsScreen() {
   const [pinUnlocked, setPinUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
-  const fetchAllStats = useCallback(async () => {
-    const code = await AsyncStorage.getItem('restaurant_code') || '';
-    if (!code) return;
+  const [isFocused, setIsFocused] = useState(false);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [statsPeriods, setStatsPeriods] = useState<{
+    today: StatsPeriod;
+    week: StatsPeriod;
+    month: StatsPeriod;
+    year: StatsPeriod;
+    previousYear: StatsPeriod;
+  } | null>(null);
+  const [compactCouriers, setCompactCouriers] = useState<CompactStatsCourier[] | null>(null);
+  const fetchLegacyStats = useCallback(async (code: string) => {
     const [ordersResult, deliveredResult, claimsResult] = await Promise.all([
       fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
       fetch(`${BACKEND_URL}/all-couriers-delivered/${code}`).then(r => r.json()).catch(() => ({})),
@@ -97,6 +240,8 @@ export default function StatsScreen() {
       setOrders(validOrders);
     }
     if (deliveredResult.success) setCourierDelivered(deliveredResult.couriers);
+    setStatsPeriods(null);
+    setCompactCouriers(null);
     if (claimsResult.success && ordersForClaims.success) {
       setAllOrders(ordersForClaims.orders);
       const grouped: { [key: string]: any[] } = {};
@@ -118,6 +263,35 @@ export default function StatsScreen() {
       setCourierClaims(grouped);
     }
   }, []);
+  const fetchCompactStats = useCallback(async (code: string) => {
+    const result = validateCompactStatsResponse(
+      await fetchJsonWithTimeout(`${BACKEND_URL}/stats/${code}?${buildStatsQuery()}`, STATS_REQUEST_TIMEOUT_MS)
+    );
+
+    setStatsPeriods({
+      today: withStatsCurrency(result.periods.today, result.currency),
+      week: withStatsCurrency(result.periods.week, result.currency),
+      month: withStatsCurrency(result.periods.month, result.currency),
+      year: withStatsCurrency(result.periods.year, result.currency),
+      previousYear: withStatsCurrency(result.periods.previousYear, result.currency),
+    });
+
+    setCompactCouriers([...result.couriers].sort((a, b) => b.legacySortTotal - a.legacySortTotal));
+    setOrders([]);
+    setCourierDelivered({});
+    setCourierClaims({});
+    setAllOrders([]);
+  }, []);
+  const fetchAllStats = useCallback(async () => {
+    const code = await AsyncStorage.getItem('restaurant_code') || '';
+    if (!code) return;
+
+    try {
+      await fetchCompactStats(code);
+    } catch (e) {
+      await fetchLegacyStats(code);
+    }
+  }, [fetchCompactStats, fetchLegacyStats]);
   const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
   const [courierClaims, setCourierClaims] = useState<{ [key: string]: any[] }>({});
@@ -131,6 +305,7 @@ export default function StatsScreen() {
 
 useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       const now = Date.now();
       if (lastUnlockedAt && now - lastUnlockedAt < PIN_UNLOCK_MS) {
         setPinUnlocked(true);
@@ -145,11 +320,24 @@ useFocusEffect(
       setTimeout(() => {
         try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
       }, 300);
-      fetchAllStats();
-      const interval = setInterval(fetchAllStats, 15000);
-      return () => clearInterval(interval);
-    }, [fetchAllStats])
+      return () => {
+        setIsFocused(false);
+      };
+    }, [])
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused || !pinUnlocked || appState !== 'active') return;
+
+    fetchAllStats();
+    const interval = setInterval(fetchAllStats, STATS_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [appState, fetchAllStats, isFocused, pinUnlocked]);
 
   const handlePinSubmit = async () => {
     try {
@@ -177,11 +365,11 @@ useFocusEffect(
     setExpanded(prev => prev === key ? null : key);
   };
 
-  const todayStats = getStats(orders, getStartOfDay());
-  const weekStats = getStats(orders, getStartOfWeek());
-  const monthStats = getStats(orders, getStartOfMonth());
-  const yearStats = getStats(orders, getStartOfYear());
-  const pastYearStats = getStats(orders, getStartOfPastYear(), getEndOfPastYear());
+  const todayStats = statsPeriods?.today || getStats(orders, getStartOfDay());
+  const weekStats = statsPeriods?.week || getStats(orders, getStartOfWeek());
+  const monthStats = statsPeriods?.month || getStats(orders, getStartOfMonth());
+  const yearStats = statsPeriods?.year || getStats(orders, getStartOfYear());
+  const pastYearStats = statsPeriods?.previousYear || getStats(orders, getStartOfPastYear(), getEndOfPastYear());
 
   const StatRows = ({ stats }: { stats: any }) => (
     <>
@@ -333,10 +521,96 @@ useFocusEffect(
             <CollapsibleCard title={t.thisWeek} statsKey="week" stats={weekStats} />
             <CollapsibleCard title={t.thisMonth} statsKey="month" stats={monthStats} />
             <CollapsibleCard title={t.thisYear} statsKey="year" stats={yearStats} />
-            {(Object.keys(courierDelivered).length > 0 || Object.keys(courierClaims).length > 0) && (
+            {((compactCouriers !== null && compactCouriers.length > 0) || (compactCouriers === null && (Object.keys(courierDelivered).length > 0 || Object.keys(courierClaims).length > 0))) && (
             <>
               <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
-              {(() => {
+              {compactCouriers !== null ? (
+                compactCouriers.map(courier => {
+                const name = courier.name;
+                const isOpen = expandedCourier === name;
+                const currency = courier.currency || 'CHF';
+                const openCashOrders = courier.openCashOrders || [];
+                const todayCashOrders = courier.todayDeliveredCashOrders || [];
+                const todayCashTotal = courier.todayCashTotal;
+                const inProgressCashTotal = courier.inProgressCashTotal;
+                const totalOwed = courier.totalOwed;
+
+                return (
+                  <View key={name} style={[styles.section, { marginBottom: 10 }]}>
+                    <TouchableOpacity
+                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
+                      onPress={() => setExpandedCourier(isOpen ? null : name)}
+                    >
+                      <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
+                      <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: totalOwed > 0 ? '#e74c3c' : '#2ecc71' }}>
+                          {t.total || 'Total'}: {currency} {totalOwed.toFixed(2)}
+                        </Text>
+                      </View>
+                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
+                    </TouchableOpacity>
+
+                    {isOpen && (
+                      <>
+                        {/* In Progress / Open Orders */}
+                        {courier.openOrderCount > 0 && (
+                          <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f39c12', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                              {t.openOrders || 'Open Orders'}
+                            </Text>
+                            {openCashOrders.map((o: CompactStatsOrder, oi: number) => (
+                              <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === openCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
+                                <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
+                                <Text style={{ fontSize: 13, color: '#f39c12', fontWeight: '600' }}>{currency} {parseFloat(String(o.total)).toFixed(2)}</Text>
+                              </View>
+                            ))}
+                            {openCashOrders.length === 0 && (
+                              <Text style={{ fontSize: 13, color: '#999' }}>{t.noCashInProgress || 'No cash orders in progress'}</Text>
+                            )}
+                            {openCashOrders.length > 0 && (
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: '#f39c12' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{currency} {inProgressCashTotal.toFixed(2)}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+
+                        {/* Today Delivered Cash */}
+                        <View style={{ paddingVertical: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B38CB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                            {t.today} — {t.delivered || 'Delivered'}
+                          </Text>
+                          {todayCashOrders.length === 0 ? (
+                            <Text style={{ fontSize: 13, color: '#999' }}>{t.noDeliveriesToday || 'No cash deliveries today'}</Text>
+                          ) : (
+                            <>
+                              {todayCashOrders.map((o: CompactStatsOrder, oi: number) => (
+                                <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === todayCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
+                                  <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
+                                  <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{currency} {parseFloat(String(o.total)).toFixed(2)}</Text>
+                                </View>
+                              ))}
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#111' }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{t.cashCollected || 'Cash Collected'}</Text>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{currency} {todayCashTotal.toFixed(2)}</Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+
+                        {/* Grand Total Owed */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1.5, borderTopColor: '#8B38CB' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{t.totalToSubmit || 'Total to Submit'}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{currency} {totalOwed.toFixed(2)}</Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                );
+              })
+              ) : (() => {
                 const isCashFn = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
                 const allCourierNames = Array.from(new Set([
                   ...Object.keys(courierDelivered),
