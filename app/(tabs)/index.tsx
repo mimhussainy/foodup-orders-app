@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
+import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -203,6 +204,7 @@ const [pickupReadyOrders, setPickupReadyOrders] = useState<{[key: string]: boole
 const [storeIsOpen, setStoreIsOpen] = useState<boolean | null>(null);
 const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; buttons: any[]; icon?: string; iconColor?: string }>({ visible: false, title: '', message: '', buttons: [] });
 const [canPrint, setCanPrint] = useState(false);
+const [canUseKitchen, setCanUseKitchen] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [pendingDecisionOrders, setPendingDecisionOrders] = useState<number[]>([]);
 const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -295,7 +297,15 @@ useEffect(() => {
       const res = await fetch(`${BACKEND_URL}/printer-device/${code}`);
       const result = await res.json();
       const allowed = result.success && result.device_id && result.device_id === deviceId;
+
+      const previewKitchenTester =
+        Updates.channel === 'preview' &&
+        code.toLowerCase() === 'eatime' &&
+        deviceId === 'a4923a131ecbf2bd';
+
       setCanPrint(allowed);
+      setCanUseKitchen(Boolean(allowed || previewKitchenTester));
+
       await AsyncStorage.setItem('can_print', allowed ? 'true' : 'false');
       return allowed;
     } catch (e) {
@@ -518,7 +528,7 @@ useEffect(() => {
 
   const moveOrderToKitchen = async (order: Order) => {
     try {
-      if (!canPrint) return;
+      if (!canUseKitchen) return;
 
       const code = await AsyncStorage.getItem('restaurant_code') || '';
 
@@ -616,7 +626,7 @@ useEffect(() => {
   };
 
   const shouldShowKitchenButton = (order: Order) => {
-    if (!canPrint) return false;
+    if (!canUseKitchen) return false;
 
     const currentStatus = getDeliveryStatus(order);
     const acceptedData = acceptedTimes[String(order.order_id)];
