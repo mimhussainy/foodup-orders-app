@@ -62,6 +62,58 @@ async function postDecisionAction(path: string, body: any) {
   }
 }
 
+
+async function postWordPressDecision(
+  url: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  let lastError: unknown = new Error(
+    'WooCommerce decision synchronization failed'
+  );
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      const result: any = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || result?.success !== true) {
+        throw new Error(
+          'WooCommerce synchronization failed with HTTP ' + response.status
+        );
+      }
+
+      return;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < 3) {
+        await new Promise(resolve =>
+          setTimeout(resolve, attempt * 500)
+        );
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw (
+    lastError instanceof Error
+      ? lastError
+      : new Error('WooCommerce decision synchronization failed')
+  );
+}
+
 interface AcceptRejectModalProps {
   order: any | null;
   visible: boolean;
@@ -227,6 +279,23 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (!website) {
+        throw new Error('Restaurant website is not configured');
+      }
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        await postWordPressDecision(
+          baseUrl + '/wp-json/foodup/v1/order-accepted',
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            accepted_time: acceptTime,
+          }
+        );
+
+      // WooCommerce confirmed completed; now record FoodUp acceptance.
       await postDecisionAction('/accepted-time', {
         restaurant_code: code,
         order_id: order.order_id,
@@ -234,15 +303,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         accepted_at: new Date().toISOString(),
         status: 'accepted',
       });
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-      if (website) {
-        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-        fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptTime }),
-        }).catch(() => {});
       }
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
@@ -274,16 +334,24 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
-      await postDecisionAction('/rejected-time', { restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' });
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
+      if (!website) {
+        throw new Error('Restaurant website is not configured');
+      }
       if (website) {
         const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-        fetch(`${baseUrl}/wp-json/foodup/v1/order-rejected`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
-        }).catch(() => {});
+        await postWordPressDecision(
+          baseUrl + '/wp-json/foodup/v1/order-rejected',
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            reason,
+          }
+        );
+
+      // WooCommerce confirmed cancelled; now record FoodUp rejection.
+      await postDecisionAction('/rejected-time', { restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' });
       }
       await postDecisionAction('/status-update', {
         restaurant_code: code,
@@ -328,6 +396,23 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (!website) {
+        throw new Error('Restaurant website is not configured');
+      }
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        await postWordPressDecision(
+          baseUrl + '/wp-json/foodup/v1/order-accepted',
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            accepted_time: acceptedTime,
+          }
+        );
+
+      // WooCommerce confirmed completed; now record FoodUp acceptance.
       await postDecisionAction('/accepted-time', {
         restaurant_code: code,
         order_id: order.order_id,
@@ -335,15 +420,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         accepted_at: new Date().toISOString(),
         status: 'accepted',
       });
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-      if (website) {
-        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-        fetch(`${baseUrl}/wp-json/foodup/v1/order-accepted`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, accepted_time: acceptedTime }),
-        }).catch(() => {});
       }
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
@@ -376,22 +452,31 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+      if (!website) {
+        throw new Error('Restaurant website is not configured');
+      }
+      if (website) {
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+        await postWordPressDecision(
+          baseUrl + '/wp-json/foodup/v1/order-rejected',
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            reason,
+          }
+        );
+
+      // WooCommerce confirmed cancelled; now record FoodUp rejection.
       await postDecisionAction('/rejected-time', { restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' });
+
       const stored = await AsyncStorage.getItem('foodup_orders');
       const existing = stored ? JSON.parse(stored) : [];
       const updated = existing.map((o: any) =>
         o.order_id === order.order_id ? { ...o, status: 'cancelled' } : o
       );
       await AsyncStorage.setItem('foodup_orders', JSON.stringify(updated));
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-      if (website) {
-        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-        fetch(`${baseUrl}/wp-json/foodup/v1/order-rejected`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id, reason }),
-        }).catch(() => {});
       }
       await postDecisionAction('/status-update', {
         restaurant_code: code,
