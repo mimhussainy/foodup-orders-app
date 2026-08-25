@@ -136,6 +136,10 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
+    debugLog(`ROOT STATE visible:${showOrderModal} order:${newOrderModal?.order_id ?? 'none'} countdown:${showCountdown} modalRef:${modalOpenRef.current}`);
+  }, [showOrderModal, newOrderModal?.order_id, showCountdown]);
+
+  useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       return false;
     });
@@ -353,10 +357,14 @@ export default function RootLayout() {
             await orderSoundRef.current.unloadAsync().catch(() => {});
             orderSoundRef.current = null;
           }
+          debugLog(`SOUND START order:${data.order_id} selected:${selectedSound} uri:${uri}`);
           const { sound } = await Audio.Sound.createAsync({ uri }, { isLooping: true });
           orderSoundRef.current = sound;
           await sound.playAsync();
-        } catch (e) {}
+          debugLog(`SOUND OK order:${data.order_id} selected:${selectedSound}`);
+        } catch (e) {
+          debugLog(`SOUND ERROR order:${data.order_id} error:${e instanceof Error ? e.message : String(e)}`);
+        }
       }
     });
 
@@ -416,6 +424,7 @@ export default function RootLayout() {
             visible={showOrderModal}
             showCountdown={showCountdown}
             onClose={async () => {
+              debugLog(`MODAL onClose order:${newOrderModal?.order_id ?? 'none'}`);
               if (orderSoundRef.current) {
                 await orderSoundRef.current.stopAsync().catch(() => {});
                 await orderSoundRef.current.unloadAsync().catch(() => {});
