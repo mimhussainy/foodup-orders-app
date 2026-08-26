@@ -1,9 +1,99 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 
 let isPrinting = false;
 
+
+const PRINTER_BACKEND_URL =
+  'https://foodup-order-alerts-backend.onrender.com';
+
+async function verifyRegisteredPrinterDevice(): Promise<boolean> {
+  // Existing non-Android behaviour remains unchanged.
+  if (Platform.OS !== 'android') return true;
+
+  try {
+    const restaurantCode =
+      (await AsyncStorage.getItem('restaurant_code') || '')
+        .toLowerCase()
+        .trim();
+
+    const currentDeviceId =
+      Application.getAndroidId() || '';
+
+    if (!restaurantCode || !currentDeviceId) {
+      await AsyncStorage.setItem('can_print', 'false');
+      console.log(
+        '[print-permission] BLOCKED: restaurant code or Android ID missing'
+      );
+      return false;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      3000
+    );
+
+    try {
+      const response = await fetch(
+        `${PRINTER_BACKEND_URL}/printer-device/${restaurantCode}`,
+        {
+          signal: controller.signal,
+        }
+      );
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      const registeredDeviceId =
+        String(result?.device_id || '').trim();
+
+      const allowed =
+        response.ok &&
+        result?.success === true &&
+        registeredDeviceId !== '' &&
+        registeredDeviceId === currentDeviceId;
+
+      await AsyncStorage.setItem(
+        'can_print',
+        allowed ? 'true' : 'false'
+      );
+
+      console.log(
+        `[print-permission] restaurant:${restaurantCode} current:${currentDeviceId} registered:${registeredDeviceId || 'none'} allowed:${allowed}`
+      );
+
+      return allowed;
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    // Fail closed: an unverified device must never print.
+    await AsyncStorage
+      .setItem('can_print', 'false')
+      .catch(() => {});
+
+    console.log(
+      '[print-permission] BLOCKED: verification failed:',
+      error instanceof Error
+        ? error.message
+        : String(error)
+    );
+
+    return false;
+  }
+}
+
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
+  const registeredPrinter = await verifyRegisteredPrinterDevice();
+  if (!registeredPrinter) {
+    console.log(`[print] BLOCKED order ${order?.order_id} ? this device is not the registered printer`);
+    return false;
+  }
+
   if (isPrinting) {
     console.log(`[print] blocked — already printing`);
     return false;
