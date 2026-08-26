@@ -273,6 +273,19 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     setCountdown(null);
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+      // Start the existing print timer before WordPress synchronization.
+      // Keep the original print delay unchanged.
+      setTimeout(() => {
+        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+        if (isScheduledTime) {
+          printOrder(order, undefined, false, '', acceptTime).catch(() => {});
+          scheduleScheduledOrderReminder(order, acceptTime, t).catch(() => {});
+        } else {
+          const mins = parseInt(acceptTime);
+          printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
+        }
+      }, 300);
       // Owner took control — cancel backend auto-action
       fetch(`${BACKEND_URL}/cancel-auto-action`, {
         method: 'POST',
@@ -307,16 +320,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
-      setTimeout(() => {
-        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
-        if (isScheduledTime) {
-          printOrder(order, undefined, false, '', acceptTime).catch(() => {});
-          scheduleScheduledOrderReminder(order, acceptTime, t).catch(() => {});
-        } else {
-          const mins = parseInt(acceptTime);
-          printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
-        }
-      }, 300);
     } catch (e) {
       setLoading(false);
     }
@@ -396,6 +399,17 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
+
+      // Start the existing print timer before WordPress synchronization.
+      // Keep the original print delay unchanged.
+      setTimeout(() => {
+        if (isScheduled) {
+          printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
+          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t).catch(() => {});
+        } else {
+          printOrder(order, selectedTime).catch(() => {});
+        }
+      }, 2000);
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (!website) {
@@ -424,14 +438,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
-      setTimeout(() => {
-        if (isScheduled) {
-          printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
-          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t).catch(() => {});
-        } else {
-          printOrder(order, selectedTime).catch(() => {});
-        }
-      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();
