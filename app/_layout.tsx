@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
@@ -73,6 +74,11 @@ async function registerForPushNotifications() {
     return;
   }
 
+  const orderDeviceId =
+    Platform.OS === 'android'
+      ? (Application.getAndroidId() || '')
+      : '';
+
   let token = '';
   try {
     token = (await Notifications.getExpoPushTokenAsync({
@@ -106,7 +112,7 @@ async function registerForPushNotifications() {
     const response = await fetch(`${BACKEND_URL}/register-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, restaurant_code: code, channel_id: channelId }),
+      body: JSON.stringify({token, restaurant_code: code, channel_id: channelId, device_id: orderDeviceId }),
     });
     const result = await response.json();
     console.log('=== REGISTER RESULT:', result, 'channel:', channelId);
