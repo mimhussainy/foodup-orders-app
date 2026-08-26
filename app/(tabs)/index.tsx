@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
@@ -341,6 +342,28 @@ useEffect(() => {
       if (result.success) setStoreIsOpen(result.is_open);
     } catch (e) {}
   };
+  // Orders foreground synchronization.
+  // Runs once when the app returns from background/inactive state.
+  // This is event-driven and does not restore backend polling.
+  useEffect(() => {
+    let previousState = AppState.currentState;
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      const returnedToForeground =
+        nextState === 'active' &&
+        (previousState === 'background' || previousState === 'inactive');
+
+      previousState = nextState;
+
+      if (!returnedToForeground) return;
+
+      void fetchOrdersFromBackend();
+      void fetchClaims();
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   const fetchClaims = async () => {
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
@@ -474,6 +497,23 @@ useEffect(() => {
           setTimeout(() => {
             void refreshOrdersData();
           }, 7000);
+
+          return;
+        }
+
+        if (data.event_type === 'order_accepted_update') {
+          const orderId = String(data.order_id || '');
+
+          if (orderId) {
+            setAcceptedTimes(prev => ({
+              ...prev,
+              [orderId]: {
+                accepted_time: String(data.accepted_time || ''),
+                accepted_at: String(data.accepted_at || new Date().toISOString()),
+                status: 'accepted',
+              },
+            }));
+          }
 
           return;
         }

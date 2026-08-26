@@ -407,6 +407,15 @@ export default function RootLayout() {
           debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
           enqueueOrder(newOrder, true, true);
         }
+        // iOS uses only the normal system notification sound.
+        // The looping/custom FoodUp order alarm is Android-only.
+        if (Platform.OS !== 'android') {
+          debugLog(
+            `SYSTEM NOTIFICATION SOUND ONLY order:${data.order_id} platform:${Platform.OS}`
+          );
+          return;
+        }
+
         try {
           const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
           const soundMap: { [key: string]: string } = {
