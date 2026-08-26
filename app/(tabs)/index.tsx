@@ -478,6 +478,13 @@ useEffect(() => {
           return;
         }
 
+        if (data.event_type === 'courier_status_update') {
+          // Courier changed in_bag / delivering / delivered.
+          // Refresh claims exactly once; no polling.
+          void fetchClaims();
+          return;
+        }
+
         const newOrder: Order = {
         order_id: parseInt(data.order_id),
         customer_name: data.customer_name,
