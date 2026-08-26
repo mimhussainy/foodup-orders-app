@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
@@ -12,6 +13,58 @@ import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
+
+async function isRegisteredOrderDevice(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+
+  try {
+    const code = String(
+      (await AsyncStorage.getItem('restaurant_code')) || ''
+    ).toLowerCase().trim();
+
+    const deviceId = String(
+      Application.getAndroidId() || ''
+    ).trim();
+
+    if (!code || !deviceId) {
+      return false;
+    }
+
+    const response = await fetch(
+      `${BACKEND_URL}/printer-device/${encodeURIComponent(code)}`
+    );
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const result = await response.json();
+
+    const registeredDeviceId = String(
+      result?.device_id || ''
+    ).trim();
+
+    // No Printer Device ID configured:
+    // preserve the normal/legacy Android order behaviour.
+    if (!registeredDeviceId) {
+      return true;
+    }
+
+    return (
+      result?.success === true &&
+      registeredDeviceId === deviceId
+    );
+  } catch (error) {
+    console.log(
+      '[device-auth] Unable to verify registered order device:',
+      error
+    );
+    return false;
+  }
+}
+
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -302,6 +355,20 @@ export default function RootLayout() {
             debugLog(`DROP cross-restaurant notification order:${data.order_id} from:${incomingCode} current:${currentCode}`);
             return;
           }
+
+          // Every device still receives the normal notification.
+          // Only the registered Android device handles the
+          // Accept/Reject modal and custom new-order ringing.
+          if (
+            Platform.OS === 'android' &&
+            !(await isRegisteredOrderDevice())
+          ) {
+            debugLog(
+              `NOTIFICATION ONLY order:${data.order_id} - modal/ringing suppressed on non-registered Android device`
+            );
+            return;
+          }
+
           const newOrder = {
             order_id: parseInt(data.order_id),
             customer_name: data.customer_name || '',
@@ -377,6 +444,20 @@ export default function RootLayout() {
           debugLog(`DROP cross-restaurant tap order:${data.order_id} from:${incomingCode} current:${currentCode}`);
           return;
         }
+
+        // The notification can still open the app normally,
+        // but a non-registered Android device must not open
+        // the Accept/Reject modal.
+        if (
+          Platform.OS === 'android' &&
+          !(await isRegisteredOrderDevice())
+        ) {
+          debugLog(
+            `NOTIFICATION TAP ONLY order:${data.order_id} - modal suppressed on non-registered Android device`
+          );
+          return;
+        }
+
         const newOrder = {
           order_id: parseInt(data.order_id),
           customer_name: data.customer_name || '',
