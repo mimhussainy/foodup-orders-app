@@ -177,8 +177,8 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       return;
     }
 
-    // Only show countdown if this is a live foreground notification
-    if (!showCountdown) return;
+    // Only show countdown when this order is still eligible for backend auto-action.
+    if (!showCountdown || order?.auto_actioned) return;
 
     AsyncStorage.getItem('restaurant_code').then(async code => {
       if (!code) return;
@@ -187,48 +187,61 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         const result = await res.json();
         if (result.success && result.settings.auto_action !== 'disabled') {
           setAutoSettings(result.settings);
-          setCountdown(result.settings.wait_minutes * 60);
+          const waitSeconds = Math.max(1, Number(result.settings.wait_minutes || 5) * 60);
+          const receivedRaw = order?.received_at || order?.timestamp || order?.date_created;
+          const receivedMs = typeof receivedRaw === 'number'
+            ? receivedRaw
+            : (receivedRaw ? new Date(String(receivedRaw).replace(' ', 'T')).getTime() : NaN);
+          const elapsedSeconds = Number.isFinite(receivedMs)
+            ? Math.max(0, Math.floor((Date.now() - receivedMs) / 1000))
+            : 0;
+          setCountdown(Math.max(0, waitSeconds - elapsedSeconds));
         }
       } catch (e) {}
     });
-  }, [visible, showCountdown]);
+  }, [visible, showCountdown, order?.order_id, order?.received_at, order?.timestamp, order?.auto_actioned]);
 
-  // Countdown timer — display only, backend handles the actual auto-action
+  // Countdown timer — display only. Reaching zero is NOT proof that the server
+  // auto-action succeeded. Keep the modal/Review state until the backend confirms
+  // auto_actioned; otherwise a slow/failed server action could silently hide an order.
   useEffect(() => {
     if (countdown === null) return;
-    if (countdown <= 0) {
-      setCountdown(null);
 
-      // Auto-action completed normally while the modal stayed open.
-      // Clear pending Review. If the app/modal was force-closed earlier,
-      // this code never runs and Review remains available.
-      const orderId = Number(order?.order_id);
-
-      if (Number.isFinite(orderId)) {
-        AsyncStorage.getItem('pending_decision')
-          .then(async stored => {
-            const list: number[] = stored ? JSON.parse(stored) : [];
-            const updated = list.filter(id => id !== orderId);
-
-            await AsyncStorage.setItem(
-              'pending_decision',
-              JSON.stringify(updated)
-            );
-
-            await AsyncStorage.setItem(
-              'pending_decision_refresh',
-              String(Date.now())
-            );
-          })
-          .catch(() => {});
-      }
-
-      onClose();
-      return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => (c !== null ? Math.max(0, c - 1) : null)), 1000);
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => setCountdown(c => (c !== null ? c - 1 : null)), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
+
+    let cancelled = false;
+    const verifyAutoAction = async () => {
+      try {
+        const code = await AsyncStorage.getItem('restaurant_code') || '';
+        const orderId = Number(order?.order_id);
+        if (!code || !Number.isFinite(orderId)) return;
+        const res = await fetch(`${BACKEND_URL}/check-auto-actioned/${code}/${orderId}`);
+        const result = await res.json();
+        if (cancelled || !result?.auto_actioned) return;
+
+        const stored = await AsyncStorage.getItem('pending_decision');
+        const list: number[] = stored ? JSON.parse(stored) : [];
+        await AsyncStorage.setItem(
+          'pending_decision',
+          JSON.stringify(list.filter(id => id !== orderId))
+        );
+        await AsyncStorage.setItem('pending_decision_refresh', String(Date.now()));
+        onClose();
+      } catch (e) {
+        // Keep the modal visible; live reconciliation will retry/resolve it.
+      }
+    };
+
+    void verifyAutoAction();
+    const timer = setInterval(() => void verifyAutoAction(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [countdown, order?.order_id, onClose]);
 
   // Reset on open
   useEffect(() => {

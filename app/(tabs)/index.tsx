@@ -285,9 +285,21 @@ useEffect(() => {
       }
     }, 2000);
 
+    // RootLayout performs the guaranteed live reconciliation. When it discovers
+    // an order that arrived without a push, refresh this screen from the backend.
+    let lastOrdersLiveRefresh = '';
+    const ordersLiveRefreshInterval = setInterval(async () => {
+      const flag = await AsyncStorage.getItem('orders_live_refresh');
+      if (flag && flag !== lastOrdersLiveRefresh) {
+        lastOrdersLiveRefresh = flag;
+        void fetchOrdersFromBackend();
+      }
+    }, 2000);
+
     return () => {
       clearInterval(autoRefreshInterval);
       clearInterval(pendingRefreshInterval);
+      clearInterval(ordersLiveRefreshInterval);
     };
   }, []);
 
