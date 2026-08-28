@@ -12,6 +12,40 @@ import { printOrder } from '../lib/printer';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
+// Manual decision printing must be idempotent. The same order can be visible
+// through more than one UI path (live modal + Review screen), and duplicated
+// callbacks must never produce duplicate kitchen receipts. Manual reprints from
+// the order details screen are intentionally not affected by this guard.
+const decisionPrintClaims = new Set<string>();
+
+async function printDecisionOnce(
+  action: 'accept' | 'reject',
+  order: any,
+  printJob: () => Promise<unknown>
+): Promise<boolean> {
+  const orderId = Number(order?.order_id);
+  if (!Number.isFinite(orderId) || orderId <= 0) return false;
+
+  const claimId = `${action}:${orderId}`;
+  if (decisionPrintClaims.has(claimId)) {
+    console.log(`[decision-print] duplicate blocked ${claimId}`);
+    return false;
+  }
+  decisionPrintClaims.add(claimId);
+
+  const storageKey = `foodup_decision_print_${action}_${orderId}`;
+  const existing = await AsyncStorage.getItem(storageKey).catch(() => null);
+  if (existing) {
+    console.log(`[decision-print] persisted duplicate blocked ${claimId}`);
+    return false;
+  }
+
+  // Claim before starting the print job so two modal instances cannot race.
+  await AsyncStorage.setItem(storageKey, String(Date.now())).catch(() => {});
+  await printJob();
+  return true;
+}
+
 async function scheduleScheduledOrderReminder(order: any, acceptTime: string, t: any) {
   try {
     const parts = acceptTime.split('—');
@@ -119,10 +153,11 @@ interface AcceptRejectModalProps {
   visible: boolean;
   onClose: () => void;
   onDecisionMade?: (orderId: number) => void;
+  onDecisionStart?: (orderId: number) => void | Promise<void>;
   showCountdown?: boolean; // true only for live foreground notifications
 }
 
-export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade, showCountdown = false }: AcceptRejectModalProps) {
+export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade, onDecisionStart, showCountdown = false }: AcceptRejectModalProps) {
   const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
   const [selectedTime, setSelectedTime] = useState<number | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
@@ -284,21 +319,10 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
   const handleConfirmAcceptWithTime = async (acceptTime: string) => {
     setLoading(true);
     setCountdown(null);
+    void onDecisionStart?.(Number(order?.order_id));
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
 
-      // Start the existing print timer before WordPress synchronization.
-      // Keep the original print delay unchanged.
-      setTimeout(() => {
-        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
-        if (isScheduledTime) {
-          printOrder(order, undefined, false, '', acceptTime).catch(() => {});
-          scheduleScheduledOrderReminder(order, acceptTime, t).catch(() => {});
-        } else {
-          const mins = parseInt(acceptTime);
-          printOrder(order, isNaN(mins) ? 30 : mins).catch(() => {});
-        }
-      }, 300);
       // Owner took control — cancel backend auto-action
       fetch(`${BACKEND_URL}/cancel-auto-action`, {
         method: 'POST',
@@ -330,6 +354,20 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         status: 'accepted',
       });
       }
+
+      // Print only after the acceptance has been synchronized, and only once
+      // for this order even if two UI paths race.
+      await printDecisionOnce('accept', order, async () => {
+        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+        if (isScheduledTime) {
+          await printOrder(order, undefined, false, '', acceptTime);
+          await scheduleScheduledOrderReminder(order, acceptTime, t);
+        } else {
+          const mins = parseInt(acceptTime);
+          await printOrder(order, isNaN(mins) ? 30 : mins);
+        }
+      });
+
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
@@ -341,6 +379,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
   const handleConfirmRejectWithReason = async (reason: string) => {
     setLoading(true);
     setCountdown(null);
+    void onDecisionStart?.(Number(order?.order_id));
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       // Owner took control — cancel backend auto-action
@@ -388,11 +427,11 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         sound: false,
       });
       await removePendingDecision(order.order_id);
+      await printDecisionOnce('reject', order, async () => {
+        await printOrder(order, undefined, true, reason);
+      });
       setLoading(false);
       onClose();
-      setTimeout(() => {
-        printOrder(order, undefined, true, reason).catch(() => {});
-      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();
@@ -403,6 +442,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     if (!selectedTime) return;
     setLoading(true);
     setCountdown(null);
+    void onDecisionStart?.(Number(order?.order_id));
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       // Owner took control — cancel backend auto-action
@@ -413,16 +453,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
 
-      // Start the existing print timer before WordPress synchronization.
-      // Keep the original print delay unchanged.
-      setTimeout(() => {
-        if (isScheduled) {
-          printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`).catch(() => {});
-          scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t).catch(() => {});
-        } else {
-          printOrder(order, selectedTime).catch(() => {});
-        }
-      }, 2000);
       const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
       const website = restaurantProfile?.profile?.website;
       if (!website) {
@@ -448,6 +478,16 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         status: 'accepted',
       });
       }
+
+      await printDecisionOnce('accept', order, async () => {
+        if (isScheduled) {
+          await printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`);
+          await scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t);
+        } else {
+          await printOrder(order, selectedTime);
+        }
+      });
+
       await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
@@ -462,6 +502,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
     if (!reason) return;
     setLoading(true);
     setCountdown(null);
+    void onDecisionStart?.(Number(order?.order_id));
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       // Owner took control — cancel backend auto-action
@@ -516,11 +557,11 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         sound: false,
       });
       await removePendingDecision(order.order_id);
+      await printDecisionOnce('reject', order, async () => {
+        await printOrder(order, undefined, true, reason);
+      });
       setLoading(false);
       onClose();
-      setTimeout(() => {
-        printOrder(order, undefined, true, reason).catch(() => {});
-      }, 2000);
     } catch (e) {
       setLoading(false);
       onClose();

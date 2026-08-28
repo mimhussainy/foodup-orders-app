@@ -1,4 +1,4 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
@@ -811,6 +811,9 @@ export default function RootLayout() {
             order={newOrderModal}
             visible={showOrderModal}
             showCountdown={showCountdown}
+            onDecisionStart={async () => {
+              await stopOrderSound();
+            }}
             onClose={async () => {
               debugLog(`MODAL onClose order:${newOrderModal?.order_id ?? 'none'}`);
               if (orderSoundRef.current) {
