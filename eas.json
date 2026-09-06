@@ -18,6 +18,15 @@
     "production": {
       "channel": "production",
       "distribution": "store"
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "production",
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

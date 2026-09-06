@@ -33,7 +33,7 @@
       },
       "package": "com.foodup.orders",
       "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 2,
+      "versionCode": 3,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
