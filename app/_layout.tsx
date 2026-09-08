@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -11,6 +10,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
+import {
+  isOrderRingtoneSuppressed, isOrderRingtoneResolved, resolveOrderRingtone, startOrderRingtone,
+  stopAllOrderRingtone, stopOrderRingtone, subscribeOrderRingtoneResolution, suppressOrderRingtone,
+  orderRingtoneKey, OrderRingtoneKey, sameRingtoneKey, ringtoneKeyId, selectOrderRingtoneRestaurant,
+  markOrderRingtoneResolved, releaseOrderRingtoneSuppression, subscribeOrderRingtoneFailure,
+} from '../lib/orderRingtone';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const DEVICE_AUTH_CACHE_MS = 10 * 60 * 1000;
@@ -219,11 +224,19 @@ export default function RootLayout() {
   const [newOrderModal, setNewOrderModal] = useState<any>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
-  const orderSoundRef = useRef<any>(null);
+  const mountedRef = useRef(true);
+  const restaurantReadGenerationRef = useRef(0);
+  const restaurantReadPromiseRef = useRef<Promise<string | null>>(Promise.resolve(null));
+  const queueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const orderQueueRef = useRef<any[]>([]);
   const modalOpenRef = useRef(false);
   const currentModalOrderIdRef = useRef<number | null>(null);
-  const processedNewOrderIdsRef = useRef<Set<number>>(new Set());
+  const currentModalKeyRef = useRef<OrderRingtoneKey | null>(null);
+  const currentModalEntryRef = useRef<any>(null);
+  const localDecisionKeysRef = useRef(new Set<string>());
+  const failedDecisionKeysRef = useRef(new Set<string>());
+  const processedNewOrderIdsRef = useRef<Set<string>>(new Set());
+  const keyForOrder = (order: any) => orderRingtoneKey(order?.restaurant_code || '', Number(order?.order_id));
   const liveCursorRef = useRef(0);
   const liveSyncRunningRef = useRef(false);
   const liveRestaurantCodeRef = useRef('');
@@ -245,16 +258,14 @@ export default function RootLayout() {
     return () => backHandler.remove();
   }, []);
 
-  const stopOrderSound = async () => {
-    if (!orderSoundRef.current) return;
-    await orderSoundRef.current.stopAsync().catch(() => {});
-    await orderSoundRef.current.unloadAsync().catch(() => {});
-    orderSoundRef.current = null;
-  };
-
-  const startOrderSound = async (orderId: number) => {
+  const startOrderSound = async (key: OrderRingtoneKey) => {
+    const orderId = key.orderId;
     if (Platform.OS !== 'android') return;
+    const eligible = () => mountedRef.current && sameRingtoneKey(currentModalKeyRef.current, key) && !isOrderRingtoneSuppressed(key) && !isOrderRingtoneResolved(key);
+    if (!eligible()) return;
     try {
+      const code = await refreshRingtoneRestaurant();
+      if (code !== key.restaurantCode || !eligible()) return;
       const selectedSound = await AsyncStorage.getItem('notification_sound') || 'default';
       const soundMap: { [key: string]: string } = {
         default: 'https://assets.mixkit.co/active_storage/sfx/1045/1045.wav',
@@ -265,20 +276,18 @@ export default function RootLayout() {
         slot_machine: 'https://assets.mixkit.co/active_storage/sfx/1995/1995.wav',
       };
       const uri = soundMap[selectedSound];
-      if (!uri) return;
-      await stopOrderSound();
+      if (!uri || !eligible()) return;
       debugLog(`SOUND START order:${orderId} selected:${selectedSound} uri:${uri}`);
-      const { sound } = await Audio.Sound.createAsync({ uri }, { isLooping: true });
-      orderSoundRef.current = sound;
-      await sound.playAsync();
-      debugLog(`SOUND OK order:${orderId} selected:${selectedSound}`);
+      await startOrderRingtone(key, uri);
     } catch (e) {
       debugLog(`SOUND ERROR order:${orderId} error:${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
-  const addPendingDecision = async (orderId: number) => {
-    if (Platform.OS === 'ios') return;
+  const addPendingDecision = async (orderId: number, restaurantCode?: string) => {
+    if (Platform.OS === 'ios' || !mountedRef.current) return;
+    const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    if ((restaurantCode && code !== restaurantCode) || isOrderRingtoneResolved(orderRingtoneKey(code, orderId))) return;
     const stored = await AsyncStorage.getItem('pending_decision').catch(() => null);
     const list: number[] = stored ? JSON.parse(stored) : [];
     if (list.includes(orderId)) return;
@@ -287,7 +296,10 @@ export default function RootLayout() {
     await AsyncStorage.setItem('pending_decision_refresh', String(Date.now())).catch(() => {});
   };
 
-  const removePendingDecision = async (orderId: number) => {
+  const removePendingDecision = async (key: OrderRingtoneKey) => {
+    const orderId = key.orderId;
+    const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    if (code !== key.restaurantCode) return;
     const stored = await AsyncStorage.getItem('pending_decision').catch(() => null);
     const list: number[] = stored ? JSON.parse(stored) : [];
     const updated = list.filter(id => id !== orderId);
@@ -297,43 +309,128 @@ export default function RootLayout() {
   };
 
   const showNextInQueue = () => {
+    if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
+    queueTimerRef.current = null;
+    if (!mountedRef.current) return;
+    orderQueueRef.current = orderQueueRef.current.filter(
+      queued => !isOrderRingtoneResolved(keyForOrder(queued.order))
+    );
     if (orderQueueRef.current.length === 0) {
       modalOpenRef.current = false;
       currentModalOrderIdRef.current = null;
+      currentModalKeyRef.current = null;
+      currentModalEntryRef.current = null;
       return;
     }
     const next = orderQueueRef.current.shift();
     setShowOrderModal(false);
     setNewOrderModal(null);
     setShowCountdown(false);
-    currentModalOrderIdRef.current = null;
-    setTimeout(() => {
-      currentModalOrderIdRef.current = Number(next.order.order_id);
+    // Reserve ownership during the transition so resolution can cancel it.
+    const key = keyForOrder(next.order);
+    const orderId = key.orderId;
+    currentModalOrderIdRef.current = orderId;
+    currentModalKeyRef.current = key;
+    currentModalEntryRef.current = next;
+    modalOpenRef.current = true;
+    queueTimerRef.current = setTimeout(() => {
+      queueTimerRef.current = null;
+      if (!mountedRef.current || !sameRingtoneKey(currentModalKeyRef.current, key)) return;
+      if (isOrderRingtoneResolved(key)) {
+        showNextInQueue();
+        return;
+      }
       setNewOrderModal(next.order);
       setShowOrderModal(true);
       setShowCountdown(next.showCountdown);
       modalOpenRef.current = true;
-      void startOrderSound(Number(next.order.order_id));
+      void startOrderSound(key);
     }, 400);
   };
 
-  const dismissResolvedOrder = async (orderId: number) => {
+  const closeOrder = (key: OrderRingtoneKey) => {
+    void stopOrderRingtone(key);
+    if (!mountedRef.current) return;
+    localDecisionKeysRef.current.delete(ringtoneKeyId(key));
     orderQueueRef.current = orderQueueRef.current.filter(
-      queued => Number(queued.order?.order_id) !== Number(orderId)
+      queued => !sameRingtoneKey(keyForOrder(queued.order), key)
     );
-    if (currentModalOrderIdRef.current !== Number(orderId)) return;
-    await stopOrderSound();
+    if (!sameRingtoneKey(currentModalKeyRef.current, key)) return;
+    if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
+    queueTimerRef.current = null;
+    // Preserve recovery when an existing handler closes after a failed decision.
+    if (failedDecisionKeysRef.current.delete(ringtoneKeyId(key)) && !isOrderRingtoneResolved(key) && currentModalEntryRef.current) {
+      orderQueueRef.current.push(currentModalEntryRef.current);
+    }
     setShowOrderModal(false);
     setNewOrderModal(null);
     setShowCountdown(false);
     modalOpenRef.current = false;
     currentModalOrderIdRef.current = null;
-    setTimeout(showNextInQueue, 250);
+    currentModalKeyRef.current = null;
+    currentModalEntryRef.current = null;
+    showNextInQueue();
   };
+
+  const dismissResolvedOrder = (key: OrderRingtoneKey) => resolveOrderRingtone(key);
+  const beginRootDecision = (key: OrderRingtoneKey) => {
+    localDecisionKeysRef.current.add(ringtoneKeyId(key));
+    return suppressOrderRingtone(key);
+  };
+  const refreshRingtoneRestaurant = (): Promise<string | null> => {
+    const token = ++restaurantReadGenerationRef.current;
+    const read = async (): Promise<string | null> => {
+      const code = String(await AsyncStorage.getItem('restaurant_code').catch(() => '') || '').toLowerCase().trim();
+      if (!mountedRef.current) return null;
+      // Older reads follow the latest request instead of selecting stale scope
+      // or accidentally silencing a concurrent start for the same restaurant.
+      if (token !== restaurantReadGenerationRef.current) return restaurantReadPromiseRef.current;
+      selectOrderRingtoneRestaurant(code);
+      return code;
+    };
+    const result = read();
+    restaurantReadPromiseRef.current = result;
+    return result;
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const unsubscribe = subscribeOrderRingtoneResolution(key => {
+      // A local decision may still be printing when its own server echo arrives.
+      if (!localDecisionKeysRef.current.has(ringtoneKeyId(key))) closeOrder(key);
+    });
+    const unsubscribeFailure = subscribeOrderRingtoneFailure(key => {
+      localDecisionKeysRef.current.delete(ringtoneKeyId(key));
+      if (isOrderRingtoneResolved(key)) { closeOrder(key); return; }
+      failedDecisionKeysRef.current.add(ringtoneKeyId(key));
+      processedNewOrderIdsRef.current.delete(ringtoneKeyId(key));
+      if (sameRingtoneKey(currentModalKeyRef.current, key)) void startOrderSound(key);
+    });
+    // Observe selection independently of live-sync, which may be waiting for I/O.
+    // This reads local storage only; selection UI/storage and API polling are unchanged.
+    void refreshRingtoneRestaurant();
+    const restaurantInterval = setInterval(() => void refreshRingtoneRestaurant(), 1000);
+    const restaurantReadGeneration = restaurantReadGenerationRef;
+    return () => {
+      mountedRef.current = false;
+      ++restaurantReadGeneration.current;
+      unsubscribe();
+      unsubscribeFailure();
+      clearInterval(restaurantInterval);
+      if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
+      queueTimerRef.current = null;
+      void stopAllOrderRingtone();
+    };
+    // Lifetime subscriptions use refs and stable React setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const enqueueOrder = async (order: any, withCountdown: boolean, fromNotification: boolean = false): Promise<boolean> => {
     const orderId = Number(order?.order_id);
-    if (!Number.isFinite(orderId)) return false;
+    const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    const key = orderRingtoneKey(order.restaurant_code || code, orderId);
+    if (!Number.isFinite(orderId) || !mountedRef.current || key.restaurantCode !== code || isOrderRingtoneResolved(key)) return false;
+    order = { ...order, restaurant_code: key.restaurantCode };
 
     const terminalStatuses = new Set(['completed', 'cancelled', 'refunded', 'failed']);
     if (terminalStatuses.has(String(order.status || '').toLowerCase())) return false;
@@ -347,9 +444,9 @@ export default function RootLayout() {
     }
 
     if (
-      processedNewOrderIdsRef.current.has(orderId) ||
-      currentModalOrderIdRef.current === orderId ||
-      orderQueueRef.current.some(q => Number(q.order?.order_id) === orderId)
+      processedNewOrderIdsRef.current.has(ringtoneKeyId(key)) ||
+      sameRingtoneKey(currentModalKeyRef.current, key) ||
+      orderQueueRef.current.some(q => sameRingtoneKey(keyForOrder(q.order), key))
     ) {
       debugLog(`SKIP_DUP order:${orderId}`);
       return false;
@@ -357,7 +454,6 @@ export default function RootLayout() {
 
     // A delayed notification must never reopen an order that the server already
     // accepted. Bound this safety request so a slow backend cannot delay a live modal.
-    const code = await AsyncStorage.getItem('restaurant_code').catch(() => '') || '';
     if (code && fromNotification) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1200);
@@ -366,7 +462,8 @@ export default function RootLayout() {
         const result = await res.json();
         if (result.success && result.accepted_time) {
           debugLog(`DROP accepted order:${orderId}`);
-          await removePendingDecision(orderId);
+          dismissResolvedOrder(key);
+          await removePendingDecision(key);
           return false;
         }
       } catch (e) {
@@ -376,7 +473,13 @@ export default function RootLayout() {
       }
     }
 
-    processedNewOrderIdsRef.current.add(orderId);
+    // Another source or a decision may have won while the safety check awaited.
+    const latestCode = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    if (!mountedRef.current || latestCode !== key.restaurantCode || isOrderRingtoneResolved(key) ||
+        processedNewOrderIdsRef.current.has(ringtoneKeyId(key)) ||
+        sameRingtoneKey(currentModalKeyRef.current, key) ||
+        orderQueueRef.current.some(q => sameRingtoneKey(keyForOrder(q.order), key))) return false;
+    processedNewOrderIdsRef.current.add(ringtoneKeyId(key));
 
     if (modalOpenRef.current) {
       orderQueueRef.current.push({ order, showCountdown: withCountdown });
@@ -387,6 +490,8 @@ export default function RootLayout() {
     debugLog(`SHOW order:${orderId}`);
     modalOpenRef.current = true;
     currentModalOrderIdRef.current = orderId;
+    currentModalKeyRef.current = key;
+    currentModalEntryRef.current = { order, showCountdown: withCountdown };
     setNewOrderModal(order);
     setShowOrderModal(true);
     setShowCountdown(withCountdown);
@@ -442,9 +547,22 @@ export default function RootLayout() {
     const subscription = Notifications.addNotificationReceivedListener(async notification => {
       const data = notification.request.content.data as any;
 
+      if (data.event_type === 'order_accepted_update' ||
+          (data.event_type === 'status_update' && ['completed', 'cancelled', 'refunded', 'failed'].includes(String(data.status || '').toLowerCase()))) {
+        const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+        const incomingCode = String(data.restaurant_code || '').toLowerCase().trim();
+        const orderId = Number(data.order_id);
+        if (mountedRef.current && code && incomingCode === code && Number.isFinite(orderId)) {
+          dismissResolvedOrder(orderRingtoneKey(code, orderId));
+          await removePendingDecision(orderRingtoneKey(code, orderId));
+        }
+        return;
+      }
+
       if (data.event_type === 'auto_accepted') {
         try {
           const orderId = Number(data.order_id);
+          const code = String(data.restaurant_code || '').toLowerCase().trim();
           await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
           await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
             accepted_time: data.accepted_time || '',
@@ -464,8 +582,8 @@ export default function RootLayout() {
             items: data.items || '[]',
           }));
           if (Number.isFinite(orderId)) {
-            await removePendingDecision(orderId);
-            await dismissResolvedOrder(orderId);
+            dismissResolvedOrder(orderRingtoneKey(code, orderId));
+            await removePendingDecision(orderRingtoneKey(code, orderId));
           }
         } catch(e) {}
         return;
@@ -518,10 +636,10 @@ export default function RootLayout() {
           date_created: data.date_created || '',
         };
 
-        await addPendingDecision(newOrder.order_id);
+        await addPendingDecision(newOrder.order_id, String(newOrder.restaurant_code || currentCode).toLowerCase().trim());
         debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
         const enqueued = await enqueueOrder(newOrder, true, true);
-        if (enqueued) await startOrderSound(newOrder.order_id);
+        if (enqueued && currentModalOrderIdRef.current === newOrder.order_id) await startOrderSound(keyForOrder({ ...newOrder, restaurant_code: newOrder.restaurant_code || currentCode }));
       }
     });
 
@@ -571,8 +689,9 @@ export default function RootLayout() {
           orderable_order_date: data.orderable_order_date || '',
         };
         debugLog(`SRC:tap order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
-        await addPendingDecision(newOrder.order_id);
-        await enqueueOrder(newOrder, true, true);
+        await addPendingDecision(newOrder.order_id, String(newOrder.restaurant_code || currentCode).toLowerCase().trim());
+        const enqueued = await enqueueOrder(newOrder, true, true);
+        if (enqueued && currentModalOrderIdRef.current === newOrder.order_id) await startOrderSound(keyForOrder({ ...newOrder, restaurant_code: newOrder.restaurant_code || currentCode }));
       }
     });
 
@@ -673,11 +792,10 @@ export default function RootLayout() {
       liveSyncRunningRef.current = true;
 
       try {
-        const [codeRaw, role] = await Promise.all([
-          AsyncStorage.getItem('restaurant_code'),
+        const [code, role] = await Promise.all([
+          refreshRingtoneRestaurant(),
           AsyncStorage.getItem('user_role'),
         ]);
-        const code = String(codeRaw || '').toLowerCase().trim();
         if (!code || role !== 'owner') return;
 
         if (liveRestaurantCodeRef.current !== code) {
@@ -704,7 +822,9 @@ export default function RootLayout() {
           clearTimeout(timeout);
         }
 
-        if (!result?.success) return;
+        if (stopped || !result?.success) return;
+        const selectedCode = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+        if (selectedCode !== code) return;
 
         let authorizedOrderDevice = false;
         if (Platform.OS === 'android') {
@@ -728,9 +848,10 @@ export default function RootLayout() {
           const orderId = Number(orderIdText);
           if (!Number.isFinite(orderId)) continue;
 
-          if (state?.accepted || state?.rejected) {
-            await removePendingDecision(orderId);
-            await dismissResolvedOrder(orderId);
+          const status = String(stateOrderMap.get(orderIdText)?.status || '').toLowerCase();
+          if (state?.accepted || state?.rejected || ['completed', 'cancelled', 'refunded', 'failed'].includes(status)) {
+            dismissResolvedOrder(orderRingtoneKey(code, orderId));
+            await removePendingDecision(orderRingtoneKey(code, orderId));
             await AsyncStorage.setItem('orders_live_refresh', String(Date.now())).catch(() => {});
           }
 
@@ -752,7 +873,7 @@ export default function RootLayout() {
         }
 
         for (const raw of discoveredOrders) {
-          const order = normalizeBackendOrder(raw);
+          const order = normalizeBackendOrder({ ...raw, restaurant_code: code });
           if (!Number.isFinite(order.order_id) || order.order_id <= 0) continue;
 
           const state = result.states?.[String(order.order_id)] || {};
@@ -761,11 +882,11 @@ export default function RootLayout() {
           if (!shouldRecoverForDecision(order)) continue;
           if (!authorizedOrderDevice) continue;
 
-          await addPendingDecision(order.order_id);
+          await addPendingDecision(order.order_id, code);
           debugLog(`SRC:live-sync order:${order.order_id} cursor:${liveCursorRef.current}`);
           const enqueued = await enqueueOrder(order, true, false);
           if (enqueued && currentModalOrderIdRef.current === order.order_id) {
-            await startOrderSound(order.order_id);
+            await startOrderSound(keyForOrder(order));
           }
         }
 
@@ -811,21 +932,10 @@ export default function RootLayout() {
             order={newOrderModal}
             visible={showOrderModal}
             showCountdown={showCountdown}
-            onDecisionStart={async () => {
-              await stopOrderSound();
-            }}
-            onClose={async () => {
-              debugLog(`MODAL onClose order:${newOrderModal?.order_id ?? 'none'}`);
-              if (orderSoundRef.current) {
-                await orderSoundRef.current.stopAsync().catch(() => {});
-                await orderSoundRef.current.unloadAsync().catch(() => {});
-                orderSoundRef.current = null;
-              }
-              setShowOrderModal(false);
-              setNewOrderModal(null);
-              setShowCountdown(false);
-              showNextInQueue();
-            }}
+            onDecisionStart={() => beginRootDecision(keyForOrder(newOrderModal))}
+            onDecisionMade={() => markOrderRingtoneResolved(keyForOrder(newOrderModal))}
+            onDecisionFailed={() => releaseOrderRingtoneSuppression(keyForOrder(newOrderModal))}
+            onClose={() => closeOrder(keyForOrder(newOrderModal))}
           />
         </View>
       )}

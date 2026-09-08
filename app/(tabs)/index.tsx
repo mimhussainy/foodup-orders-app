@@ -24,6 +24,7 @@ import {
   View
 } from 'react-native';
 import AcceptRejectModal from '../../components/AcceptRejectModal';
+import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone, suppressOrderRingtone } from '../../lib/orderRingtone';
 import CustomAlert from '../../components/CustomAlert';
 import OrderCountdown from '../../components/OrderCountdown';
 import ScheduledCountdown from '../../components/ScheduledCountdown';
@@ -1246,9 +1247,10 @@ const flatData: FlatItem[] = [
                     )}
                     {pendingDecisionOrders.includes(order.order_id) && (
                       <TouchableOpacity
-                        onPress={(e) => {
+                        onPress={async (e) => {
                           e.stopPropagation();
-                          setAcceptRejectOrder(order);
+                          const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+                          setAcceptRejectOrder({ ...order, restaurant_code: order.restaurant_code || code });
                           setShowAcceptReject(true);
                         }}
                         style={{ backgroundColor: '#E91E6320', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
@@ -1396,11 +1398,14 @@ const flatData: FlatItem[] = [
       <AcceptRejectModal
         order={acceptRejectOrder}
         visible={showAcceptReject}
+        onDecisionStart={(orderId: number) => suppressOrderRingtone(orderRingtoneKey(acceptRejectOrder?.restaurant_code || '', orderId))}
+        onDecisionFailed={(orderId: number) => releaseOrderRingtoneSuppression(orderRingtoneKey(acceptRejectOrder?.restaurant_code || '', orderId))}
         onClose={() => {
           setShowAcceptReject(false);
           setAcceptRejectOrder(null);
         }}
         onDecisionMade={(orderId: number) => {
+          resolveOrderRingtone(orderRingtoneKey(acceptRejectOrder?.restaurant_code || '', orderId));
           setPendingDecisionOrders(prev => prev.filter(id => id !== orderId));
         }}
       />

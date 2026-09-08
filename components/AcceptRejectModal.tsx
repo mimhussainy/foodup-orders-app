@@ -154,10 +154,11 @@ interface AcceptRejectModalProps {
   onClose: () => void;
   onDecisionMade?: (orderId: number) => void;
   onDecisionStart?: (orderId: number) => void | Promise<void>;
+  onDecisionFailed?: (orderId: number) => void;
   showCountdown?: boolean; // true only for live foreground notifications
 }
 
-export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade, onDecisionStart, showCountdown = false }: AcceptRejectModalProps) {
+export default function AcceptRejectModal({ order, visible, onClose, onDecisionMade, onDecisionStart, onDecisionFailed, showCountdown = false }: AcceptRejectModalProps) {
   const [step, setStep] = useState<'main' | 'accept' | 'reject'>('main');
   const [selectedTime, setSelectedTime] = useState<number | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
@@ -372,6 +373,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       setLoading(false);
       onClose();
     } catch (e) {
+      onDecisionFailed?.(Number(order.order_id));
       setLoading(false);
     }
   };
@@ -433,6 +435,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       setLoading(false);
       onClose();
     } catch (e) {
+      onDecisionFailed?.(Number(order.order_id));
       setLoading(false);
       onClose();
     }
@@ -492,6 +495,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       setLoading(false);
       onClose();
     } catch (e) {
+      onDecisionFailed?.(Number(order.order_id));
       setLoading(false);
       onClose();
     }
@@ -563,6 +567,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       setLoading(false);
       onClose();
     } catch (e) {
+      onDecisionFailed?.(Number(order.order_id));
       setLoading(false);
       onClose();
     }
