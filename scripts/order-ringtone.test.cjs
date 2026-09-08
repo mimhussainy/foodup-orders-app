@@ -694,3 +694,48 @@ test('V2 concurrent scope polling does not discard a valid ringtone start', asyn
   q.unmount();
   await h.api.stopAllOrderRingtone();
 });
+
+
+test('V2 regression: accepted order never re-rings if printing fails after decision commit', async () => {
+  const h = audioHarness(), q = queueHarness(h), c = h.controller;
+  const current = { ...order(123), restaurant_code: 'demo' };
+  await q.enqueueOrder(current, true);
+  q.storage.set('pending_decision', '[123]');
+
+  const initial = q.startOrderSound(123);
+  await flush();
+  const firstSound = h.loads[0].finish();
+  await initial;
+  assert.equal(firstSound.playing, true);
+
+  const callbacks = rootDecisionCallbacks(h, q, current);
+  const source = read('components/AcceptRejectModal.tsx');
+  const helper = source.slice(source.indexOf('  const removePendingDecision ='), source.indexOf('  if (!order) return null;'));
+  const handlers = source.slice(source.indexOf('  const handleConfirmAcceptWithTime ='), source.indexOf('\n  return (\n    <Modal'));
+  const accept = vm.runInNewContext(compile(helper + handlers) + '\nhandleConfirmAccept;', {
+    ...q.environment, ...callbacks,
+    order: current, selectedTime: 30, isScheduled: false,
+    scheduledTime: '', scheduledDate: '',
+    t: { other: 'Other', minutes: 'Minutes' },
+    setLoading() {}, setCountdown() {},
+    postWordPressDecision: async () => {},
+    postDecisionAction: async () => ({ success: true }),
+    fetch: async () => ({ json: async () => ({ profile: { website: 'https://example.invalid' } }) }),
+    printDecisionOnce: async () => { throw new Error('printer failure'); },
+    onDecisionMade: callbacks.onDecisionMade,
+    onDecisionStart: callbacks.onDecisionStart,
+    onDecisionFailed: callbacks.onDecisionFailed,
+    onClose: callbacks.onClose,
+  });
+
+  await accept();
+  q.tick();
+  await flush();
+
+  const key = c.orderRingtoneKey('demo', 123);
+  assert.equal(c.isOrderRingtoneResolved(key), true);
+  assert.equal(firstSound.playing, false);
+  assert.equal(h.loads.length, 1, 'no replacement ringtone may be created after committed acceptance');
+  q.unmount();
+  await c.stopAllOrderRingtone();
+});

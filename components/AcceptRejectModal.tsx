@@ -356,6 +356,12 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       });
       }
 
+      // The order decision is already committed before printing starts.
+      // Resolve pending/ringtone state now so a printer failure cannot make an
+      // already-accepted order eligible to ring again. The parent still keeps
+      // the root modal open until onClose after printing completes.
+      await removePendingDecision(order.order_id, 7000);
+
       // Print only after the acceptance has been synchronized, and only once
       // for this order even if two UI paths race.
       await printDecisionOnce('accept', order, async () => {
@@ -368,8 +374,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           await printOrder(order, isNaN(mins) ? 30 : mins);
         }
       });
-
-      await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
     } catch (e) {
@@ -482,6 +486,10 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       });
       }
 
+      // Acceptance is already committed at this point. Resolve pending/ringtone
+      // state before printing so a printer failure cannot restart the ringtone.
+      await removePendingDecision(order.order_id, 7000);
+
       await printDecisionOnce('accept', order, async () => {
         if (isScheduled) {
           await printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`);
@@ -490,8 +498,6 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           await printOrder(order, selectedTime);
         }
       });
-
-      await removePendingDecision(order.order_id, 7000);
       setLoading(false);
       onClose();
     } catch (e) {
