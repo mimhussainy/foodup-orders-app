@@ -32,6 +32,7 @@ import { formatDate, formatISODate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder } from '../../lib/printer';
+import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../../lib/orderDisplay';
 import { useLanguage } from '../../lib/useLanguage';
 
 
@@ -67,6 +68,17 @@ interface Order {
   orderable_order_date?: string;
   orderable_order_time?: string;
   date_created?: string;
+  fulfillment_type?: string;
+  order_type?: string;
+  qr_order_number?: number;
+  qr_service_day?: string;
+  table_id?: string | number;
+  table_number?: string;
+  table_name?: string;
+  table_session_id?: string;
+  table_round_id?: string;
+  table_integration?: string;
+  source?: string;
 }
 
 
@@ -448,6 +460,17 @@ useEffect(() => {
           orderable_order_date: o.orderable_order_date || '',
           orderable_order_time: o.orderable_order_time || '',
           date_created: o.date_created || '',
+          fulfillment_type: o.fulfillment_type || o.order_type || '',
+          order_type: o.order_type || o.fulfillment_type || '',
+          qr_order_number: Number(o.qr_order_number || 0) || undefined,
+          qr_service_day: o.qr_service_day || '',
+          table_id: o.table_id || '',
+          table_number: o.table_number || '',
+          table_name: o.table_name || '',
+          table_session_id: o.table_session_id || '',
+          table_round_id: o.table_round_id || '',
+          table_integration: o.table_integration || '',
+          source: o.source || '',
         }));
         setOrders(prev => {
           const merged = [...prev];
@@ -458,8 +481,18 @@ useEffect(() => {
               merged.push(bo);
               hasChanges = true;
             } else {
-              if (bo.status && bo.status !== merged[exists].status) {
-                merged[exists] = { ...merged[exists], status: bo.status };
+              const current = merged[exists];
+              const metadataChanged =
+                bo.status !== current.status ||
+                bo.fulfillment_type !== current.fulfillment_type ||
+                bo.qr_order_number !== current.qr_order_number ||
+                bo.qr_service_day !== current.qr_service_day ||
+                bo.table_number !== current.table_number ||
+                bo.table_name !== current.table_name ||
+                bo.table_session_id !== current.table_session_id ||
+                bo.table_round_id !== current.table_round_id;
+              if (metadataChanged) {
+                merged[exists] = { ...current, ...bo };
                 hasChanges = true;
               }
             }
@@ -500,6 +533,17 @@ useEffect(() => {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
             date_created: data.date_created || '',
+            fulfillment_type: data.fulfillment_type || data.order_type || '',
+            order_type: data.order_type || data.fulfillment_type || '',
+            qr_order_number: Number(data.qr_order_number || 0) || undefined,
+            qr_service_day: data.qr_service_day || '',
+            table_id: data.table_id || '',
+            table_number: data.table_number || '',
+            table_name: data.table_name || '',
+            table_session_id: data.table_session_id || '',
+            table_round_id: data.table_round_id || '',
+            table_integration: data.table_integration || '',
+            source: data.source || '',
             items: data.items || '[]',
           };
           AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(printData)).catch(() => {});
@@ -558,6 +602,17 @@ useEffect(() => {
         orderable_order_time: data.orderable_order_time || '',
         orderable_order_date: data.orderable_order_date || '',
         date_created: data.date_created || '',
+        fulfillment_type: data.fulfillment_type || data.order_type || '',
+        order_type: data.order_type || data.fulfillment_type || '',
+        qr_order_number: Number(data.qr_order_number || 0) || undefined,
+        qr_service_day: data.qr_service_day || '',
+        table_id: data.table_id || '',
+        table_number: data.table_number || '',
+        table_name: data.table_name || '',
+        table_session_id: data.table_session_id || '',
+        table_round_id: data.table_round_id || '',
+        table_integration: data.table_integration || '',
+        source: data.source || '',
         };
 
         if (data.event_type === 'status_update') {
@@ -566,7 +621,7 @@ useEffect(() => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
             if (exists >= 0 && data.status) {
               const updated = [...prev];
-              updated[exists] = { ...updated[exists], status: data.status };
+              updated[exists] = { ...updated[exists], ...newOrder, status: data.status };
               return updated;
             }
             return prev;
@@ -631,6 +686,17 @@ useEffect(() => {
             address: order.shipping_address || '',
           },
           event_type: 'status_update',
+          fulfillment_type: order.fulfillment_type || order.order_type || '',
+          order_type: order.order_type || order.fulfillment_type || '',
+          qr_order_number: order.qr_order_number || '',
+          qr_service_day: order.qr_service_day || '',
+          table_id: order.table_id || '',
+          table_number: order.table_number || '',
+          table_name: order.table_name || '',
+          table_session_id: order.table_session_id || '',
+          table_round_id: order.table_round_id || '',
+          table_integration: order.table_integration || '',
+          source: order.source || '',
           sound: false,
         }),
       });
@@ -759,6 +825,9 @@ useEffect(() => {
       const s = search.toLowerCase();
       return (
         String(o.order_id).includes(s) ||
+        String(o.qr_order_number || '').includes(s) ||
+        String(o.table_number || '').toLowerCase().includes(s) ||
+        String(o.table_name || '').toLowerCase().includes(s) ||
         o.customer_name.toLowerCase().includes(s) ||
         o.customer_phone.toLowerCase().includes(s)
       );
@@ -824,8 +893,8 @@ const flatData: FlatItem[] = [
             <TouchableOpacity onPress={() => {
               const { Share } = require('react-native');
               Share.share({
-                title: `Order #${selectedOrder.order_id}`,
-                message: `Order #${selectedOrder.order_id}\nCustomer: ${selectedOrder.customer_name}\nPhone: ${formatPhone(selectedOrder.customer_phone)}\nAddress: ${selectedOrder.shipping_address}\nTotal: ${selectedOrder.currency} ${selectedOrder.total}\nPayment: ${selectedOrder.payment_method}\nItems: ${selectedOrder.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}${selectedOrder.note ? `\nNote: ${selectedOrder.note}` : ''}`,
+                title: getQrOrderContextLabel(selectedOrder, t.table || 'Tisch') || getOrderPrimaryLabel(selectedOrder, t.orderNumber || 'Order'),
+                message: `${getQrOrderContextLabel(selectedOrder, t.table || 'Tisch') || getOrderPrimaryLabel(selectedOrder, t.orderNumber || 'Order')}\nCustomer: ${selectedOrder.customer_name}\nPhone: ${formatPhone(selectedOrder.customer_phone)}\nAddress: ${selectedOrder.shipping_address}\nTotal: ${selectedOrder.currency} ${selectedOrder.total}\nPayment: ${selectedOrder.payment_method}\nItems: ${selectedOrder.items.map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}${selectedOrder.note ? `\nNote: ${selectedOrder.note}` : ''}`,
               });
             }} style={styles.backCircle}>
               <Ionicons name="share-outline" size={20} color="#111" />
@@ -839,7 +908,7 @@ const flatData: FlatItem[] = [
             {/* ── CARD (collapsed style, not tappable) ── */}
             <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
               <View style={styles.orderTopRow}>
-                <Text style={styles.orderId}>Order #{selectedOrder.order_id}</Text>
+                <Text style={styles.orderId}>{getQrOrderContextLabel(selectedOrder, t.table || 'Tisch') || getOrderPrimaryLabel(selectedOrder, t.orderNumber || 'Order')}</Text>
                 <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) + '20' }]}>
                   <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) }]}>
                     {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
@@ -849,8 +918,8 @@ const flatData: FlatItem[] = [
               <View style={styles.divider} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="person-outline" size={Platform.OS === 'android' ? 13 : 14} color="#999" />
-                  <Text style={styles.orderCustomer}>{selectedOrder.customer_name}</Text>
+                  <Ionicons name={isDineInOrder(selectedOrder) ? "restaurant-outline" : "person-outline"} size={Platform.OS === 'android' ? 13 : 14} color="#999" />
+                  <Text style={styles.orderCustomer}>{isDineInOrder(selectedOrder) ? (getTableLabel(selectedOrder, t.table || 'Tisch') || 'Am Tisch') : selectedOrder.customer_name}</Text>
                 </View>
                 {selectedOrder.orderable_order_time ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -1238,7 +1307,7 @@ const flatData: FlatItem[] = [
                 activeOpacity={0.7}
               >
                 <View style={styles.orderTopRow}>
-                  <Text style={styles.orderId}>Order #{order.order_id}</Text>
+                  <Text style={styles.orderId}>{getQrOrderContextLabel(order, t.table || 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber || 'Order')}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {autoPrintOrders[String(order.order_id)] && (
                       <View style={{ backgroundColor: '#79554820', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
@@ -1271,8 +1340,8 @@ const flatData: FlatItem[] = [
                 <View style={styles.divider} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="person-outline" size={14} color="#999" />
-                    <Text style={styles.orderCustomer}>{order.customer_name}</Text>
+                    <Ionicons name={isDineInOrder(order) ? "restaurant-outline" : "person-outline"} size={14} color="#999" />
+                    <Text style={styles.orderCustomer}>{isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name}</Text>
                   </View>
                   {order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

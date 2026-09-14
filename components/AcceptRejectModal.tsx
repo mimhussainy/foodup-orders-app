@@ -9,6 +9,7 @@ import {
 import { formatAddress } from '../lib/formatters';
 import { getTranslation, Language } from '../lib/i18n';
 import { printOrder } from '../lib/printer';
+import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../lib/orderDisplay';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -61,7 +62,7 @@ async function scheduleScheduledOrderReminder(order: any, acceptTime: string, t:
     await Notifications.scheduleNotificationAsync({
       content: {
         title: `⏰ ${t.scheduledOrderReminder}`,
-        body: `${t.orderNumber} #${order.order_id} ${t.scheduledReminderFor} ${order.customer_name} ${t.scheduledReminderDue} (${timePart})`,
+        body: `${getQrOrderContextLabel(order, t.table || 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber)} ${t.scheduledReminderFor} ${isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name} ${t.scheduledReminderDue} (${timePart})`,
         sound: true,
       },
       trigger: {
@@ -586,7 +587,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           {step === 'main' && (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>{t.orderNumber} #{order.order_id}</Text>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>{getQrOrderContextLabel(order, t.table || 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber)}</Text>
                 {countdown !== null && autoSettings && showCountdown && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="hourglass-outline" size={18} color={countdown < 60 ? '#e74c3c' : '#f39c12'} />
@@ -599,8 +600,8 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                 <View style={{ gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="person-outline" size={13} color="#999" />
-                    <Text style={{ fontSize: 14, color: '#999' }}>{order.customer_name}</Text>
+                    <Ionicons name={isDineInOrder(order) ? "restaurant-outline" : "person-outline"} size={13} color="#999" />
+                    <Text style={{ fontSize: 14, color: '#999' }}>{isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="cash-outline" size={13} color="#999" />

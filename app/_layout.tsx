@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
+import { printOrder } from '../lib/printer';
 import {
   isOrderRingtoneSuppressed, isOrderRingtoneResolved, resolveOrderRingtone, startOrderRingtone,
   stopAllOrderRingtone, stopOrderRingtone, subscribeOrderRingtoneResolution, suppressOrderRingtone,
@@ -29,6 +30,61 @@ function safeParseItems(value: any): any[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];
+  }
+}
+
+
+async function autoPrintAcceptedOrder(payload: any) {
+  const orderId = Number(payload?.order_id);
+  if (!Number.isFinite(orderId) || orderId <= 0) return false;
+
+  const markerKey = `auto_printed_${orderId}`;
+  const existing = await AsyncStorage.getItem(markerKey).catch(() => null);
+  if (existing) return false;
+
+  // Reserve the order immediately so the notification listener and live-sync
+  // fallback can never print the same auto-accepted order twice.
+  await AsyncStorage.setItem(markerKey, 'printing').catch(() => {});
+
+  try {
+    const order = {
+      ...payload,
+      order_id: orderId,
+      items: safeParseItems(payload?.items),
+    };
+
+    const acceptedTime = String(payload?.accepted_time || '').trim();
+    const isScheduled =
+      acceptedTime.includes('—') ||
+      (acceptedTime.includes(':') && !acceptedTime.toLowerCase().includes('minute'));
+
+    let printed = false;
+    if (isScheduled) {
+      printed = await printOrder(order, undefined, false, '', acceptedTime);
+    } else {
+      const minsMatch = acceptedTime.match(/\d+/);
+      const mins = minsMatch ? Number(minsMatch[0]) : 30;
+      printed = await printOrder(order, Number.isFinite(mins) ? mins : 30);
+    }
+
+    if (printed) {
+      await AsyncStorage.setItem(markerKey, String(Date.now())).catch(() => {});
+      console.log(`[auto-print] printed order ${orderId}`);
+      return true;
+    }
+
+    // Not the registered printer / printer temporarily busy: allow the live-sync
+    // fallback to try again later instead of permanently losing the print.
+    await AsyncStorage.removeItem(markerKey).catch(() => {});
+    console.log(`[auto-print] deferred order ${orderId}`);
+    return false;
+  } catch (error) {
+    await AsyncStorage.removeItem(markerKey).catch(() => {});
+    console.log(
+      `[auto-print] failed order ${orderId}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return false;
   }
 }
 
@@ -564,7 +620,7 @@ export default function RootLayout() {
           const orderId = Number(data.order_id);
           const code = String(data.restaurant_code || '').toLowerCase().trim();
           await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now()));
-          await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify({
+          const autoPrintPayload = {
             accepted_time: data.accepted_time || '',
             order_id: data.order_id,
             customer_name: data.customer_name || '',
@@ -579,8 +635,21 @@ export default function RootLayout() {
             orderable_order_time: data.orderable_order_time || '',
             orderable_order_date: data.orderable_order_date || '',
             date_created: data.date_created || '',
+            fulfillment_type: data.fulfillment_type || data.order_type || '',
+            order_type: data.order_type || data.fulfillment_type || '',
+            qr_order_number: Number(data.qr_order_number || 0) || undefined,
+            qr_service_day: data.qr_service_day || '',
+            table_id: data.table_id || '',
+            table_number: data.table_number || '',
+            table_name: data.table_name || '',
+            table_session_id: data.table_session_id || '',
+            table_round_id: data.table_round_id || '',
+            table_integration: data.table_integration || '',
+            source: data.source || '',
             items: data.items || '[]',
-          }));
+          };
+          await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(autoPrintPayload));
+          void autoPrintAcceptedOrder(autoPrintPayload);
           if (Number.isFinite(orderId)) {
             dismissResolvedOrder(orderRingtoneKey(code, orderId));
             await removePendingDecision(orderRingtoneKey(code, orderId));
@@ -630,7 +699,17 @@ export default function RootLayout() {
           shipping_method: data.shipping_method || '',
           shipping_address: data.shipping_address || '',
           restaurant_code: data.restaurant_code || '',
-          fulfillment_type: data.fulfillment_type || '',
+          fulfillment_type: data.fulfillment_type || data.order_type || '',
+          order_type: data.order_type || data.fulfillment_type || '',
+          qr_order_number: Number(data.qr_order_number || 0) || undefined,
+          qr_service_day: data.qr_service_day || '',
+          table_id: data.table_id || '',
+          table_number: data.table_number || '',
+          table_name: data.table_name || '',
+          table_session_id: data.table_session_id || '',
+          table_round_id: data.table_round_id || '',
+          table_integration: data.table_integration || '',
+          source: data.source || '',
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
           date_created: data.date_created || '',
@@ -684,7 +763,17 @@ export default function RootLayout() {
           shipping_method: data.shipping_method || '',
           shipping_address: data.shipping_address || '',
           restaurant_code: data.restaurant_code || '',
-          fulfillment_type: data.fulfillment_type || '',
+          fulfillment_type: data.fulfillment_type || data.order_type || '',
+          order_type: data.order_type || data.fulfillment_type || '',
+          qr_order_number: Number(data.qr_order_number || 0) || undefined,
+          qr_service_day: data.qr_service_day || '',
+          table_id: data.table_id || '',
+          table_number: data.table_number || '',
+          table_name: data.table_name || '',
+          table_session_id: data.table_session_id || '',
+          table_round_id: data.table_round_id || '',
+          table_integration: data.table_integration || '',
+          source: data.source || '',
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
@@ -734,7 +823,17 @@ export default function RootLayout() {
         shipping_method: String(raw?.shipping?.method || raw?.shipping_method || ''),
         shipping_address: String(raw?.shipping?.address || raw?.shipping_address || ''),
         restaurant_code: String(raw?.restaurant_code || ''),
-        fulfillment_type: String(raw?.fulfillment_type || ''),
+        fulfillment_type: String(raw?.fulfillment_type || raw?.order_type || ''),
+        order_type: String(raw?.order_type || raw?.fulfillment_type || ''),
+        qr_order_number: Number(raw?.qr_order_number || 0) || undefined,
+        qr_service_day: String(raw?.qr_service_day || ''),
+        table_id: raw?.table_id ?? '',
+        table_number: String(raw?.table_number || ''),
+        table_name: String(raw?.table_name || ''),
+        table_session_id: String(raw?.table_session_id || ''),
+        table_round_id: String(raw?.table_round_id || ''),
+        table_integration: String(raw?.table_integration || ''),
+        source: String(raw?.source || ''),
         orderable_order_time: String(raw?.orderable_order_time || ''),
         orderable_order_date: String(raw?.orderable_order_date || ''),
         date_created: dateCreated,
@@ -784,6 +883,17 @@ export default function RootLayout() {
       orderable_order_time: String(order?.orderable_order_time || ''),
       orderable_order_date: String(order?.orderable_order_date || ''),
       date_created: String(order?.date_created || ''),
+      fulfillment_type: String(order?.fulfillment_type || order?.order_type || ''),
+      order_type: String(order?.order_type || order?.fulfillment_type || ''),
+      qr_order_number: Number(order?.qr_order_number || 0) || undefined,
+      qr_service_day: String(order?.qr_service_day || ''),
+      table_id: order?.table_id ?? '',
+      table_number: String(order?.table_number || ''),
+      table_name: String(order?.table_name || ''),
+      table_session_id: String(order?.table_session_id || ''),
+      table_round_id: String(order?.table_round_id || ''),
+      table_integration: String(order?.table_integration || ''),
+      source: String(order?.source || ''),
       items: Array.isArray(order?.items) ? order.items : safeParseItems(order?.items),
     });
 
@@ -858,11 +968,13 @@ export default function RootLayout() {
           if (state?.auto_accepted && state?.accepted) {
             const rawOrder = stateOrderMap.get(orderIdText);
             if (rawOrder) {
+              const autoPrintPayload = buildAutoPrintPayload(rawOrder, state.accepted);
               await AsyncStorage.setItem(
                 `auto_print_${orderId}`,
-                JSON.stringify(buildAutoPrintPayload(rawOrder, state.accepted))
+                JSON.stringify(autoPrintPayload)
               ).catch(() => {});
               await AsyncStorage.setItem('auto_accepted_refresh', String(Date.now())).catch(() => {});
+              void autoPrintAcceptedOrder(autoPrintPayload);
             }
           }
         }

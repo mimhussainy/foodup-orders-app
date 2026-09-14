@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import * as Print from 'expo-print';
+import { getOrderPrimaryLabel, getTableLabel, isDineInOrder } from './orderDisplay';
 
 let isPrinting = false;
 
@@ -211,6 +212,9 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       pickedUp: lang === 'de' ? 'Abgeholt' : 'Picked up',
     };
 
+    const printedOrderLabel = getOrderPrimaryLabel(order, labels.orderLabel);
+    const printedTableLabel = getTableLabel(order, lang === 'de' ? 'Tisch' : 'Table');
+
     const inferredScheduledStr = (() => {
   if (order.orderable_order_date && order.orderable_order_time) {
     const isAsap = order.orderable_order_time.toLowerCase().includes('as soon as possible') ||
@@ -256,7 +260,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
         </head>
         <body>
           ${logoHtml}
-          <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 4px 0; letter-spacing:0;">${labels.orderLabel}#${order.order_id}</h2>
+          <h2 style="text-align:center; font-size:22px; font-weight:900; margin:6px 0 4px 0; letter-spacing:0;">${printedOrderLabel}</h2>
           <p style="font-size:16px; color:#333; margin:2px 0;">${labels.createTime}: <span style="float:right;">${createdTimeStr}&nbsp;&nbsp;${createdDateStr}</span></p>
           <div class="divider"></div>
           <p style="text-align:center; font-size:17px; font-weight:bold; margin:2px 0; text-transform:uppercase; letter-spacing:1px;">${labels.requestedFor}:</p>
@@ -269,6 +273,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
                 <div style="font-size:22px; font-weight:900; margin-top:2px;">${
                   order.shipping_method === 'Lieferung' ? (lang === 'de' ? 'Lieferung' : 'Delivery') :
                   order.shipping_method === 'Abholung' ? (lang === 'de' ? 'Abholung' : 'Pickup') :
+                  isDineInOrder(order) ? (printedTableLabel || (lang === 'de' ? 'Am Tisch' : 'Dine in')) :
                   order.shipping_method || '-'
                 }</div>
               </td>
