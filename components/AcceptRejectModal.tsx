@@ -62,7 +62,7 @@ async function scheduleScheduledOrderReminder(order: any, acceptTime: string, t:
     await Notifications.scheduleNotificationAsync({
       content: {
         title: `⏰ ${t.scheduledOrderReminder}`,
-        body: `${getQrOrderContextLabel(order, t.table || 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber)} ${t.scheduledReminderFor} ${isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name} ${t.scheduledReminderDue} (${timePart})`,
+        body: `${getQrOrderContextLabel(order, 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber)} ${t.scheduledReminderFor} ${isDineInOrder(order) ? (getTableLabel(order, 'Tisch') || 'Am Tisch') : order.customer_name} ${t.scheduledReminderDue} (${timePart})`,
         sound: true,
       },
       trigger: {
@@ -317,6 +317,62 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
   };
 
   if (!order) return null;
+
+  const tableOrder = isDineInOrder(order);
+
+  const handleTableAccept = async () => {
+    setLoading(true);
+    setCountdown(null);
+    void onDecisionStart?.(Number(order?.order_id));
+
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+      fetch(`${BACKEND_URL}/cancel-auto-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
+      }).catch(() => {});
+
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+        .then(r => r.json())
+        .catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+
+      if (!website) throw new Error('Restaurant website is not configured');
+
+      const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+
+      await postWordPressDecision(
+        baseUrl + '/wp-json/foodup/v1/order-accepted',
+        {
+          secret: 'foodup2026',
+          order_id: order.order_id,
+          accepted_time: '',
+        }
+      );
+
+      await postDecisionAction('/accepted-time', {
+        restaurant_code: code,
+        order_id: order.order_id,
+        accepted_time: '',
+        accepted_at: new Date().toISOString(),
+        status: 'accepted',
+      });
+
+      await removePendingDecision(order.order_id, 7000);
+
+      await printDecisionOnce('accept', order, async () => {
+        await printOrder(order);
+      });
+
+      setLoading(false);
+      onClose();
+    } catch (e) {
+      onDecisionFailed?.(Number(order.order_id));
+      setLoading(false);
+    }
+  };
 
   const handleConfirmAcceptWithTime = async (acceptTime: string) => {
     setLoading(true);
@@ -587,8 +643,8 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           {step === 'main' && (
             <>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>{getQrOrderContextLabel(order, t.table || 'Tisch') || getOrderPrimaryLabel(order, t.orderNumber)}</Text>
-                {countdown !== null && autoSettings && showCountdown && (
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#111' }}>{getQrOrderContextLabel(order, (modalLang === 'de' ? 'Tisch' : 'Table')) || getOrderPrimaryLabel(order, t.orderNumber)}</Text>
+                {!tableOrder && countdown !== null && autoSettings && showCountdown && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="hourglass-outline" size={18} color={countdown < 60 ? '#e74c3c' : '#f39c12'} />
                     <Text style={{ fontSize: 18, fontWeight: '900', color: countdown < 60 ? '#e74c3c' : '#f39c12' }}>
@@ -601,7 +657,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                 <View style={{ gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name={isDineInOrder(order) ? "restaurant-outline" : "person-outline"} size={13} color="#999" />
-                    <Text style={{ fontSize: 14, color: '#999' }}>{isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name}</Text>
+                    <Text style={{ fontSize: 14, color: '#999' }}>{isDineInOrder(order) ? (getTableLabel(order, (modalLang === 'de' ? 'Tisch' : 'Table')) || 'Am Tisch') : order.customer_name}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="cash-outline" size={13} color="#999" />
@@ -609,7 +665,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                   </View>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  {order.orderable_order_time ? (
+                  {!tableOrder && order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons
                         name={isScheduled ? 'calendar-outline' : 'flash-outline'}
@@ -621,7 +677,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                       </Text>
                     </View>
                   ) : null}
-                  {countdown !== null && autoSettings && showCountdown && (
+                  {!tableOrder && countdown !== null && autoSettings && showCountdown && (
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={{ fontSize: 11, color: '#999' }}>
                         {autoSettings.auto_action === 'accept' ? t.autoAccept : t.autoReject}:
@@ -633,13 +689,13 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
                   )}
                 </View>
               </View>
-              {isScheduled && order.orderable_order_date ? (
+              {!tableOrder && isScheduled && order.orderable_order_date ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <Ionicons name="time-outline" size={14} color="#8B38CB" />
                   <Text style={{ fontSize: 13, color: '#8B38CB' }}>{scheduledTime} — {scheduledDate}</Text>
                 </View>
               ) : null}
-              {order.shipping_address ? (
+              {!tableOrder && order.shipping_address ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                   <Ionicons name="location-outline" size={14} color="#8B38CB" />
                   <Text style={{ fontSize: 13, color: '#8B38CB', flex: 1 }}>{formatAddress(order.shipping_address)}</Text>
@@ -659,14 +715,30 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: '#2ecc71', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                onPress={() => { setStep('accept'); setCountdown(null); }}
+                onPress={() => {
+                  if (tableOrder) {
+                    void handleTableAccept();
+                  } else {
+                    setStep('accept');
+                    setCountdown(null);
+                  }
+                }}
+                disabled={loading}
               >
                 <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.acceptOrder}</Text>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{loading && tableOrder ? t.printing : t.acceptOrder}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ backgroundColor: '#e74c3c', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                onPress={() => { setStep('reject'); setCountdown(null); }}
+                onPress={() => {
+                  if (tableOrder) {
+                    void handleConfirmRejectWithReason('');
+                  } else {
+                    setStep('reject');
+                    setCountdown(null);
+                  }
+                }}
+                disabled={loading}
               >
                 <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t.rejectOrder}</Text>

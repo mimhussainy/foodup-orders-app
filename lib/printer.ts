@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
-import { Platform } from 'react-native';
 import * as Print from 'expo-print';
+import { Platform } from 'react-native';
 import { getOrderPrimaryLabel, getTableLabel, isDineInOrder } from './orderDisplay';
 
 let isPrinting = false;
@@ -88,6 +88,81 @@ async function verifyRegisteredPrinterDevice(): Promise<boolean> {
   }
 }
 
+
+function normalizePrintLogoScale(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 100;
+  return Math.max(60, Math.min(140, Math.round(parsed)));
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs = 3500): Promise<any> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function resolvePrintBranding(code: string): Promise<{ logoUrl: string; scale: number }> {
+  const logoCacheKey = `foodup_print_logo_url_${code}`;
+  const scaleCacheKey = `foodup_print_logo_scale_${code}`;
+
+  let logoUrl = (await AsyncStorage.getItem(logoCacheKey)) || '';
+  let scale = normalizePrintLogoScale(await AsyncStorage.getItem(scaleCacheKey));
+
+  try {
+    const profileData = await fetchJsonWithTimeout(
+      `${PRINTER_BACKEND_URL}/restaurant-profile/${encodeURIComponent(code)}`
+    );
+    const profile = profileData?.profile || {};
+
+    const backendLogo = String(profile?.print_logo_url || '').trim();
+    if (backendLogo) {
+      logoUrl = backendLogo;
+    }
+
+    const website = String(profile?.website || '').trim().replace(/\/+$/, '');
+    if (website) {
+      try {
+        const brandingData = await fetchJsonWithTimeout(
+          `${website}/wp-json/foodup/v1/app-profile?foodup_cache_bust=${Date.now()}`
+        );
+
+        const directLogo = String(brandingData?.print_logo_url || '').trim();
+        if (directLogo) {
+          logoUrl = directLogo;
+        }
+
+        scale = normalizePrintLogoScale(brandingData?.print_logo_scale);
+      } catch (error) {
+        console.log(
+          '[print-branding] WordPress branding refresh failed; using cached/backend values:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    if (logoUrl) {
+      await AsyncStorage.setItem(logoCacheKey, logoUrl);
+    }
+    await AsyncStorage.setItem(scaleCacheKey, String(scale));
+  } catch (error) {
+    console.log(
+      '[print-branding] backend profile refresh failed; using cached values:',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
+  return { logoUrl, scale };
+}
+
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {
   const registeredPrinter = await verifyRegisteredPrinterDevice();
   if (!registeredPrinter) {
@@ -105,29 +180,11 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     let logoHtml = '';
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
-      const cacheKey = `foodup_print_logo_url_${code}`;
-      const cachedLogoUrl = await AsyncStorage.getItem(cacheKey);
+      const branding = await resolvePrintBranding(code);
 
-      if (cachedLogoUrl) {
-        logoHtml = `<img src="${cachedLogoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
-
-        fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`)
-          .then(r => r.json())
-          .then(async profileData => {
-            const freshLogoUrl = profileData?.profile?.print_logo_url || '';
-            if (freshLogoUrl) {
-              await AsyncStorage.setItem(cacheKey, freshLogoUrl);
-            }
-          })
-          .catch(() => {});
-      } else {
-        const profileRes = await fetch(`https://foodup-order-alerts-backend.onrender.com/restaurant-profile/${code}`);
-        const profileData = await profileRes.json();
-        const logoUrl = profileData?.profile?.print_logo_url;
-        if (logoUrl) {
-          await AsyncStorage.setItem(cacheKey, logoUrl);
-          logoHtml = `<img src="${logoUrl}" style="width:220px; display:block; margin:0 auto 8px auto;" />`;
-        }
+      if (branding.logoUrl) {
+        const logoWidth = Math.round(220 * (branding.scale / 100));
+        logoHtml = `<img src="${branding.logoUrl}" style="width:${logoWidth}px; max-width:90%; height:auto; display:block; margin:0 auto 8px auto;" />`;
       }
     } catch (e) {}
 
@@ -210,10 +267,45 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
       scanQr: lang === 'de' ? 'QR-Code scannen für Navigation' : 'Scan for navigation',
       deliveredBy: lang === 'de' ? 'Geliefert von' : 'Delivered by',
       pickedUp: lang === 'de' ? 'Abgeholt' : 'Picked up',
+      tableOrder: lang === 'de' ? 'Tischbestellung' : 'Table order',
+      tableNotPaid: lang === 'de' ? 'Noch nicht bezahlt' : 'Not yet paid',
+      payAtCounter: lang === 'de' ? 'An der Kasse bezahlen' : 'Pay at cashier',
+      payWithWaiter: lang === 'de' ? 'Beim Service bezahlen' : 'Pay with waiter',
     };
 
     const printedOrderLabel = getOrderPrimaryLabel(order, labels.orderLabel);
     const printedTableLabel = getTableLabel(order, lang === 'de' ? 'Tisch' : 'Table');
+    const dineInOrder = isDineInOrder(order);
+
+    const tablePaymentMethod = String(order.payment_method || '').trim().toLowerCase();
+    const tablePaymentPending =
+      tablePaymentMethod === 'fuo_table_counter' ||
+      tablePaymentMethod === 'fuo_table_waiter' ||
+      tablePaymentMethod.includes('cashier') ||
+      tablePaymentMethod.includes('counter') ||
+      tablePaymentMethod.includes('kasse') ||
+      tablePaymentMethod.includes('waiter') ||
+      tablePaymentMethod.includes('service') ||
+      tablePaymentMethod.includes('pay later') ||
+      tablePaymentMethod.includes('bar') ||
+      tablePaymentMethod.includes('cash');
+
+    const tablePaymentLabel =
+      tablePaymentMethod === 'fuo_table_counter' ||
+      tablePaymentMethod.includes('cashier') ||
+      tablePaymentMethod.includes('counter') ||
+      tablePaymentMethod.includes('kasse')
+        ? labels.payAtCounter
+        : tablePaymentMethod === 'fuo_table_waiter' ||
+          tablePaymentMethod.includes('waiter') ||
+          tablePaymentMethod.includes('service') ||
+          tablePaymentMethod.includes('pay later')
+        ? labels.payWithWaiter
+        : tablePaymentMethod.includes('bar') || tablePaymentMethod.includes('cash')
+        ? (lang === 'de' ? 'Barzahlung' : 'Cash')
+        : tablePaymentMethod.includes('online') || tablePaymentMethod.includes('card')
+        ? 'Online'
+        : (order.payment_method || '-');
 
     const inferredScheduledStr = (() => {
   if (order.orderable_order_date && order.orderable_order_time) {
@@ -245,7 +337,72 @@ const acceptanceHtml = resolvedScheduledStr ? `
       ${rejectionReason ? `<p style="text-align:left; font-size:18px; margin:2px 0;">${rejectionReason}</p>` : ''}
     ` : '';
 
-    const html = `
+    const tableOrderHtml = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px; width: 280px; }
+            * { -webkit-print-color-adjust: exact; }
+            @page { margin: 0; size: 80mm auto; }
+            .divider { border-top: 1px solid #000; margin: 9px 0; }
+            .divider-dashed { border-top: 1px dashed #000; margin: 9px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            td { font-size: 13px; vertical-align: top; }
+            .table-kicker { text-align:center; font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; margin:2px 0 3px; }
+            .table-title { text-align:center; font-size:31px; line-height:1; font-weight:900; margin:4px 0 5px; }
+            .qr-title { text-align:center; font-size:22px; line-height:1.1; font-weight:900; margin:0 0 8px; }
+            .meta-row { font-size:14px; margin:3px 0; }
+            .payment-box { border:2px solid #000; padding:8px 9px; margin:10px 0; text-align:center; }
+            .payment-label { font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-bottom:3px; }
+            .payment-method { font-size:19px; font-weight:900; line-height:1.15; }
+            .payment-state { font-size:15px; font-weight:800; margin-top:4px; }
+          </style>
+        </head>
+        <body>
+          ${logoHtml}
+
+          <div class="table-kicker">${labels.tableOrder}</div>
+          <div class="table-title">${printedTableLabel || labels.tableOrder}</div>
+          <div class="qr-title">${printedOrderLabel}</div>
+
+          <div class="divider"></div>
+          <p class="meta-row">${labels.createTime}: <span style="float:right; font-weight:700;">${createdTimeStr}&nbsp;&nbsp;${createdDateStr}</span></p>
+          <div class="divider"></div>
+
+          <table>${itemsHtml}</table>
+
+          <div class="divider"></div>
+          <table>
+            ${(() => {
+              const itemsSum = (order.items || []).reduce((sum: number, item: any) => sum + parseFloat(String(item.total || '0')), 0);
+              const tip = parseFloat(String(order.total || '0')) - itemsSum;
+              if (tip > 0.01) {
+                return `<tr><td colspan="2" style="text-align:right; font-size:16px; color:#333;">${lang === 'de' ? 'Trinkgeld' : 'Tip'}:&nbsp;&nbsp;${order.currency} ${tip.toFixed(2)}</td></tr>`;
+              }
+              return '';
+            })()}
+            <tr>
+              <td colspan="2" style="text-align:right; font-size:21px; font-weight:900;">${labels.total}:&nbsp;&nbsp;${order.currency} ${parseFloat(String(order.total || '0')).toFixed(2)}</td>
+            </tr>
+          </table>
+
+          <div class="payment-box">
+            <div class="payment-label">${labels.paymentMode}</div>
+            <div class="payment-method">${tablePaymentLabel}</div>
+            <div class="payment-state">${tablePaymentPending ? labels.tableNotPaid : labels.paid}</div>
+          </div>
+
+          ${order.note ? `<div class="divider-dashed"></div><p style="font-size:18px;"><strong>${labels.note}:</strong> ${order.note}</p>` : ''}
+          ${acceptanceHtml}
+
+          <div style="border-top:1px dashed #000; margin:12px 0;"></div>
+          <p style="text-align:center; font-size:12px; color:#000000; margin:4px 0;">Powered by: foodup.ch</p>
+        </body>
+      </html>
+    `;
+
+    const normalOrderHtml = `
       <html>
         <head>
           <meta charset="utf-8">
@@ -347,6 +504,8 @@ const acceptanceHtml = resolvedScheduledStr ? `
         </body>
       </html>
     `;
+
+    const html = dineInOrder ? tableOrderHtml : normalOrderHtml;
 
     const printTimeout = new Promise<void>((_, reject) =>
       setTimeout(() => reject(new Error('Print timeout after 60s')), 60000)

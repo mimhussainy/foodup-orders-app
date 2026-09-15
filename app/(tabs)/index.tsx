@@ -1,15 +1,13 @@
-import { AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
-import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  Animated,
-  BackHandler,
+  Animated, AppState, BackHandler,
   FlatList,
   Image,
   Linking,
@@ -24,15 +22,15 @@ import {
   View
 } from 'react-native';
 import AcceptRejectModal from '../../components/AcceptRejectModal';
-import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone, suppressOrderRingtone } from '../../lib/orderRingtone';
 import CustomAlert from '../../components/CustomAlert';
 import OrderCountdown from '../../components/OrderCountdown';
 import ScheduledCountdown from '../../components/ScheduledCountdown';
 import { formatDate, formatISODate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
+import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../../lib/orderDisplay';
+import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone, suppressOrderRingtone } from '../../lib/orderRingtone';
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder } from '../../lib/printer';
-import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../../lib/orderDisplay';
 import { useLanguage } from '../../lib/useLanguage';
 
 
@@ -102,6 +100,27 @@ function getStatusLabel(status: string, t: any) {
     case 'on-hold': return t.onHold;
     default: return status;
   }
+}
+
+function isUnpaidOrder(order: any): boolean {
+  const method = String(order?.payment_method || '').trim().toLowerCase();
+  const normalCashPayment = method.includes('bar') || method.includes('cash');
+
+  if (!isDineInOrder(order)) {
+    return normalCashPayment;
+  }
+
+  return (
+    normalCashPayment ||
+    method === 'fuo_table_counter' ||
+    method === 'fuo_table_waiter' ||
+    method.includes('cashier') ||
+    method.includes('counter') ||
+    method.includes('kasse') ||
+    method.includes('waiter') ||
+    method.includes('service') ||
+    method.includes('pay later')
+  );
 }
 
 function getDeliveryStatusColor(claim: any, orderStatus?: string) {
@@ -202,6 +221,48 @@ function parseScheduledAcceptedTime(at: string): number | null {
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 const STORAGE_KEY = 'foodup_orders';
 
+async function postTableWordPressStatus(
+  url: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  let lastError: unknown = new Error('Table status synchronization failed');
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      const result: any = await response.json().catch(() => ({}));
+
+      if (!response.ok || result?.success !== true) {
+        throw new Error(
+          `Table status synchronization failed with HTTP ${response.status}`
+        );
+      }
+
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw (lastError instanceof Error
+    ? lastError
+    : new Error('Table status synchronization failed'));
+}
+
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -221,6 +282,7 @@ const [canPrint, setCanPrint] = useState(false);
 const [canUseKitchen, setCanUseKitchen] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [pendingDecisionOrders, setPendingDecisionOrders] = useState<number[]>([]);
+const [tableOrderingEnabled, setTableOrderingEnabled] = useState(false);
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -237,6 +299,39 @@ useEffect(() => {
   const router = useRouter();
   const listRef = useRef<any>(null);
 
+  const fetchTableOrderingEnabled = async () => {
+    try {
+      const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+      if (!code) {
+        setTableOrderingEnabled(false);
+        return;
+      }
+
+      const profile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+        .then(r => r.json())
+        .catch(() => ({}));
+
+      const website = String(profile?.profile?.website || '').trim();
+      if (!website) {
+        setTableOrderingEnabled(false);
+        return;
+      }
+
+      const baseUrl = website.startsWith('http') ? website.replace(/\/$/, '') : `https://${website.replace(/\/$/, '')}`;
+      const response = await fetch(`${baseUrl}/wp-json/foodup/v1/table-ordering-status`);
+      const result = await response.json().catch(() => ({}));
+
+      setTableOrderingEnabled(
+        response.ok &&
+        result?.enabled === true &&
+        String(result?.integration || '') === 'foodup_orders'
+      );
+    } catch (e) {
+      // Capability lookup is optional. Hide the Table filter on a temporary failure.
+      setTableOrderingEnabled(false);
+    }
+  };
+
   useEffect(() => {
     if (!selectedOrder) return;
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -252,6 +347,7 @@ useEffect(() => {
       fetchOrdersFromBackend();
       fetchClaims();
       fetchStoreStatus();
+      fetchTableOrderingEnabled();
       loadAutoPrintOrders();
       loadPendingDecision();
       setTimeout(() => {
@@ -270,6 +366,12 @@ useEffect(() => {
       }, 500);
     }, [])
   );
+
+  useEffect(() => {
+    if (!tableOrderingEnabled && filter === 'table') {
+      setFilter('today');
+    }
+  }, [tableOrderingEnabled, filter]);
 
   useEffect(() => {
     AsyncStorage.getItem('user_role').then(r => {
@@ -665,8 +767,35 @@ useEffect(() => {
       if (!canUseKitchen) return;
 
       const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const tableOrder = isDineInOrder(order);
 
-      await fetch(`${BACKEND_URL}/status-update`, {
+      let baseUrl = '';
+
+      // For table orders the WordPress lifecycle is the customer's live status
+      // source of truth. Confirm it first so the app never advances locally
+      // while the guest page is still stuck on "Accepted".
+      if (tableOrder) {
+        const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+          .then(r => r.json())
+          .catch(() => ({}));
+        const website = restaurantProfile?.profile?.website;
+
+        if (!website) {
+          throw new Error('Restaurant website is not configured');
+        }
+
+        baseUrl = website.startsWith('http') ? website : `https://${website}`;
+
+        await postTableWordPressStatus(
+          `${baseUrl}/wp-json/foodup/v1/order-kitchen`,
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+          }
+        );
+      }
+
+      const backendResponse = await fetch(`${BACKEND_URL}/status-update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -701,16 +830,25 @@ useEffect(() => {
         }),
       });
 
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
+      if (!backendResponse.ok) {
+        throw new Error(`FoodUp status update failed with HTTP ${backendResponse.status}`);
+      }
 
-      if (website) {
-        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-        fetch(`${baseUrl}/wp-json/foodup/v1/order-kitchen`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id }),
-        }).catch(() => {});
+      // Preserve the existing normal-order WordPress callback behavior.
+      if (!tableOrder) {
+        const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+          .then(r => r.json())
+          .catch(() => ({}));
+        const website = restaurantProfile?.profile?.website;
+
+        if (website) {
+          const normalBaseUrl = website.startsWith('http') ? website : `https://${website}`;
+          fetch(`${normalBaseUrl}/wp-json/foodup/v1/order-kitchen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: 'foodup2026', order_id: order.order_id }),
+          }).catch(() => {});
+        }
       }
 
       const updatedOrder = { ...order, status: 'kitchen' };
@@ -722,9 +860,200 @@ useEffect(() => {
       setSelectedOrder(prev =>
         prev && prev.order_id === order.order_id ? updatedOrder : prev
       );
-    } catch (e) {}
+    } catch (e) {
+      console.log(
+        '[table-status] kitchen sync failed:',
+        e instanceof Error ? e.message : String(e)
+      );
+
+      if (isDineInOrder(order)) {
+        Alert.alert(
+          t.error || 'Error',
+          t.tableStatusSyncFailed || 'Table status could not be synchronized. Please try again.'
+        );
+      }
+    }
   };
 
+
+  const markTableOrderReady = async (order: Order) => {
+    if (!isDineInOrder(order)) return;
+
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+        .then(r => r.json())
+        .catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+
+      if (!website) {
+        throw new Error('Restaurant website is not configured');
+      }
+
+      const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+
+      // Keep the guest page and owner app in the same sequence. WordPress is
+      // confirmed first because it owns the live customer-facing table status.
+      await postTableWordPressStatus(
+        `${baseUrl}/wp-json/foodup/v1/order-ready-pickup`,
+        {
+          secret: 'foodup2026',
+          order_id: order.order_id,
+          send_email: false,
+        }
+      );
+
+      const backendResponse = await fetch(`${BACKEND_URL}/status-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_code: code,
+          order_id: order.order_id,
+          status: 'ready_for_pickup',
+          customer_name: order.customer_name || '',
+          customer_email: order.customer_email || '',
+          customer_phone: order.customer_phone || '',
+          total: order.total || '',
+          currency: order.currency || 'CHF',
+          items: order.items || [],
+          payment_method: order.payment_method || '',
+          note: order.note || '',
+          shipping: {
+            method: order.shipping_method || '',
+            address: order.shipping_address || '',
+          },
+          event_type: 'status_update',
+          fulfillment_type: order.fulfillment_type || order.order_type || '',
+          order_type: order.order_type || order.fulfillment_type || '',
+          qr_order_number: order.qr_order_number || '',
+          qr_service_day: order.qr_service_day || '',
+          table_id: order.table_id || '',
+          table_number: order.table_number || '',
+          table_name: order.table_name || '',
+          table_session_id: order.table_session_id || '',
+          table_round_id: order.table_round_id || '',
+          table_integration: order.table_integration || '',
+          source: order.source || '',
+          sound: false,
+        }),
+      });
+
+      if (!backendResponse.ok) {
+        throw new Error(`FoodUp status update failed with HTTP ${backendResponse.status}`);
+      }
+
+      const updatedOrder = { ...order, status: 'ready_for_pickup' };
+      setOrders(prev => prev.map(o => o.order_id === order.order_id ? updatedOrder : o));
+      setSelectedOrder(prev => prev && prev.order_id === order.order_id ? updatedOrder : prev);
+    } catch (e) {
+      console.log(
+        '[table-status] ready sync failed:',
+        e instanceof Error ? e.message : String(e)
+      );
+
+      Alert.alert(
+        t.error || 'Error',
+        t.tableStatusSyncFailed || 'Table status could not be synchronized. Please try again.'
+      );
+    }
+  };
+
+
+  const closeTableSession = async (order: Order) => {
+    if (!isDineInOrder(order) || !order.table_session_id) return;
+
+    try {
+      const code = await AsyncStorage.getItem('restaurant_code') || '';
+      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+        .then(r => r.json())
+        .catch(() => ({}));
+      const website = restaurantProfile?.profile?.website;
+
+      if (!website) throw new Error('Restaurant website is not configured');
+
+      const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+
+      // WordPress owns the table session. Close it first so the QR/customer side
+      // is authoritative before the owner app changes locally.
+      await postTableWordPressStatus(
+        `${baseUrl}/wp-json/foodup/v1/table-close`,
+        {
+          secret: 'foodup2026',
+          order_id: order.order_id,
+        }
+      );
+
+      const sameSessionOrders = orders.filter(item =>
+        isDineInOrder(item) &&
+        String(item.table_session_id || '') === String(order.table_session_id || '')
+      );
+      const targets = sameSessionOrders.length > 0 ? sameSessionOrders : [order];
+
+      for (const target of targets) {
+        const response = await fetch(`${BACKEND_URL}/status-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurant_code: code,
+            order_id: target.order_id,
+            status: 'table_completed',
+            customer_name: target.customer_name || '',
+            customer_email: target.customer_email || '',
+            customer_phone: target.customer_phone || '',
+            total: target.total || '',
+            currency: target.currency || 'CHF',
+            items: target.items || [],
+            payment_method: target.payment_method || '',
+            note: target.note || '',
+            shipping: {
+              method: target.shipping_method || '',
+              address: target.shipping_address || '',
+            },
+            event_type: 'status_update',
+            fulfillment_type: target.fulfillment_type || target.order_type || 'dine_in',
+            order_type: target.order_type || target.fulfillment_type || 'dine_in',
+            qr_order_number: target.qr_order_number || '',
+            qr_service_day: target.qr_service_day || '',
+            table_id: target.table_id || '',
+            table_number: target.table_number || '',
+            table_name: target.table_name || '',
+            table_session_id: target.table_session_id || '',
+            table_round_id: target.table_round_id || '',
+            table_integration: target.table_integration || '',
+            source: target.source || '',
+            sound: false,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`FoodUp table close status failed with HTTP ${response.status}`);
+        }
+      }
+
+      setOrders(prev => prev.map(item =>
+        String(item.table_session_id || '') === String(order.table_session_id || '')
+          ? { ...item, status: 'table_completed' }
+          : item
+      ));
+
+      setSelectedOrder(prev =>
+        prev && String(prev.table_session_id || '') === String(order.table_session_id || '')
+          ? { ...prev, status: 'table_completed' }
+          : prev
+      );
+    } catch (e) {
+      console.log(
+        '[table-status] close table failed:',
+        e instanceof Error ? e.message : String(e)
+      );
+
+      Alert.alert(
+        t.error || 'Error',
+        t.tableStatusSyncFailed || 'Table could not be closed. Please try again.'
+      );
+    }
+  };
 
 
   const loadPickupReadyOrders = async () => {
@@ -768,6 +1097,36 @@ useEffect(() => {
     const isPickup = isPickupMethod(order.shipping_method);
     if (status === 'delivered' && isPickup) return 'pickedUp';
     return status;
+  };
+
+  const getTableStatusPresentation = (order: Order) => {
+    const raw = String(order.status || '').toLowerCase();
+
+    if (['cancelled', 'refunded', 'rejected', 'failed'].includes(raw)) {
+      return { label: t.cancelled || 'Cancelled', color: '#e74c3c', key: 'cancelled' };
+    }
+    if (['table_completed', 'closed'].includes(raw)) {
+      return { label: t.completed || 'Completed', color: '#3498db', key: 'completed' };
+    }
+    if (['ready', 'ready_for_pickup'].includes(raw)) {
+      return { label: t.ready || 'Ready', color: '#2fc053', key: 'ready' };
+    }
+    if (['kitchen', 'processing', 'preparing'].includes(raw)) {
+      return { label: t.kitchen || 'Preparing', color: '#1976D2', key: 'preparing' };
+    }
+    if (acceptedTimes[String(order.order_id)]) {
+      return { label: t.accepted || 'Accepted', color: '#8B38CB', key: 'accepted' };
+    }
+    return { label: t.newOrder || 'Received', color: '#f39c12', key: 'received' };
+  };
+
+  const getOrderStatusPresentation = (order: Order) => {
+    if (isDineInOrder(order)) return getTableStatusPresentation(order);
+    return {
+      label: getDeliveryStatusLabel(claims[String(order.order_id)], order, t),
+      color: getDeliveryStatusColor(claims[String(order.order_id)], order.status),
+      key: getDeliveryStatus(order),
+    };
   };
 
   const shouldShowKitchenButton = (order: Order) => {
@@ -814,6 +1173,7 @@ useEffect(() => {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
         return new Date(o.timestamp) >= todayStart;
       }
+      if (filter === 'table') return isDineInOrder(o);
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
       if (filter === 'kitchen') return getDeliveryStatus(o) === 'kitchen';
       if (filter === 'auto') return !!autoPrintOrders[String(o.order_id)];
@@ -858,6 +1218,7 @@ const flatData: FlatItem[] = [
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayOrders = orders.filter(o => new Date(o.timestamp) >= todayStart);
   const filterCounts = {
+    table: todayOrders.filter(o => isDineInOrder(o)).length,
     new: todayOrders.filter(o => getDeliveryStatus(o) === 'new').length,
     scheduled: todayOrders.filter(o => isScheduledOrder(o) && o.status !== 'cancelled').length,
     kitchen: todayOrders.filter(o => getDeliveryStatus(o) === 'kitchen').length,
@@ -909,11 +1270,16 @@ const flatData: FlatItem[] = [
             <View style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}>
               <View style={styles.orderTopRow}>
                 <Text style={styles.orderId}>{getQrOrderContextLabel(selectedOrder, t.table || 'Tisch') || getOrderPrimaryLabel(selectedOrder, t.orderNumber || 'Order')}</Text>
-                <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) + '20' }]}>
-                  <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(selectedOrder.order_id)], selectedOrder.status) }]}>
-                    {getDeliveryStatusLabel(claims[String(selectedOrder.order_id)], selectedOrder, t)}
-                  </Text>
-                </View>
+                {(() => {
+                  const presentation = getOrderStatusPresentation(selectedOrder);
+                  return (
+                    <View style={[styles.statusPill, { backgroundColor: presentation.color + '20' }]}>
+                      <Text style={[styles.statusPillText, { color: presentation.color }]}>
+                        {presentation.label}
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
               <View style={styles.divider} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -936,16 +1302,16 @@ const flatData: FlatItem[] = [
                   <Text style={styles.orderTotal}>{selectedOrder.currency} {selectedOrder.total}</Text>
                 </View>
                 {(() => {
-                  const isCash = selectedOrder.payment_method?.toLowerCase().includes('bar') || selectedOrder.payment_method?.toLowerCase().includes('cash');
+                  const isUnpaid = isUnpaidOrder(selectedOrder);
                   return (
                     <View style={styles.orderMeta}>
-                      <Ionicons name={isCash ? 'cash-outline' : 'card-outline'} size={14} color={isCash ? '#e74c3c' : '#2ecc71'} />
-                      <Text style={[styles.orderTotal, { color: isCash ? '#e74c3c' : '#2ecc71' }]}>{isCash ? t.notPaid : t.paidOnline}</Text>
+                      <Ionicons name={isUnpaid ? 'cash-outline' : 'card-outline'} size={14} color={isUnpaid ? '#e74c3c' : '#2ecc71'} />
+                      <Text style={[styles.orderTotal, { color: isUnpaid ? '#e74c3c' : '#2ecc71' }]}>{isUnpaid ? t.notPaid : t.paidOnline}</Text>
                     </View>
                   );
                 })()}
               </View>
-              {acceptedTimes[String(selectedOrder.order_id)] && (() => {
+              {!isDineInOrder(selectedOrder) && acceptedTimes[String(selectedOrder.order_id)] && (() => {
                 const claim = claims[String(selectedOrder.order_id)];
                 const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                 const at = acceptedTimes[String(selectedOrder.order_id)].accepted_time || '';
@@ -973,13 +1339,18 @@ const flatData: FlatItem[] = [
                 return null;
               })()}
               <View style={styles.orderBottomRow}>
-                {selectedOrder.shipping_method ? (
+                {isDineInOrder(selectedOrder) ? (
+                  <View style={styles.orderMeta}>
+                    <Ionicons name="restaurant-outline" size={14} color="#999" />
+                    <Text style={styles.orderShipping}>{getTableLabel(selectedOrder, t.table || 'Tisch') || (t.table || 'Tisch')}</Text>
+                  </View>
+                ) : selectedOrder.shipping_method ? (
                   <View style={styles.orderMeta}>
                     <Ionicons name={isPickupMethod(selectedOrder.shipping_method) ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                     <Text style={styles.orderShipping}>{isPickupMethod(selectedOrder.shipping_method) ? t.pickupLabel : t.deliveryLabel}</Text>
                   </View>
                 ) : <View />}
-                {claims[String(selectedOrder.order_id)] ? (
+                {!isDineInOrder(selectedOrder) && claims[String(selectedOrder.order_id)] ? (
                   <View style={styles.orderMeta}>
                     {(() => {
                       const claim = claims[String(selectedOrder.order_id)];
@@ -1102,8 +1473,61 @@ const flatData: FlatItem[] = [
             )}
 
 
+            {/* ── TABLE ORDER ACTION ── */}
+            {isDineInOrder(selectedOrder) && (() => {
+              const presentation = getTableStatusPresentation(selectedOrder);
+
+              if (presentation.key === 'ready') {
+                return (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#111', borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                    onPress={() => {
+                      Alert.alert(
+                        'Tisch schliessen',
+                        'Nur schliessen, wenn der Gast bezahlt hat und fertig ist.',
+                        [
+                          { text: t.cancel || 'Abbrechen', style: 'cancel' },
+                          { text: 'Tisch Schliessen', onPress: () => void closeTableSession(selectedOrder) },
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="checkmark-done-circle-outline" size={18} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Tisch Schliessen</Text>
+                  </TouchableOpacity>
+                );
+              }
+
+              if (presentation.key === 'preparing') {
+                return (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#2fc053', borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                    onPress={() => markTableOrderReady(selectedOrder)}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{t.markReady}</Text>
+                  </TouchableOpacity>
+                );
+              }
+
+              if (presentation.key === 'accepted' && shouldShowKitchenButton(selectedOrder)) {
+                return (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#1976D2', borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                    onPress={() => moveOrderToKitchen(selectedOrder)}
+                  >
+                    <Ionicons name="restaurant-outline" size={18} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{t.moveToKitchen}</Text>
+                  </TouchableOpacity>
+                );
+              }
+
+              return null;
+            })()}
+
             {/* ── MARK DELIVERED / PICKUP BUTTON ── */}
             {(() => {
+              if (isDineInOrder(selectedOrder)) return null;
               const claim = claims[String(selectedOrder.order_id)];
               const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
               const acceptedData = acceptedTimes[String(selectedOrder.order_id)];
@@ -1265,6 +1689,7 @@ const flatData: FlatItem[] = [
                     showsHorizontalScrollIndicator={false}
                     data={[
                       { key: 'today', label: t.today || 'Today', color: '#8B38CB' },
+                      ...(tableOrderingEnabled ? [{ key: 'table', label: t.table || 'Tisch', color: '#6F2DBD' }] : []),
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
                       { key: 'kitchen', label: t.kitchen || 'Kitchen', color: '#1976D2' },
                       { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
@@ -1330,11 +1755,16 @@ const flatData: FlatItem[] = [
                         </Text>
                       </TouchableOpacity>
                     )}
-                    <View style={[styles.statusPill, { backgroundColor: getDeliveryStatusColor(claims[String(order.order_id)], order.status) + '20' }]}>
-                      <Text style={[styles.statusPillText, { color: getDeliveryStatusColor(claims[String(order.order_id)], order.status) }]}>
-                        {getDeliveryStatusLabel(claims[String(order.order_id)], order, t)}
-                      </Text>
-                    </View>
+                    {(() => {
+                      const presentation = getOrderStatusPresentation(order);
+                      return (
+                        <View style={[styles.statusPill, { backgroundColor: presentation.color + '20' }]}>
+                          <Text style={[styles.statusPillText, { color: presentation.color }]}>
+                            {presentation.label}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
                 <View style={styles.divider} />
@@ -1358,22 +1788,33 @@ const flatData: FlatItem[] = [
                     <Text style={styles.orderTotal}>{order.currency} {order.total}</Text>
                   </View>
                   {(() => {
-                    const isCash = order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash');
+                    const isUnpaid = isUnpaidOrder(order);
                     return (
                       <View style={styles.orderMeta}>
-                        <Ionicons name={isCash ? 'cash-outline' : 'card-outline'} size={14} color={isCash ? '#e74c3c' : '#2ecc71'} />
-                        <Text style={[styles.orderTotal, { color: isCash ? '#e74c3c' : '#2ecc71' }]}>{isCash ? t.notPaid : t.paidOnline}</Text>
+                        <Ionicons name={isUnpaid ? 'cash-outline' : 'card-outline'} size={14} color={isUnpaid ? '#e74c3c' : '#2ecc71'} />
+                        <Text style={[styles.orderTotal, { color: isUnpaid ? '#e74c3c' : '#2ecc71' }]}>{isUnpaid ? t.notPaid : t.paidOnline}</Text>
                       </View>
                     );
                   })()}
                 </View>
+                {isDineInOrder(order) ? (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: '#E5E7EB',
+                      marginTop: 10,
+                      marginBottom: 2,
+                      width: '100%',
+                    }}
+                  />
+                ) : null}
                 {order.note ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, backgroundColor: '#fffbeb', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderLeftWidth: 3, borderLeftColor: '#f39c12' }}>
                     <Ionicons name="alert-circle-outline" size={13} color="#f39c12" />
                     <Text style={{ fontSize: 12, color: '#111', fontWeight: '600', flex: 1 }} numberOfLines={1}>{order.note}</Text>
                   </View>
                 ) : null}
-                {acceptedTimes[String(order.order_id)] && (() => {
+                {!isDineInOrder(order) && acceptedTimes[String(order.order_id)] && (() => {
                   const claim = claims[String(order.order_id)];
                   const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
                   const at = acceptedTimes[String(order.order_id)].accepted_time || '';
@@ -1402,7 +1843,12 @@ const flatData: FlatItem[] = [
                     return null;
                   })()}
                 <View style={styles.orderBottomRow}>
-                  {order.shipping_method ? (
+                  {isDineInOrder(order) ? (
+                    <View style={styles.orderMeta}>
+                      <Ionicons name="restaurant-outline" size={14} color="#999" />
+                      <Text style={styles.orderShipping}>{getTableLabel(order, t.table || 'Tisch') || (t.table || 'Tisch')}</Text>
+                    </View>
+                  ) : order.shipping_method ? (
                     <View style={styles.orderMeta}>
                       <Ionicons name={isPickupMethod(order.shipping_method) ? 'bag-outline' : 'bicycle-outline'} size={14} color="#999" />
                       <Text style={styles.orderShipping}>{isPickupMethod(order.shipping_method) ? t.pickupLabel : t.deliveryLabel}</Text>
@@ -1412,7 +1858,7 @@ const flatData: FlatItem[] = [
                   {(() => {
                     const claim = claims[String(order.order_id)];
 
-                    if (claim) {
+                    if (!isDineInOrder(order) && claim) {
                       const raw = typeof claim === 'string' ? claim : claim.name;
                       if (raw === 'Owner' || raw === '__owner__') return null;
 
@@ -1432,7 +1878,48 @@ const flatData: FlatItem[] = [
                       );
                     }
 
-                    if (!shouldShowKitchenButton(order)) return null;
+                    if (isDineInOrder(order)) {
+                      const presentation = getTableStatusPresentation(order);
+
+                      if (presentation.key === 'preparing') {
+                        return (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              markTableOrderReady(order);
+                            }}
+                            activeOpacity={0.82}
+                            style={{
+                              backgroundColor: '#16A34A',
+                              borderColor: '#15803D',
+                              borderWidth: 1,
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              marginTop: 4,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              shadowColor: '#000',
+                              shadowOpacity: 0.12,
+                              shadowRadius: 2,
+                              shadowOffset: { width: 0, height: 1 },
+                              elevation: 2,
+                            }}
+                          >
+                            <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                            <Text style={{ color: '#fff', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '800' }}>
+                              {t.markReady}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={12} color="#fff" />
+                          </TouchableOpacity>
+                        );
+                      }
+
+                      if (presentation.key !== 'accepted' || !shouldShowKitchenButton(order)) return null;
+                    } else if (!shouldShowKitchenButton(order)) {
+                      return null;
+                    }
 
                     return (
                       <TouchableOpacity
@@ -1440,12 +1927,30 @@ const flatData: FlatItem[] = [
                           e.stopPropagation();
                           moveOrderToKitchen(order);
                         }}
-                        style={{ backgroundColor: '#E3F2FD', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        activeOpacity={0.82}
+                        style={{
+                          backgroundColor: '#1976D2',
+                          borderColor: '#1565C0',
+                          borderWidth: 1,
+                          borderRadius: 8,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          marginTop: 4,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          shadowColor: '#000',
+                          shadowOpacity: 0.10,
+                          shadowRadius: 2,
+                          shadowOffset: { width: 0, height: 1 },
+                          elevation: 2,
+                        }}
                       >
-                        <Ionicons name="arrow-forward" size={13} color="#1565C0" />
-                        <Text style={{ color: '#1565C0', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '700' }}>
-                          {t.kitchen || 'Kitchen'}
+                        <Ionicons name="restaurant" size={13} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '800' }}>
+                          {t.moveToKitchen}
                         </Text>
+                        <Ionicons name="chevron-forward" size={12} color="#fff" />
                       </TouchableOpacity>
                     );
                   })()}
