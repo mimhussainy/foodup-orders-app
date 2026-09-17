@@ -189,7 +189,13 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     } catch (e) {}
 
     const items = order.items || [];
-    const isPaid = !(order.payment_method?.toLowerCase().includes('bar') || order.payment_method?.toLowerCase().includes('cash'));
+    const paymentMethod = String(order.payment_method || '').trim().toLowerCase();
+    const isPaid = !(
+      paymentMethod.includes('bar')
+      || paymentMethod.includes('cash')
+      || paymentMethod.includes('payment at pickup')
+      || paymentMethod.includes('payment_at_pickup')
+    );
 
     let itemsHtml = '';
     items.forEach((item: any) => {
