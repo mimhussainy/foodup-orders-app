@@ -10,6 +10,13 @@ let isPrinting = false;
 const PRINTER_BACKEND_URL =
   'https://foodup-order-alerts-backend.onrender.com';
 
+// Printing is a latency-sensitive foreground action. The Orders screen already
+// verifies the registered printer when the app opens, so reuse that recent
+// verification instead of adding another network round-trip to every receipt.
+const PRINTER_PERMISSION_CACHE_MS = 5 * 60 * 1000;
+const PRINT_BRANDING_CACHE_MS = 15 * 60 * 1000;
+const brandingRefreshes = new Map<string, Promise<{ logoUrl: string; scale: number }>>();
+
 async function verifyRegisteredPrinterDevice(): Promise<boolean> {
   // Existing non-Android behaviour remains unchanged.
   if (Platform.OS !== 'android') return true;
@@ -20,8 +27,7 @@ async function verifyRegisteredPrinterDevice(): Promise<boolean> {
         .toLowerCase()
         .trim();
 
-    const currentDeviceId =
-      Application.getAndroidId() || '';
+    const currentDeviceId = Application.getAndroidId() || '';
 
     if (!restaurantCode || !currentDeviceId) {
       await AsyncStorage.setItem('can_print', 'false');
@@ -29,6 +35,28 @@ async function verifyRegisteredPrinterDevice(): Promise<boolean> {
         '[print-permission] BLOCKED: restaurant code or Android ID missing'
       );
       return false;
+    }
+
+    const [cachedAllowed, cachedAtRaw, cachedDeviceId, cachedRestaurantCode] =
+      await Promise.all([
+        AsyncStorage.getItem('can_print'),
+        AsyncStorage.getItem('can_print_verified_at'),
+        AsyncStorage.getItem('can_print_device_id'),
+        AsyncStorage.getItem('can_print_restaurant_code'),
+      ]);
+
+    const cachedAt = Number(cachedAtRaw || 0);
+    const cacheIsFresh =
+      cachedAllowed === 'true' &&
+      cachedDeviceId === currentDeviceId &&
+      cachedRestaurantCode === restaurantCode &&
+      Number.isFinite(cachedAt) &&
+      cachedAt > 0 &&
+      Date.now() - cachedAt < PRINTER_PERMISSION_CACHE_MS;
+
+    if (cacheIsFresh) {
+      console.log(`[print-permission] cached allow for ${restaurantCode}`);
+      return true;
     }
 
     const controller = new AbortController();
@@ -58,10 +86,12 @@ async function verifyRegisteredPrinterDevice(): Promise<boolean> {
         registeredDeviceId !== '' &&
         registeredDeviceId === currentDeviceId;
 
-      await AsyncStorage.setItem(
-        'can_print',
-        allowed ? 'true' : 'false'
-      );
+      await Promise.all([
+        AsyncStorage.setItem('can_print', allowed ? 'true' : 'false'),
+        AsyncStorage.setItem('can_print_verified_at', String(Date.now())),
+        AsyncStorage.setItem('can_print_device_id', currentDeviceId),
+        AsyncStorage.setItem('can_print_restaurant_code', restaurantCode),
+      ]);
 
       console.log(
         `[print-permission] restaurant:${restaurantCode} current:${currentDeviceId} registered:${registeredDeviceId || 'none'} allowed:${allowed}`
@@ -110,57 +140,120 @@ async function fetchJsonWithTimeout(url: string, timeoutMs = 3500): Promise<any>
   }
 }
 
+async function refreshPrintBranding(code: string): Promise<{ logoUrl: string; scale: number }> {
+  const existing = brandingRefreshes.get(code);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const logoCacheKey = `foodup_print_logo_url_${code}`;
+    const scaleCacheKey = `foodup_print_logo_scale_${code}`;
+    const checkedCacheKey = `foodup_print_branding_checked_at_${code}`;
+
+    let logoUrl = (await AsyncStorage.getItem(logoCacheKey)) || '';
+    let scale = normalizePrintLogoScale(await AsyncStorage.getItem(scaleCacheKey));
+
+    try {
+      const profileData = await fetchJsonWithTimeout(
+        `${PRINTER_BACKEND_URL}/restaurant-profile/${encodeURIComponent(code)}`
+      );
+      const profile = profileData?.profile || {};
+
+      const backendLogo = String(profile?.print_logo_url || '').trim();
+      if (backendLogo) {
+        logoUrl = backendLogo;
+      }
+
+      const website = String(profile?.website || '').trim().replace(/\/+$/, '');
+      if (website) {
+        // Share the already-fetched restaurant website with the decision modal.
+        // This removes another profile lookup from the Confirm & Print path.
+        await Promise.all([
+          AsyncStorage.setItem(`foodup_restaurant_website_${code}`, website),
+          AsyncStorage.setItem(`foodup_restaurant_website_checked_at_${code}`, String(Date.now())),
+        ]);
+        try {
+          const brandingData = await fetchJsonWithTimeout(
+            `${website}/wp-json/foodup/v1/app-profile?foodup_cache_bust=${Date.now()}`
+          );
+
+          const directLogo = String(brandingData?.print_logo_url || '').trim();
+          if (directLogo) {
+            logoUrl = directLogo;
+          }
+
+          scale = normalizePrintLogoScale(brandingData?.print_logo_scale);
+        } catch (error) {
+          console.log(
+            '[print-branding] WordPress branding refresh failed; using cached/backend values:',
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      }
+
+      const writes: Promise<void>[] = [
+        AsyncStorage.setItem(scaleCacheKey, String(scale)),
+        AsyncStorage.setItem(checkedCacheKey, String(Date.now())),
+      ];
+      if (logoUrl) writes.push(AsyncStorage.setItem(logoCacheKey, logoUrl));
+      await Promise.all(writes);
+    } catch (error) {
+      console.log(
+        '[print-branding] backend profile refresh failed; using cached values:',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+
+    return { logoUrl, scale };
+  })();
+
+  brandingRefreshes.set(code, task);
+  try {
+    return await task;
+  } finally {
+    brandingRefreshes.delete(code);
+  }
+}
+
 async function resolvePrintBranding(code: string): Promise<{ logoUrl: string; scale: number }> {
   const logoCacheKey = `foodup_print_logo_url_${code}`;
   const scaleCacheKey = `foodup_print_logo_scale_${code}`;
+  const checkedCacheKey = `foodup_print_branding_checked_at_${code}`;
 
-  let logoUrl = (await AsyncStorage.getItem(logoCacheKey)) || '';
-  let scale = normalizePrintLogoScale(await AsyncStorage.getItem(scaleCacheKey));
+  const [cachedLogo, cachedScale, checkedAtRaw] = await Promise.all([
+    AsyncStorage.getItem(logoCacheKey),
+    AsyncStorage.getItem(scaleCacheKey),
+    AsyncStorage.getItem(checkedCacheKey),
+  ]);
 
+  const logoUrl = cachedLogo || '';
+  const scale = normalizePrintLogoScale(cachedScale);
+  const checkedAt = Number(checkedAtRaw || 0);
+  const hasCheckedBefore = Number.isFinite(checkedAt) && checkedAt > 0;
+  const isFresh = hasCheckedBefore && Date.now() - checkedAt < PRINT_BRANDING_CACHE_MS;
+
+  // Never hold up a receipt just to re-fetch artwork we already have. Refresh
+  // stale branding in the background and use the cached copy immediately.
+  if (isFresh) return { logoUrl, scale };
+  if (hasCheckedBefore || logoUrl) {
+    void refreshPrintBranding(code);
+    return { logoUrl, scale };
+  }
+
+  // First-ever print on this installation: fetch once so the logo is not lost.
+  return refreshPrintBranding(code);
+}
+
+export async function warmPrintResources(): Promise<void> {
   try {
-    const profileData = await fetchJsonWithTimeout(
-      `${PRINTER_BACKEND_URL}/restaurant-profile/${encodeURIComponent(code)}`
-    );
-    const profile = profileData?.profile || {};
-
-    const backendLogo = String(profile?.print_logo_url || '').trim();
-    if (backendLogo) {
-      logoUrl = backendLogo;
-    }
-
-    const website = String(profile?.website || '').trim().replace(/\/+$/, '');
-    if (website) {
-      try {
-        const brandingData = await fetchJsonWithTimeout(
-          `${website}/wp-json/foodup/v1/app-profile?foodup_cache_bust=${Date.now()}`
-        );
-
-        const directLogo = String(brandingData?.print_logo_url || '').trim();
-        if (directLogo) {
-          logoUrl = directLogo;
-        }
-
-        scale = normalizePrintLogoScale(brandingData?.print_logo_scale);
-      } catch (error) {
-        console.log(
-          '[print-branding] WordPress branding refresh failed; using cached/backend values:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    }
-
-    if (logoUrl) {
-      await AsyncStorage.setItem(logoCacheKey, logoUrl);
-    }
-    await AsyncStorage.setItem(scaleCacheKey, String(scale));
+    const code = (await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    if (!code) return;
+    await refreshPrintBranding(code);
   } catch (error) {
     console.log(
-      '[print-branding] backend profile refresh failed; using cached values:',
+      '[print-warmup] failed:',
       error instanceof Error ? error.message : String(error)
     );
   }
-
-  return { logoUrl, scale };
 }
 
 export async function printOrder(order: any, acceptedMinutes?: number, rejected?: boolean, rejectionReason?: string, scheduledTimeStr?: string, deliveredBy?: string) {

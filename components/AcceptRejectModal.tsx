@@ -18,6 +18,60 @@ const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 // callbacks must never produce duplicate kitchen receipts. Manual reprints from
 // the order details screen are intentionally not affected by this guard.
 const decisionPrintClaims = new Set<string>();
+const restaurantWebsiteRefreshes = new Map<string, Promise<string>>();
+const RESTAURANT_WEBSITE_CACHE_MS = 30 * 60 * 1000;
+
+async function refreshRestaurantWebsite(code: string): Promise<string> {
+  const normalized = String(code || '').toLowerCase().trim();
+  if (!normalized) return '';
+
+  const existing = restaurantWebsiteRefreshes.get(normalized);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const result = await fetch(`${BACKEND_URL}/restaurant-profile/${encodeURIComponent(normalized)}`)
+      .then(r => r.json())
+      .catch(() => ({}));
+    const website = String(result?.profile?.website || '').trim();
+    if (website) {
+      await Promise.all([
+        AsyncStorage.setItem(`foodup_restaurant_website_${normalized}`, website),
+        AsyncStorage.setItem(`foodup_restaurant_website_checked_at_${normalized}`, String(Date.now())),
+      ]).catch(() => {});
+    }
+    return website;
+  })();
+
+  restaurantWebsiteRefreshes.set(normalized, task);
+  try {
+    return await task;
+  } finally {
+    restaurantWebsiteRefreshes.delete(normalized);
+  }
+}
+
+async function resolveRestaurantWebsite(code: string): Promise<string> {
+  const normalized = String(code || '').toLowerCase().trim();
+  if (!normalized) return '';
+
+  const [cached, checkedAtRaw] = await Promise.all([
+    AsyncStorage.getItem(`foodup_restaurant_website_${normalized}`),
+    AsyncStorage.getItem(`foodup_restaurant_website_checked_at_${normalized}`),
+  ]);
+  const checkedAt = Number(checkedAtRaw || 0);
+  const fresh =
+    !!cached &&
+    Number.isFinite(checkedAt) &&
+    checkedAt > 0 &&
+    Date.now() - checkedAt < RESTAURANT_WEBSITE_CACHE_MS;
+
+  if (fresh) return cached || '';
+  if (cached) {
+    void refreshRestaurantWebsite(normalized);
+    return cached;
+  }
+  return refreshRestaurantWebsite(normalized);
+}
 
 async function printDecisionOnce(
   action: 'accept' | 'reject',
@@ -183,6 +237,13 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
 
   const t = getTranslation(modalLang);
 
+  useEffect(() => {
+    if (!visible) return;
+    AsyncStorage.getItem('restaurant_code').then(code => {
+      if (code) void resolveRestaurantWebsite(code);
+    }).catch(() => {});
+  }, [visible]);
+
   const isScheduled = order ? (
     !!order.orderable_order_time &&
     order.orderable_order_time.trim() !== '' &&
@@ -334,37 +395,41 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
 
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
-        .then(r => r.json())
-        .catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-
-      if (!website) throw new Error('Restaurant website is not configured');
-
-      const baseUrl = website.startsWith('http') ? website : `https://${website}`;
-
-      await postWordPressDecision(
-        baseUrl + '/wp-json/foodup/v1/order-accepted',
-        {
-          secret: 'foodup2026',
-          order_id: order.order_id,
-          accepted_time: '',
-        }
-      );
-
-      await postDecisionAction('/accepted-time', {
-        restaurant_code: code,
-        order_id: order.order_id,
-        accepted_time: '',
-        accepted_at: new Date().toISOString(),
-        status: 'accepted',
-      });
-
-      await removePendingDecision(order.order_id, 7000);
-
-      await printDecisionOnce('accept', order, async () => {
+      // Start the physical print immediately. Acceptance synchronization still
+      // keeps its original WordPress -> FoodUp ordering, but no longer blocks
+      // the printer while waiting on network latency.
+      const printJob = printDecisionOnce('accept', order, async () => {
         await printOrder(order);
       });
+
+      const acceptanceSync = (async () => {
+        const website = await resolveRestaurantWebsite(code);
+
+        if (!website) throw new Error('Restaurant website is not configured');
+
+        const baseUrl = website.startsWith('http') ? website : `https://${website}`;
+
+        await postWordPressDecision(
+          baseUrl + '/wp-json/foodup/v1/order-accepted',
+          {
+            secret: 'foodup2026',
+            order_id: order.order_id,
+            accepted_time: '',
+          }
+        );
+
+        await postDecisionAction('/accepted-time', {
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: '',
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        });
+
+        await removePendingDecision(order.order_id, 7000);
+      })();
+
+      await Promise.all([acceptanceSync, printJob]);
 
       setLoading(false);
       onClose();
@@ -387,12 +452,25 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-      if (!website) {
-        throw new Error('Restaurant website is not configured');
-      }
-      if (website) {
+      // Start printing immediately. Keep WordPress acceptance, FoodUp acceptance
+      // recording, and pending/ringtone cleanup in their original order on the
+      // network side so only the printer dependency changes.
+      const printJob = printDecisionOnce('accept', order, async () => {
+        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
+        if (isScheduledTime) {
+          await printOrder(order, undefined, false, '', acceptTime);
+          await scheduleScheduledOrderReminder(order, acceptTime, t);
+        } else {
+          const mins = parseInt(acceptTime);
+          await printOrder(order, isNaN(mins) ? 30 : mins);
+        }
+      });
+
+      const acceptanceSync = (async () => {
+        const website = await resolveRestaurantWebsite(code);
+        if (!website) {
+          throw new Error('Restaurant website is not configured');
+        }
         const baseUrl = website.startsWith('http') ? website : `https://${website}`;
         await postWordPressDecision(
           baseUrl + '/wp-json/foodup/v1/order-accepted',
@@ -403,34 +481,18 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           }
         );
 
-      // WooCommerce confirmed completed; now record FoodUp acceptance.
-      await postDecisionAction('/accepted-time', {
-        restaurant_code: code,
-        order_id: order.order_id,
-        accepted_time: acceptTime,
-        accepted_at: new Date().toISOString(),
-        status: 'accepted',
-      });
-      }
+        await postDecisionAction('/accepted-time', {
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: acceptTime,
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        });
 
-      // The order decision is already committed before printing starts.
-      // Resolve pending/ringtone state now so a printer failure cannot make an
-      // already-accepted order eligible to ring again. The parent still keeps
-      // the root modal open until onClose after printing completes.
-      await removePendingDecision(order.order_id, 7000);
+        await removePendingDecision(order.order_id, 7000);
+      })();
 
-      // Print only after the acceptance has been synchronized, and only once
-      // for this order even if two UI paths race.
-      await printDecisionOnce('accept', order, async () => {
-        const isScheduledTime = acceptTime.includes('—') || acceptTime.includes(':');
-        if (isScheduledTime) {
-          await printOrder(order, undefined, false, '', acceptTime);
-          await scheduleScheduledOrderReminder(order, acceptTime, t);
-        } else {
-          const mins = parseInt(acceptTime);
-          await printOrder(order, isNaN(mins) ? 30 : mins);
-        }
-      });
+      await Promise.all([acceptanceSync, printJob]);
       setLoading(false);
       onClose();
     } catch (e) {
@@ -452,8 +514,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
+      const website = await resolveRestaurantWebsite(code);
       if (!website) {
         throw new Error('Restaurant website is not configured');
       }
@@ -517,12 +578,22 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       }).catch(() => {});
       const acceptedTime = isScheduled ? `${scheduledTime} — ${scheduledDate}` : `${selectedTime} ${t.minutes}`;
 
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
-      if (!website) {
-        throw new Error('Restaurant website is not configured');
-      }
-      if (website) {
+      // Start printing immediately. WordPress acceptance remains authoritative
+      // and still completes before FoodUp acceptance state/pending cleanup.
+      const printJob = printDecisionOnce('accept', order, async () => {
+        if (isScheduled) {
+          await printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`);
+          await scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t);
+        } else {
+          await printOrder(order, selectedTime);
+        }
+      });
+
+      const acceptanceSync = (async () => {
+        const website = await resolveRestaurantWebsite(code);
+        if (!website) {
+          throw new Error('Restaurant website is not configured');
+        }
         const baseUrl = website.startsWith('http') ? website : `https://${website}`;
         await postWordPressDecision(
           baseUrl + '/wp-json/foodup/v1/order-accepted',
@@ -533,28 +604,18 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
           }
         );
 
-      // WooCommerce confirmed completed; now record FoodUp acceptance.
-      await postDecisionAction('/accepted-time', {
-        restaurant_code: code,
-        order_id: order.order_id,
-        accepted_time: acceptedTime,
-        accepted_at: new Date().toISOString(),
-        status: 'accepted',
-      });
-      }
+        await postDecisionAction('/accepted-time', {
+          restaurant_code: code,
+          order_id: order.order_id,
+          accepted_time: acceptedTime,
+          accepted_at: new Date().toISOString(),
+          status: 'accepted',
+        });
 
-      // Acceptance is already committed at this point. Resolve pending/ringtone
-      // state before printing so a printer failure cannot restart the ringtone.
-      await removePendingDecision(order.order_id, 7000);
+        await removePendingDecision(order.order_id, 7000);
+      })();
 
-      await printDecisionOnce('accept', order, async () => {
-        if (isScheduled) {
-          await printOrder(order, undefined, false, '', `${scheduledTime} — ${scheduledDate}`);
-          await scheduleScheduledOrderReminder(order, `${scheduledTime} — ${scheduledDate}`, t);
-        } else {
-          await printOrder(order, selectedTime);
-        }
-      });
+      await Promise.all([acceptanceSync, printJob]);
       setLoading(false);
       onClose();
     } catch (e) {
@@ -579,8 +640,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
         body: JSON.stringify({ restaurant_code: code, order_id: order.order_id, secret: 'foodup2026' }),
       }).catch(() => {});
       // Guard against backend race — mirrors accepted_time protection for accept
-      const restaurantProfile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`).then(r => r.json()).catch(() => ({}));
-      const website = restaurantProfile?.profile?.website;
+      const website = await resolveRestaurantWebsite(code);
       if (!website) {
         throw new Error('Restaurant website is not configured');
       }

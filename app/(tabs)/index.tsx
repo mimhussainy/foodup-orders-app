@@ -30,7 +30,7 @@ import { formatAddress, formatPhone } from '../../lib/formatters';
 import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../../lib/orderDisplay';
 import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone, suppressOrderRingtone } from '../../lib/orderRingtone';
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
-import { printOrder } from '../../lib/printer';
+import { printOrder, warmPrintResources } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
 
 
@@ -79,6 +79,18 @@ interface Order {
   source?: string;
 }
 
+interface TableServiceEvent {
+  id: number;
+  event_uuid: string;
+  event_type: 'call_waiter' | 'request_bill' | string;
+  created_at: string;
+  table_session_id: string;
+  table_id: string | number;
+  table_number: string;
+  table_name: string;
+  payload?: Record<string, unknown>;
+}
+
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -104,14 +116,21 @@ function getStatusLabel(status: string, t: any) {
 
 function isUnpaidOrder(order: any): boolean {
   const method = String(order?.payment_method || '').trim().toLowerCase();
-  const normalCashPayment = method.includes('bar') || method.includes('cash');
+  const normalOfflinePayment =
+    method.includes('bar') ||
+    method.includes('cash') ||
+    method.includes('payment at pickup') ||
+    method.includes('payment_at_pickup') ||
+    method.includes('pay at pickup') ||
+    method.includes('pay on pickup') ||
+    method.includes('payment on pickup');
 
   if (!isDineInOrder(order)) {
-    return normalCashPayment;
+    return normalOfflinePayment;
   }
 
   return (
-    normalCashPayment ||
+    normalOfflinePayment ||
     method === 'fuo_table_counter' ||
     method === 'fuo_table_waiter' ||
     method.includes('cashier') ||
@@ -124,9 +143,11 @@ function isUnpaidOrder(order: any): boolean {
 }
 
 function getDeliveryStatusColor(claim: any, orderStatus?: string) {
-  if (orderStatus === 'refunded') return '#e67e22';
-  if (orderStatus === 'cancelled') return '#e74c3c';
-  if (!claim && orderStatus === 'kitchen') return '#1976D2';
+  const normalizedOrderStatus = String(orderStatus || '').trim().toLowerCase();
+  if (normalizedOrderStatus === 'refunded') return '#e67e22';
+  if (normalizedOrderStatus === 'cancelled') return '#e74c3c';
+  if (!claim && normalizedOrderStatus === 'delivered') return '#2fc053';
+  if (!claim && normalizedOrderStatus === 'kitchen') return '#1976D2';
   if (!claim) return '#f39c12';
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
   switch (status) {
@@ -138,12 +159,16 @@ function getDeliveryStatusColor(claim: any, orderStatus?: string) {
 }
 
 function getDeliveryStatusLabel(claim: any, item: any, t: any) {
-  if (item.status === 'refunded') return t.refunded;
-  if (item.status === 'cancelled') return t.cancelled;
-  if (!claim && item.status === 'kitchen') return t.kitchen || 'Kitchen';
+  const normalizedOrderStatus = String(item?.status || '').trim().toLowerCase();
+  const isPickup = item.shipping_method === 'Abholung' || item.shipping_method?.toLowerCase().includes('pickup');
+  if (normalizedOrderStatus === 'refunded') return t.refunded;
+  if (normalizedOrderStatus === 'cancelled') return t.cancelled;
+  if (!claim && normalizedOrderStatus === 'delivered') {
+    return isPickup ? t.pickedUp : t.delivered;
+  }
+  if (!claim && normalizedOrderStatus === 'kitchen') return t.kitchen || 'Kitchen';
   if (!claim) return t.newOrder;
   const status = typeof claim === 'string' ? 'delivering' : claim.status;
-  const isPickup = item.shipping_method === 'Abholung' || item.shipping_method?.toLowerCase().includes('pickup');
   switch (status) {
     case 'delivered': return isPickup ? t.pickedUp : t.delivered;
     case 'delivering': return t.delivering;
@@ -283,6 +308,10 @@ const [canUseKitchen, setCanUseKitchen] = useState(false);
 const [autoPrintOrders, setAutoPrintOrders] = useState<{[key: string]: any}>({});
 const [pendingDecisionOrders, setPendingDecisionOrders] = useState<number[]>([]);
 const [tableOrderingEnabled, setTableOrderingEnabled] = useState(false);
+const [tableServiceEvents, setTableServiceEvents] = useState<TableServiceEvent[]>([]);
+const tableServiceEventsSeenRef = useRef<Set<string>>(new Set());
+const tableServicePollRunningRef = useRef(false);
+const tableWebsiteCacheRef = useRef<{ code: string; baseUrl: string }>({ code: '', baseUrl: '' });
 const pulseAnim = useRef(new Animated.Value(1)).current;
 
 useEffect(() => {
@@ -299,25 +328,37 @@ useEffect(() => {
   const router = useRouter();
   const listRef = useRef<any>(null);
 
+  const resolveTableWebsiteBaseUrl = async (): Promise<string> => {
+    const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
+    if (!code) return '';
+
+    if (tableWebsiteCacheRef.current.code === code && tableWebsiteCacheRef.current.baseUrl) {
+      return tableWebsiteCacheRef.current.baseUrl;
+    }
+
+    const profile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
+      .then(r => r.json())
+      .catch(() => ({}));
+
+    const website = String(profile?.profile?.website || '').trim();
+    if (!website) return '';
+
+    const baseUrl = website.startsWith('http')
+      ? website.replace(/\/$/, '')
+      : `https://${website.replace(/\/$/, '')}`;
+
+    tableWebsiteCacheRef.current = { code, baseUrl };
+    return baseUrl;
+  };
+
   const fetchTableOrderingEnabled = async () => {
     try {
-      const code = String(await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
-      if (!code) {
+      const baseUrl = await resolveTableWebsiteBaseUrl();
+      if (!baseUrl) {
         setTableOrderingEnabled(false);
         return;
       }
 
-      const profile = await fetch(`${BACKEND_URL}/restaurant-profile/${code}`)
-        .then(r => r.json())
-        .catch(() => ({}));
-
-      const website = String(profile?.profile?.website || '').trim();
-      if (!website) {
-        setTableOrderingEnabled(false);
-        return;
-      }
-
-      const baseUrl = website.startsWith('http') ? website.replace(/\/$/, '') : `https://${website.replace(/\/$/, '')}`;
       const response = await fetch(`${baseUrl}/wp-json/foodup/v1/table-ordering-status`);
       const result = await response.json().catch(() => ({}));
 
@@ -329,6 +370,93 @@ useEffect(() => {
     } catch (e) {
       // Capability lookup is optional. Hide the Table filter on a temporary failure.
       setTableOrderingEnabled(false);
+    }
+  };
+
+  const fetchTableServiceEvents = async () => {
+    if (!tableOrderingEnabled || tableServicePollRunningRef.current) return;
+    tableServicePollRunningRef.current = true;
+
+    try {
+      const baseUrl = await resolveTableWebsiteBaseUrl();
+      if (!baseUrl) return;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4500);
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl}/wp-json/foodup/v1/orders-app-table-events?limit=50`, {
+          headers: { 'x-foodup-secret': 'foodup2026' },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) return;
+      const result = await response.json().catch(() => ({}));
+      const incoming: TableServiceEvent[] = Array.isArray(result?.events) ? result.events : [];
+
+      setTableServiceEvents(incoming);
+
+      for (const event of incoming) {
+        const uuid = String(event?.event_uuid || '').trim();
+        if (!uuid || tableServiceEventsSeenRef.current.has(uuid)) continue;
+        tableServiceEventsSeenRef.current.add(uuid);
+
+        const tableLabel = String(event?.table_name || '').trim()
+          || (String(event?.table_number || '').trim() ? `${t.table || 'Table'} ${event.table_number}` : (t.table || 'Table'));
+        const isBill = event?.event_type === 'request_bill';
+
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: isBill ? (t.tableBillRequested || 'Bill requested') : (t.tableWaiterRequested || 'Waiter requested'),
+            body: isBill
+              ? `${tableLabel}: ${t.tableNeedsBill || 'requested the bill.'}`
+              : `${tableLabel}: ${t.tableNeedsWaiter || 'needs a waiter.'}`,
+            sound: 'default',
+            data: {
+              event_type: 'table_service_event',
+              table_event_type: event.event_type,
+              event_uuid: uuid,
+              table_session_id: event.table_session_id || '',
+            },
+          },
+          trigger: null,
+        }).catch(() => {});
+      }
+    } catch (e) {
+      // A temporary WordPress/network failure must never disturb normal orders.
+    } finally {
+      tableServicePollRunningRef.current = false;
+    }
+  };
+
+  const acknowledgeTableServiceEvents = async (eventUuids: string[]) => {
+    const uuids = Array.from(new Set(eventUuids.map(v => String(v || '').trim()).filter(Boolean)));
+    if (uuids.length === 0) return;
+
+    try {
+      const baseUrl = await resolveTableWebsiteBaseUrl();
+      if (!baseUrl) throw new Error('Restaurant website is not configured');
+
+      const response = await fetch(`${baseUrl}/wp-json/foodup/v1/orders-app-table-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-foodup-secret': 'foodup2026',
+        },
+        body: JSON.stringify({ event_uuids: uuids }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setTableServiceEvents(prev => prev.filter(event => !uuids.includes(String(event.event_uuid || ''))));
+    } catch (e) {
+      Alert.alert(
+        t.error || 'Error',
+        t.tableServiceAckFailed || 'The table request could not be completed. Please try again.'
+      );
     }
   };
 
@@ -374,10 +502,38 @@ useEffect(() => {
   }, [tableOrderingEnabled, filter]);
 
   useEffect(() => {
+    if (!tableOrderingEnabled) {
+      setTableServiceEvents([]);
+      return;
+    }
+
+    let stopped = false;
+    const sync = () => {
+      if (!stopped && AppState.currentState === 'active') {
+        void fetchTableServiceEvents();
+      }
+    };
+
+    sync();
+    const interval = setInterval(sync, 4000);
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') sync();
+    });
+
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+      appStateSubscription.remove();
+    };
+  }, [tableOrderingEnabled, t]);
+
+  useEffect(() => {
     AsyncStorage.getItem('user_role').then(r => {
       setRole(r);
     });
-    checkPrintPermission();
+    void checkPrintPermission().then(allowed => {
+      if (allowed) void warmPrintResources();
+    });
 
     // These two timers only inspect local AsyncStorage. They make no Render calls
     // and keep notification-created local state visible while this tab is open.
@@ -449,10 +605,12 @@ useEffect(() => {
       // Kitchen works on the real printer OR Eatime preview.
       setCanUseKitchen(Boolean(allowed || previewKitchenTester));
 
-      await AsyncStorage.setItem(
-        'can_print',
-        allowed ? 'true' : 'false'
-      );
+      await Promise.all([
+        AsyncStorage.setItem('can_print', allowed ? 'true' : 'false'),
+        AsyncStorage.setItem('can_print_verified_at', String(Date.now())),
+        AsyncStorage.setItem('can_print_device_id', deviceId),
+        AsyncStorage.setItem('can_print_restaurant_code', code.toLowerCase().trim()),
+      ]);
 
       return allowed;
     } catch (e) {
@@ -586,7 +744,14 @@ useEffect(() => {
               const current = merged[exists];
               const metadataChanged =
                 bo.status !== current.status ||
+                bo.payment_method !== current.payment_method ||
+                bo.note !== current.note ||
+                bo.orderable_order_date !== current.orderable_order_date ||
+                bo.orderable_order_time !== current.orderable_order_time ||
+                bo.shipping_method !== current.shipping_method ||
+                bo.shipping_address !== current.shipping_address ||
                 bo.fulfillment_type !== current.fulfillment_type ||
+                bo.order_type !== current.order_type ||
                 bo.qr_order_number !== current.qr_order_number ||
                 bo.qr_service_day !== current.qr_service_day ||
                 bo.table_number !== current.table_number ||
@@ -678,8 +843,44 @@ useEffect(() => {
         }
 
         if (data.event_type === 'courier_status_update') {
-          // Courier changed in_bag / delivering / delivered.
-          // Refresh claims exactly once; no polling.
+          // Apply the courier status from the push immediately so the UI does not
+          // wait for a claims round-trip. Keep the existing one-time claims fetch
+          // as reconciliation; this adds no new Render request compared with before.
+          const orderId = String(data.order_id || '').trim();
+          const deliveryStatus = String(data.delivery_status || '').trim().toLowerCase();
+
+          if (orderId && ['in_bag', 'delivering', 'delivered'].includes(deliveryStatus)) {
+            setClaims(prev => {
+              const existing = prev[orderId];
+              const existingClaim = existing && typeof existing === 'object' ? existing : {};
+              return {
+                ...prev,
+                [orderId]: {
+                  ...existingClaim,
+                  status: deliveryStatus,
+                  ...(deliveryStatus === 'delivered' && !existingClaim.delivered_at
+                    ? { delivered_at: new Date().toISOString() }
+                    : {}),
+                },
+              };
+            });
+
+            if (deliveryStatus === 'delivered') {
+              const numericOrderId = Number(orderId);
+              setOrders(prev => prev.map(order =>
+                order.order_id === numericOrderId
+                  ? { ...order, status: 'completed' }
+                  : order
+              ));
+              setSelectedOrder(prev =>
+                prev && prev.order_id === numericOrderId
+                  ? { ...prev, status: 'completed' }
+                  : prev
+              );
+            }
+          }
+
+          // Reconcile once with Redis. No polling is introduced.
           void fetchClaims();
           return;
         }
@@ -723,7 +924,26 @@ useEffect(() => {
             const exists = prev.findIndex(o => o.order_id === newOrder.order_id);
             if (exists >= 0 && data.status) {
               const updated = [...prev];
-              updated[exists] = { ...updated[exists], ...newOrder, status: data.status };
+              const current = updated[exists];
+              updated[exists] = {
+                ...current,
+                ...newOrder,
+                payment_method: newOrder.payment_method || current.payment_method,
+                note: newOrder.note || current.note,
+                orderable_order_date:
+                  newOrder.orderable_order_date || current.orderable_order_date,
+                orderable_order_time:
+                  newOrder.orderable_order_time || current.orderable_order_time,
+                shipping_method:
+                  newOrder.shipping_method || current.shipping_method,
+                shipping_address:
+                  newOrder.shipping_address || current.shipping_address,
+                fulfillment_type:
+                  newOrder.fulfillment_type || current.fulfillment_type,
+                order_type:
+                  newOrder.order_type || current.order_type,
+                status: data.status,
+              };
               return updated;
             }
             return prev;
@@ -1042,6 +1262,13 @@ useEffect(() => {
           ? { ...prev, status: 'table_completed' }
           : prev
       );
+
+      const sessionEventUuids = tableServiceEvents
+        .filter(event => String(event.table_session_id || '') === String(order.table_session_id || ''))
+        .map(event => event.event_uuid);
+      if (sessionEventUuids.length > 0) {
+        await acknowledgeTableServiceEvents(sessionEventUuids);
+      }
     } catch (e) {
       console.log(
         '[table-status] close table failed:',
@@ -1088,13 +1315,18 @@ useEffect(() => {
 
   const getDeliveryStatus = (order: Order) => {
     const claim = claims[String(order.order_id)];
-    if (order.status === 'cancelled' || order.status === 'refunded') return 'cancelled';
-    if (order.status === 'kitchen' && !claim) return 'kitchen';
+    const normalizedOrderStatus = String(order.status || '').trim().toLowerCase();
+    const isPickup = isPickupMethod(order.shipping_method);
+
+    if (normalizedOrderStatus === 'cancelled' || normalizedOrderStatus === 'refunded') return 'cancelled';
+    if (normalizedOrderStatus === 'delivered') {
+      return isPickup ? 'pickedUp' : 'delivered';
+    }
+    if (normalizedOrderStatus === 'kitchen' && !claim) return 'kitchen';
     // Orders placed today before 03:00 are treated as done
     if (isTodayBeforeThreeAM(order.timestamp) && !claim) return 'delivered';
     if (!claim) return 'new';
     const status = typeof claim === 'string' ? 'delivering' : claim.status;
-    const isPickup = isPickupMethod(order.shipping_method);
     if (status === 'delivered' && isPickup) return 'pickedUp';
     return status;
   };
@@ -1201,10 +1433,11 @@ const sortedOrders = [...filteredOrders].sort((a, b) => {
 });
 const sections = groupOrdersByDate(sortedOrders, t);
 
-type FlatItem = { type: 'storeStatus' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string } | { type: 'order'; item: Order };
+type FlatItem = { type: 'storeStatus' } | { type: 'tableServiceEvents' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string } | { type: 'order'; item: Order };
 
 const flatData: FlatItem[] = [
   { type: 'storeStatus' },
+  { type: 'tableServiceEvents' },
   ...(filter === 'all' ? [{ type: 'searchBar' as const }] : []),
   { type: 'filterTabs' },
   ...sections.flatMap(section => [
@@ -1663,7 +1896,7 @@ const flatData: FlatItem[] = [
           data={flatData}
           keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
           contentContainerStyle={styles.scrollContent}
-          stickyHeaderIndices={[filter === 'all' ? 2 : 1]}
+          stickyHeaderIndices={[filter === 'all' ? 3 : 2]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
           }
@@ -1671,6 +1904,54 @@ const flatData: FlatItem[] = [
           renderItem={({ item }) => {
             if (item.type === 'storeStatus') {
               return null;
+            }
+            if (item.type === 'tableServiceEvents') {
+              if (!tableOrderingEnabled || tableServiceEvents.length === 0) return null;
+
+              return (
+                <View style={styles.tableServiceWrap}>
+                  <View style={styles.tableServiceHeading}>
+                    <Ionicons name="notifications" size={16} color="#111" />
+                    <Text style={styles.tableServiceHeadingText}>
+                      {t.tableServiceRequests || 'Table requests'} ({tableServiceEvents.length})
+                    </Text>
+                  </View>
+
+                  {tableServiceEvents.map(event => {
+                    const isBill = event.event_type === 'request_bill';
+                    const tableLabel = String(event.table_name || '').trim()
+                      || (String(event.table_number || '').trim() ? `${t.table || 'Table'} ${event.table_number}` : (t.table || 'Table'));
+
+                    return (
+                      <View key={event.event_uuid} style={styles.tableServiceCard}>
+                        <View style={[styles.tableServiceIcon, { backgroundColor: isBill ? '#FFF3E0' : '#F3E8FF' }]}>
+                          <Ionicons
+                            name={isBill ? 'receipt-outline' : 'notifications-outline'}
+                            size={20}
+                            color={isBill ? '#E65100' : '#6F2DBD'}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.tableServiceTitle}>{tableLabel}</Text>
+                          <Text style={styles.tableServiceText}>
+                            {isBill
+                              ? (t.tableBillRequested || 'Bill requested')
+                              : (t.tableWaiterRequested || 'Waiter requested')}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => void acknowledgeTableServiceEvents([event.event_uuid])}
+                          style={styles.tableServiceDoneButton}
+                          activeOpacity={0.82}
+                        >
+                          <Ionicons name="checkmark" size={14} color="#fff" />
+                          <Text style={styles.tableServiceDoneText}>{t.done || 'Done'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
             }
             if (item.type === 'searchBar') {
               return (
@@ -2040,6 +2321,15 @@ const styles = StyleSheet.create({
   orderNameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   orderBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   courierName: { fontSize: Platform.OS === 'android' ? 12 : 14, color: '#8B38CB', fontWeight: '500' },
+  tableServiceWrap: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  tableServiceHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
+  tableServiceHeadingText: { fontSize: 13, fontWeight: '800', color: '#111' },
+  tableServiceCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#ECECEC', borderRadius: 12, padding: 10, marginBottom: 8 },
+  tableServiceIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tableServiceTitle: { fontSize: Platform.OS === 'android' ? 12 : 14, fontWeight: '800', color: '#111' },
+  tableServiceText: { fontSize: Platform.OS === 'android' ? 11 : 13, color: '#666', marginTop: 2 },
+  tableServiceDoneButton: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#111', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
+  tableServiceDoneText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   
   
 });
