@@ -3,6 +3,8 @@ import * as Application from 'expo-application';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
 import { getOrderPrimaryLabel, getTableLabel, isDineInOrder } from './orderDisplay';
+import { stripHouseNumber, stripHouseNumberFromSingleLine } from './address';
+import { getEdition } from './edition';
 
 let isPrinting = false;
 
@@ -501,6 +503,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
       </html>
     `;
 
+    const printEditionIsFree = getEdition() === 'free';
     const normalOrderHtml = `
       <html>
         <head>
@@ -549,16 +552,21 @@ const acceptanceHtml = resolvedScheduledStr ? `
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
           ${order.shipping_address ? `${(() => {
             const parts = order.shipping_address.split(',').map((s: string) => s.trim());
+            // Pro: no house number on paper; the courier scans the QR code in
+            // the FoodUp Courier app to see it. Free has no courier app, so the
+            // restaurant's own drivers get the full address.
+            const keepNumber = printEditionIsFree;
+            const street0 = keepNumber ? parts[0] : stripHouseNumber(parts[0]);
             let street = '';
             let zipCity = '';
             if (parts.length >= 3) {
-              street = parts[0].replace(/\s+\d+[a-zA-Z]?$/, '').trim();
+              street = street0;
               zipCity = parts[2] + ' ' + parts[1];
             } else if (parts.length === 2) {
-              street = parts[0].replace(/\s+\d+[a-zA-Z]?$/, '').trim();
+              street = street0;
               zipCity = parts[1];
             } else {
-              street = order.shipping_address;
+              street = keepNumber ? order.shipping_address : stripHouseNumberFromSingleLine(order.shipping_address);
             }
             return `<p style="margin:4px 0; font-size:20px;">${street}</p>${zipCity ? `<p style="margin:4px 0; font-size:20px;">${zipCity}</p>` : ''}`;
           })()}` : ''}
@@ -591,7 +599,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
               }
             </p>
           ` : ''}
-          ${order.shipping_address ? `
+          ${order.shipping_address && !printEditionIsFree ? `
           <div style="border-top:1px dashed #000; margin:12px 0;"></div>
           <div style="text-align:center; margin:8px 0;">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('FOODUP:' + order.order_id)}" width="180" height="180" />
