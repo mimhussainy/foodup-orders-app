@@ -32,7 +32,7 @@ import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder, warmPrintResources } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
-import { useIsFree } from '../../lib/edition';
+import { getEdition, useIsFree } from '../../lib/edition';
 
 
 interface OrderAddon {
@@ -302,7 +302,8 @@ const [filter, setFilter] = useState<string>('today');
 // Order reception, accept/reject and printing are identical in both editions.
 const isFree = useIsFree();
 useEffect(() => {
-  if (isFree && ['all', 'in_bag', 'delivering'].includes(filter)) setFilter('today');
+  // Free shows one compact list without filter chips.
+  if (isFree && filter !== 'today') setFilter('today');
 }, [isFree, filter]);
 const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
@@ -657,6 +658,7 @@ useEffect(() => {
   }, []);
 
   const fetchClaims = async () => {
+    if (getEdition() === 'free') return;
     try {
       const code = await AsyncStorage.getItem('restaurant_code') || '';
       if (!code) return;
@@ -1369,6 +1371,7 @@ useEffect(() => {
   };
 
   const shouldShowKitchenButton = (order: Order) => {
+    if (isFree) return false;
     if (!canUseKitchen) return false;
 
     const currentStatus = getDeliveryStatus(order);
@@ -1416,7 +1419,7 @@ useEffect(() => {
       if (isOlderThanToday(o.timestamp) && filter !== 'all' && !stillActionable) return false;
       if (filter === 'today') {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-        return new Date(o.timestamp) >= todayStart;
+        return new Date(o.timestamp) >= todayStart || stillActionable;
       }
       if (filter === 'table') return isDineInOrder(o);
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
@@ -1452,7 +1455,7 @@ const flatData: FlatItem[] = [
   { type: 'storeStatus' },
   { type: 'tableServiceEvents' },
   ...(filter === 'all' ? [{ type: 'searchBar' as const }] : []),
-  { type: 'filterTabs' },
+  ...(isFree ? [] : [{ type: 'filterTabs' as const }]),
   ...sections.flatMap(section => [
     { type: 'header' as const, title: section.title },
     ...section.data.map(item => ({ type: 'order' as const, item })),
@@ -1773,6 +1776,7 @@ const flatData: FlatItem[] = [
 
             {/* ── MARK DELIVERED / PICKUP BUTTON ── */}
             {(() => {
+              if (isFree) return null;
               if (isDineInOrder(selectedOrder)) return null;
               const claim = claims[String(selectedOrder.order_id)];
               const status = claim ? (typeof claim === 'string' ? 'delivering' : claim.status) : 'new';
@@ -1909,7 +1913,7 @@ const flatData: FlatItem[] = [
           data={flatData}
           keyExtractor={(item, index) => item.type === 'order' ? String(item.item.order_id) : `header-${index}`}
           contentContainerStyle={styles.scrollContent}
-          stickyHeaderIndices={[filter === 'all' ? 3 : 2]}
+          stickyHeaderIndices={isFree ? [] : [filter === 'all' ? 3 : 2]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111" colors={['#111']} />
           }
