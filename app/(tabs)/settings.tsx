@@ -9,6 +9,8 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
+import { clearStoredEdition, getEdition, useIsFree } from '../../lib/edition';
+import { ProBadge } from '../../components/ProLocked';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -48,6 +50,8 @@ async function previewSound(key: string) {
 export default function SettingsScreen() {
   const router = useRouter();
   const { language, t, changeLanguage } = useLanguage();
+  // FoodUp Free: courier management is a Pro feature (no courier requests).
+  const isFree = useIsFree();
 
   const SOUNDS = [
     { key: 'default', label: t.default, icon: 'notifications-outline' },
@@ -163,6 +167,7 @@ export default function SettingsScreen() {
   }, []);
 
   const loadAccounts = async () => {
+    if (getEdition() === 'free') return;
     const ownerPin = await AsyncStorage.getItem('owner_pin') || '';
     const iosPin = await AsyncStorage.getItem('ios_pin') || '';
     const pin = iosPin || ownerPin;
@@ -177,6 +182,13 @@ export default function SettingsScreen() {
       if (result.success) setAccounts(result.accounts);
     } catch (e) {}
   };
+  // Pro was switched on while this screen was open: load the courier accounts now.
+  const wasFreeRef = useRef(isFree);
+  useEffect(() => {
+    if (wasFreeRef.current && !isFree && role === 'owner') loadAccounts();
+    wasFreeRef.current = isFree;
+  }, [isFree]);
+
   const loadProducts = async () => {
     if (!restaurantWebsite) return;
     setProductsLoading(true);
@@ -470,6 +482,7 @@ export default function SettingsScreen() {
     }
 
     await AsyncStorage.clear();
+    await clearStoredEdition();
 
     if (ordersHistory) await AsyncStorage.setItem('foodup_orders', ordersHistory);
     if (deliveryHistory) await AsyncStorage.setItem('delivery_history', deliveryHistory);
@@ -652,7 +665,28 @@ const stopPreviewSound = async () => {
             </>
           )}
 
-          {role === 'owner' && (
+          {role === 'owner' && isFree && (
+            <>
+              <Text style={styles.groupLabel}>{t.courierAccounts}</Text>
+
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.row, { borderBottomWidth: openSection === 'proCouriers' ? 1 : 0 }]}
+                  onPress={() => toggleSection('proCouriers')}
+                >
+                  <Ionicons name="people-outline" size={18} color="#999" />
+                  <Text style={[styles.rowValue, { flex: 1 }]}>{t.courierAccounts}</Text>
+                  <ProBadge label={t.proBadge} />
+                </TouchableOpacity>
+
+                {openSection === 'proCouriers' && (
+                  <Text style={styles.aboutTagline}>{t.proCouriersText} {t.proUpgradeHint}</Text>
+                )}
+              </View>
+            </>
+          )}
+
+          {role === 'owner' && !isFree && (
             <>
               <Text style={styles.groupLabel}>{t.addCourierAccount}</Text>
 
@@ -697,7 +731,7 @@ const stopPreviewSound = async () => {
             </>
           )}
 
-          {role === 'owner' && accounts.length > 0 && (
+          {role === 'owner' && !isFree && accounts.length > 0 && (
             <>
               <Text style={styles.groupLabel}>{t.courierAccounts}</Text>
 

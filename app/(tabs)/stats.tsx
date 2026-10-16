@@ -9,6 +9,8 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
+import { useIsFree } from '../../lib/edition';
+import ProLocked from '../../components/ProLocked';
 
 interface Order {
   order_id: number;
@@ -203,7 +205,17 @@ function withStatsCurrency(period: CompactStatsPeriod, currency: string): StatsP
   return { ...period, currency };
 }
 
+// FoodUp Free: statistics are a Pro feature. The locked view makes no requests.
 export default function StatsScreen() {
+  const isFree = useIsFree();
+  const { t } = useLanguage();
+  if (isFree) {
+    return <ProLocked title={t.proFeatureTitle} message={t.proStatsText} hint={t.proUpgradeHint} icon="bar-chart-outline" />;
+  }
+  return <ProStatsScreen />;
+}
+
+function ProStatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

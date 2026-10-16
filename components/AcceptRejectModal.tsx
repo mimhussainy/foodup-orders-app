@@ -9,6 +9,7 @@ import {
 import { formatAddress } from '../lib/formatters';
 import { getTranslation, Language } from '../lib/i18n';
 import { printOrder } from '../lib/printer';
+import { applyEditionFromResponse } from '../lib/edition';
 import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../lib/orderDisplay';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
@@ -283,6 +284,7 @@ export default function AcceptRejectModal({ order, visible, onClose, onDecisionM
       try {
         const res = await fetch(`${BACKEND_URL}/auto-settings/${code}`);
         const result = await res.json();
+        applyEditionFromResponse(result);
         if (result.success && result.settings.auto_action !== 'disabled') {
           setAutoSettings(result.settings);
           const waitSeconds = Math.max(1, Number(result.settings.wait_minutes || 5) * 60);

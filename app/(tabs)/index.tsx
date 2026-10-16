@@ -32,6 +32,7 @@ import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder, warmPrintResources } from '../../lib/printer';
 import { useLanguage } from '../../lib/useLanguage';
+import { useIsFree } from '../../lib/edition';
 
 
 interface OrderAddon {
@@ -297,6 +298,12 @@ export default function OrdersScreen() {
   const [claims, setClaims] = useState<{ [key: string]: any }>({});
 const [acceptedTimes, setAcceptedTimes] = useState<{ [key: string]: any }>({});
 const [filter, setFilter] = useState<string>('today');
+// FoodUp Free: order history ("All") and courier filters are Pro features.
+// Order reception, accept/reject and printing are identical in both editions.
+const isFree = useIsFree();
+useEffect(() => {
+  if (isFree && ['all', 'in_bag', 'delivering'].includes(filter)) setFilter('today');
+}, [isFree, filter]);
 const [search, setSearch] = useState<string>('');
 const [acceptRejectOrder, setAcceptRejectOrder] = useState<Order | null>(null);
 const [showAcceptReject, setShowAcceptReject] = useState(false);
@@ -1399,8 +1406,14 @@ useEffect(() => {
 
   const filteredOrders = orders
     .filter(o => {
-      // Orders older than today only appear in the "All" filter
-      if (isOlderThanToday(o.timestamp) && filter !== 'all') return false;
+      // Orders older than today only appear in the "All" filter.
+      // FoodUp Free has no "All" (history), so orders from before today that
+      // still need action stay reachable via "New" / "Scheduled", like in Pro.
+      const stillActionable =
+        isFree &&
+        (pendingDecisionOrders.includes(o.order_id) ||
+          (isScheduledOrder(o) && !['cancelled', 'refunded', 'completed', 'delivered'].includes(String(o.status || '').toLowerCase())));
+      if (isOlderThanToday(o.timestamp) && filter !== 'all' && !stillActionable) return false;
       if (filter === 'today') {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
         return new Date(o.timestamp) >= todayStart;
@@ -1974,8 +1987,10 @@ const flatData: FlatItem[] = [
                       { key: 'new', label: t.newOrder, color: '#f39c12' },
                       { key: 'kitchen', label: t.kitchen || 'Kitchen', color: '#1976D2' },
                       { key: 'scheduled', label: t.scheduled || 'Scheduled', color: '#0097A7' },
-                      { key: 'in_bag', label: t.inBag, color: '#2980b9' },
-                      { key: 'delivering', label: t.delivering, color: '#16a085' },
+                      ...(isFree ? [] : [
+                        { key: 'in_bag', label: t.inBag, color: '#2980b9' },
+                        { key: 'delivering', label: t.delivering, color: '#16a085' },
+                      ]),
                       { key: 'delivered', label: t.delivered, color: '#2fc053' },
                       { key: 'pickedUp', label: t.pickedUp || 'Picked Up', color: '#E91E63' },
                       { key: 'auto', label: 'Auto', color: '#795548' },
@@ -1987,6 +2002,17 @@ const flatData: FlatItem[] = [
                     renderItem={({ item: f }) => (
                       <TouchableOpacity
                         onPress={() => {
+                          if (isFree && f.key === 'all') {
+                            setAlertConfig({
+                              visible: true,
+                              title: t.proFeatureTitle,
+                              message: `${t.proHistoryText} ${t.proUpgradeHint}`,
+                              icon: 'lock-closed',
+                              iconColor: '#8B38CB',
+                              buttons: [{ text: 'OK', color: '#8B38CB' }],
+                            });
+                            return;
+                          }
                           setFilter(f.key);
                           if (f.key !== 'all') setSearch('');
                         }}
@@ -1994,7 +2020,11 @@ const flatData: FlatItem[] = [
                       >
                         <Text style={{ fontSize: 11, fontWeight: '600', color: filter === f.key ? '#fff' : f.color === '#111' ? '#666' : f.color }} numberOfLines={1}>{f.label}</Text>
                         <View style={{ backgroundColor: '#fff', borderRadius: 3, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>{filterCounts[f.key as keyof typeof filterCounts]}</Text>
+                          {isFree && f.key === 'all' ? (
+                            <Ionicons name="lock-closed" size={10} color="#8B38CB" />
+                          ) : (
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: filter === f.key ? f.color : f.color }}>{filterCounts[f.key as keyof typeof filterCounts]}</Text>
+                          )}
                         </View>
                       </TouchableOpacity>
                     )}

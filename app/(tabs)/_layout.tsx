@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useLanguage } from '../../lib/useLanguage';
+import { useIsFree } from '../../lib/edition';
 
 function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
   const color = focused ? '#8B38CB' : '#8E8E93';
@@ -25,6 +26,7 @@ function FoodUpIcon({ focused, size }: { focused: boolean; size: number }) {
 const TabLayout = React.memo(function TabLayout() {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
+  const isFree = useIsFree();
 
   return (
     <Tabs
@@ -52,7 +54,14 @@ const TabLayout = React.memo(function TabLayout() {
         options={{
           title: t.tabStatistics,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bar-chart-outline" size={size} color={color} />
+            <View>
+              <Ionicons name="bar-chart-outline" size={size} color={color} />
+              {isFree && (
+                <View style={{ position: 'absolute', right: -6, top: -4, width: 15, height: 15, borderRadius: 8, backgroundColor: '#8B38CB', borderWidth: 1.5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="lock-closed" size={8} color="#fff" />
+                </View>
+              )}
+            </View>
           ),
         }}
       />

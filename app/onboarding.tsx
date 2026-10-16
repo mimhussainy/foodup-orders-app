@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { applyEditionFromResponse } from '../lib/edition';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -106,6 +107,7 @@ export default function OnboardingScreen() {
       });
       const result = await response.json();
       if (result.success) {
+        applyEditionFromResponse(result);
         await AsyncStorage.setItem('user_role', 'owner');
         await AsyncStorage.setItem('owner_pin', pin);
         if (Platform.OS === 'ios') {

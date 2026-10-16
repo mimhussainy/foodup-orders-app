@@ -11,6 +11,7 @@ import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
 import { printOrder } from '../lib/printer';
+import { applyEditionFromResponse, loadStoredEdition } from '../lib/edition';
 import {
   isOrderRingtoneSuppressed, isOrderRingtoneResolved, resolveOrderRingtone, startOrderRingtone,
   stopAllOrderRingtone, stopOrderRingtone, subscribeOrderRingtoneResolution, suppressOrderRingtone,
@@ -557,6 +558,8 @@ export default function RootLayout() {
 
   const checkUserRole = async () => {
     try {
+      // Local read only; never blocks routing on the network.
+      await loadStoredEdition();
       const role = await AsyncStorage.getItem('user_role');
       const restaurantCode = await AsyncStorage.getItem('restaurant_code');
       if (!role || !restaurantCode) {
@@ -580,7 +583,7 @@ export default function RootLayout() {
         const code = await AsyncStorage.getItem('restaurant_code') || '';
         const role = await AsyncStorage.getItem('user_role') || '';
         if (!code || role !== 'owner') return;
-        await fetch(`${BACKEND_URL}/heartbeat`, {
+        const response = await fetch(`${BACKEND_URL}/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -589,6 +592,8 @@ export default function RootLayout() {
             app_version: '1.0.0',
           }),
         });
+        // Older backends send no edition field; then nothing changes.
+        applyEditionFromResponse(await response.json().catch(() => null));
       } catch(e) {}
     };
 

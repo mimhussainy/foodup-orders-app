@@ -13,7 +13,10 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "resourceClass": "medium"
+      "resourceClass": "medium",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "channel": "production",
