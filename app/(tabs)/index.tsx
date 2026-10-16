@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import AcceptRejectModal from '../../components/AcceptRejectModal';
 import CustomAlert from '../../components/CustomAlert';
+import RestaurantHeader, { STORE_CLOSED_COLOR, STORE_OPEN_COLOR } from '../../components/RestaurantHeader';
 import OrderCountdown from '../../components/OrderCountdown';
 import ScheduledCountdown from '../../components/ScheduledCountdown';
 import { formatDate, formatISODate, wcDateToMs } from '../../lib/dateUtils';
@@ -1885,23 +1886,22 @@ const flatData: FlatItem[] = [
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerPlaceholder} />
-        <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-        <View style={{ width: 80, alignItems: 'flex-end' }}>
-          {storeIsOpen !== null ? (
+        <RestaurantHeader
+          storeIsOpen={storeIsOpen}
+          right={storeIsOpen !== null ? (
             <Animated.View style={{
-              backgroundColor: storeIsOpen ? '#2ecc71' : '#e74c3c',
+              backgroundColor: storeIsOpen ? STORE_OPEN_COLOR : STORE_CLOSED_COLOR,
               borderRadius: 12,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
+              paddingHorizontal: 9,
+              paddingVertical: 5,
               opacity: pulseAnim,
             }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.4 }}>
                 {storeIsOpen ? t.openStore.toUpperCase() : t.closeStore.toUpperCase()}
               </Text>
             </Animated.View>
           ) : null}
-        </View>
+        />
       </View>
       <SafeAreaView style={{ flex: 1 }}>
         <FlatList
