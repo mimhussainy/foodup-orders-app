@@ -1410,16 +1410,12 @@ useEffect(() => {
   const filteredOrders = orders
     .filter(o => {
       // Orders older than today only appear in the "All" filter.
-      // FoodUp Free has no "All" (history), so orders from before today that
-      // still need action stay reachable via "New" / "Scheduled", like in Pro.
-      const stillActionable =
-        isFree &&
-        (pendingDecisionOrders.includes(o.order_id) ||
-          (isScheduledOrder(o) && !['cancelled', 'refunded', 'completed', 'delivered'].includes(String(o.status || '').toLowerCase())));
-      if (isOlderThanToday(o.timestamp) && filter !== 'all' && !stillActionable) return false;
+      // FoodUp Free has no "All" (history): only today's orders, every day
+      // starts with an empty list. Undecided orders still return as the popup.
+      if (isOlderThanToday(o.timestamp) && filter !== 'all') return false;
       if (filter === 'today') {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-        return new Date(o.timestamp) >= todayStart || stillActionable;
+        return new Date(o.timestamp) >= todayStart;
       }
       if (filter === 'table') return isDineInOrder(o);
       if (filter === 'scheduled') return isScheduledOrder(o) && o.status !== 'cancelled';
