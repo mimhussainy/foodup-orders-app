@@ -74,6 +74,7 @@ interface CompactStatsResponse {
     year: CompactStatsPeriod;
     previousYear: CompactStatsPeriod;
   };
+  months?: { [key: string]: CompactStatsPeriod };
   couriers: CompactStatsCourier[];
 }
 
@@ -180,6 +181,16 @@ function validateCompactStatsResponse(value: any): CompactStatsResponse {
   });
 
   return value as CompactStatsResponse;
+}
+
+// Per-month totals ("YYYY-MM"). Older backends do not send them: then null.
+function parseMonths(value: any): { [key: string]: CompactStatsPeriod } | null {
+  if (!value || typeof value !== 'object') return null;
+  const out: { [key: string]: CompactStatsPeriod } = {};
+  Object.keys(value).forEach(key => {
+    if (/^\d{4}-\d{2}$/.test(key) && isCompactStatsPeriod(value[key])) out[key] = value[key];
+  });
+  return out;
 }
 
 async function fetchJsonWithTimeout(url: string, timeoutMs: number) {
@@ -303,7 +314,7 @@ function Rise({ delay = 0, reduce, children }: { delay?: number; reduce: boolean
   );
 }
 
-function Segmented({ labels, index, onChange, reduce }: { labels: string[]; index: number; onChange: (i: number) => void; reduce: boolean }) {
+function Segmented({ labels, index, onChange, reduce, small }: { labels: string[]; index: number; onChange: (i: number) => void; reduce: boolean; small?: boolean }) {
   const [width, setWidth] = useState(0);
   const x = useRef(new Animated.Value(index)).current;
   useEffect(() => {
@@ -312,11 +323,12 @@ function Segmented({ labels, index, onChange, reduce }: { labels: string[]; inde
   }, [index, reduce, x]);
   const thumbWidth = width > 0 ? (width - 6) / labels.length : 0;
   return (
-    <View style={styles.seg} onLayout={e => setWidth(e.nativeEvent.layout.width)} accessibilityRole="tablist">
+    <View style={[styles.seg, small && styles.segSmall]} onLayout={e => setWidth(e.nativeEvent.layout.width)} accessibilityRole="tablist">
       {width > 0 && (
         <Animated.View
           style={[
             styles.segThumb,
+            small && styles.segThumbSmall,
             {
               width: thumbWidth,
               transform: [{ translateX: x.interpolate({ inputRange: [0, labels.length - 1], outputRange: [0, thumbWidth * (labels.length - 1)] }) }],
@@ -333,7 +345,7 @@ function Segmented({ labels, index, onChange, reduce }: { labels: string[]; inde
           accessibilityRole="tab"
           accessibilityState={{ selected: i === index }}
         >
-          <Text style={[styles.segText, i === index && styles.segTextActive]}>{label}</Text>
+          <Text style={[styles.segText, small && styles.segTextSmall, i === index && styles.segTextActive]}>{label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -381,6 +393,102 @@ function LiveDot({ reduce }: { reduce: boolean }) {
     return () => loop.stop();
   }, [reduce, v]);
   return <Animated.View style={[styles.liveDot, { opacity: v }]} />;
+}
+
+const CHART_BAR_AREA = 104;
+const CHART_HEIGHT = 232;
+const CHART_GAP = 14;
+
+interface MonthCol {
+  letter: string;
+  aria: string;
+  total: number;
+  has: boolean;
+  selected: boolean;
+  lit: boolean;
+}
+
+function MonthBar({ col, maxTotal, reduce, onPress }: { col: MonthCol; maxTotal: number; reduce: boolean; onPress: () => void }) {
+  const target = col.has ? Math.max(4, Math.round((col.total / Math.max(1, maxTotal)) * CHART_BAR_AREA)) : 3;
+  const h = useRef(new Animated.Value(target)).current;
+  useEffect(() => {
+    if (reduce) { h.setValue(target); return; }
+    Animated.timing(h, { toValue: target, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [target, reduce, h]);
+  const barColor = col.lit ? BRAND : col.has ? '#E6D7F5' : LINE;
+  const letterColor = col.selected ? INK : col.has ? MUTED : '#B9B3C6';
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      disabled={!col.has}
+      style={styles.mCol}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={col.aria}
+      accessibilityState={{ selected: col.selected, disabled: !col.has }}
+    >
+      <Text style={[styles.mValue, { opacity: col.selected ? 1 : 0 }]} numberOfLines={1}>
+        {col.has ? `${(col.total / 1000).toFixed(1)}k` : ''}
+      </Text>
+      <View style={styles.mBarArea}>
+        <Animated.View style={[styles.mBar, { height: h, backgroundColor: barColor }]} />
+      </View>
+      <Text style={[styles.mLetter, { color: letterColor, fontWeight: col.selected ? '700' : '500' }]}>{col.letter}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Slides open under the Month / Year switch. Takes exactly its own height, so nothing below jumps around.
+function Drawer({ open, reduce, children }: { open: boolean; reduce: boolean; children: ReactNode }) {
+  const v = useRef(new Animated.Value(open ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduce) { v.setValue(open ? 1 : 0); return; }
+    Animated.timing(v, { toValue: open ? 1 : 0, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [open, reduce, v]);
+  return (
+    <Animated.View
+      pointerEvents={open ? 'auto' : 'none'}
+      style={{
+        height: v.interpolate({ inputRange: [0, 1], outputRange: [0, CHART_HEIGHT] }),
+        marginTop: v.interpolate({ inputRange: [0, 1], outputRange: [-CHART_GAP, 0] }),
+        opacity: v,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+function MonthChart({ title, hint, years, yearIndex, onYear, cols, maxTotal, onPick, reduce }: {
+  title: string;
+  hint: string;
+  years: string[];
+  yearIndex: number;
+  onYear: (i: number) => void;
+  cols: MonthCol[];
+  maxTotal: number;
+  onPick: (month: number) => void;
+  reduce: boolean;
+}) {
+  return (
+    <View style={styles.chartCard}>
+      <View style={styles.chartTop}>
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text style={styles.chartTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.chartHint} numberOfLines={1}>{hint}</Text>
+        </View>
+        <View style={{ width: 124 }}>
+          <Segmented labels={years} index={yearIndex} onChange={onYear} reduce={reduce} small />
+        </View>
+      </View>
+      <View style={styles.chartCols}>
+        {cols.map((col, i) => (
+          <MonthBar key={i} col={col} maxTotal={maxTotal} reduce={reduce} onPress={() => onPick(i)} />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 function CourierRow({ c, open, onToggle, reduce, t }: { c: CourierView; open: boolean; onToggle: () => void; reduce: boolean; t: any }) {
@@ -462,6 +570,7 @@ function ProStatsScreen() {
     previousYear: StatsPeriod;
   } | null>(null);
   const [compactCouriers, setCompactCouriers] = useState<CompactStatsCourier[] | null>(null);
+  const [monthsData, setMonthsData] = useState<{ [key: string]: CompactStatsPeriod } | null>(null);
   const fetchLegacyStats = useCallback(async (code: string) => {
     const [ordersResult, deliveredResult, claimsResult] = await Promise.all([
       fetch(`${BACKEND_URL}/orders/${code}`).then(r => r.json()).catch(() => ({})),
@@ -484,6 +593,7 @@ function ProStatsScreen() {
     if (deliveredResult.success) setCourierDelivered(deliveredResult.couriers);
     setStatsPeriods(null);
     setCompactCouriers(null);
+    setMonthsData(null);
     if (claimsResult.success && ordersForClaims.success) {
       setAllOrders(ordersForClaims.orders);
       const grouped: { [key: string]: any[] } = {};
@@ -518,6 +628,7 @@ function ProStatsScreen() {
       previousYear: withStatsCurrency(result.periods.previousYear, result.currency),
     });
 
+    setMonthsData(parseMonths(result.months));
     setCompactCouriers([...result.couriers].sort((a, b) => b.legacySortTotal - a.legacySortTotal));
     setOrders([]);
     setCourierDelivered({});
@@ -609,10 +720,61 @@ useFocusEffect(
   const reduce = useReduceMotion();
   const [period, setPeriod] = useState(0);
   const [openCourier, setOpenCourier] = useState<string | null>(null);
-  const periodStats: StatsPeriod[] = [todayStats, weekStats, monthStats, yearStats];
+
+  // Month / year picker: bars for every month, one year at a time.
+  const nowDate = new Date();
+  const curYear = nowDate.getFullYear();
+  const curMonth = nowDate.getMonth();
+  const [selYear, setSelYear] = useState(curYear);
+  const [selMonth, setSelMonth] = useState(curMonth);
+  const monthNamesShort: string[] = String(t.statsMonthsShort).split(',');
+  const monthNamesFull: string[] = String(t.statsMonthsFull).split(',');
+  const monthKey = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, '0')}`;
+  const monthAt = (y: number, m: number): StatsPeriod | null => {
+    const e = monthsData ? monthsData[monthKey(y, m)] : null;
+    return e ? withStatsCurrency(e, todayStats.currency) : null;
+  };
+  const isCurMonthSel = selYear === curYear && selMonth === curMonth;
+  const selMonthStats: StatsPeriod = isCurMonthSel
+    ? monthStats
+    : monthAt(selYear, selMonth) || withStatsCurrency({ totalOrders: 0, cash: 0, online: 0, total: 0, deliveries: 0, pickups: 0 }, todayStats.currency);
+  const selYearStats = selYear === curYear ? yearStats : pastYearStats;
+  const periodStats: StatsPeriod[] = [todayStats, weekStats, selMonthStats, selYearStats];
   const current = periodStats[period];
-  const periodTitles = [t.today, t.thisWeek, t.thisMonth, t.thisYear];
   const segmentLabels = [t.today, t.statsWeek, t.statsMonth, t.statsYear];
+  const chartOpen = period >= 2 && monthsData !== null;
+  const chartYears = [curYear - 1, curYear];
+  const pickYear = (i: number) => {
+    const y = chartYears[i];
+    setSelYear(y);
+    setSelMonth(m => Math.min(m, y === curYear ? curMonth : 11));
+  };
+  const pickMonth = (m: number) => {
+    setSelMonth(m);
+    setPeriod(2);
+  };
+  const chartCols: MonthCol[] = monthNamesShort.map((label, i) => {
+    const isFuture = selYear === curYear && i > curMonth;
+    const isCurrent = selYear === curYear && i === curMonth;
+    const entry = monthAt(selYear, i) || (isCurrent ? monthStats : null);
+    const has = !isFuture && !!entry;
+    const selected = period === 2 && i === selMonth;
+    return {
+      letter: label.charAt(0),
+      aria: `${monthNamesFull[i]} ${selYear}`,
+      total: entry ? entry.total : 0,
+      has,
+      selected,
+      lit: selected || (period === 3 && has),
+    };
+  });
+  let chartMax = 1;
+  chartYears.forEach(y => {
+    for (let m = 0; m < 12; m++) {
+      const e = monthAt(y, m);
+      if (e && e.total > chartMax) chartMax = e.total;
+    }
+  });
 
   const shownOrders = useTween(current.totalOrders, reduce);
   const shownDeliveries = useTween(current.deliveries, reduce);
@@ -624,10 +786,43 @@ useFocusEffect(
   const cashPct = shownTotal > 0 ? Math.round((shownCash / shownTotal) * 100) : 0;
   const onlinePct = shownTotal > 0 ? 100 - cashPct : 0;
 
-  const previousYearTotal = pastYearStats.total;
-  const showDelta = period === 3 && previousYearTotal > 0;
-  const deltaPct = showDelta ? ((yearStats.total - previousYearTotal) / previousYearTotal) * 100 : 0;
+  // Comparison with the year before. Only finished months are compared, so a half month is never set against a full one.
+  let showDelta = false;
+  let deltaPct = 0;
+  let deltaLabel = '';
+  if (period === 2 && monthsData && !isCurMonthSel) {
+    const before = monthAt(selYear - 1, selMonth);
+    if (before && before.total > 0) {
+      showDelta = true;
+      deltaPct = ((current.total - before.total) / before.total) * 100;
+      deltaLabel = `${t.statsVs} ${monthNamesShort[selMonth]} ${selYear - 1}`;
+    }
+  } else if (period === 3 && selYear === curYear) {
+    if (monthsData) {
+      let nowSum = 0;
+      let beforeSum = 0;
+      for (let m = 0; m < curMonth; m++) {
+        nowSum += monthAt(curYear, m)?.total || 0;
+        beforeSum += monthAt(curYear - 1, m)?.total || 0;
+      }
+      if (curMonth > 0 && beforeSum > 0) {
+        showDelta = true;
+        deltaPct = ((nowSum - beforeSum) / beforeSum) * 100;
+        const range = curMonth === 1 ? monthNamesShort[0] : `${monthNamesShort[0]}–${monthNamesShort[curMonth - 1]}`;
+        deltaLabel = `${t.statsVs} ${curYear - 1} (${range})`;
+      }
+    } else if (pastYearStats.total > 0) {
+      showDelta = true;
+      deltaPct = ((yearStats.total - pastYearStats.total) / pastYearStats.total) * 100;
+      deltaLabel = t.statsVsLastYear;
+    }
+  }
   const deltaText = `${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%`;
+  const soFar = ` · ${t.statsSoFar}`;
+  let periodName = t.today;
+  if (period === 1) periodName = t.thisWeek;
+  if (period === 2) periodName = `${monthNamesShort[selMonth]} ${selYear}${isCurMonthSel ? soFar : ''}`;
+  if (period === 3) periodName = `${selYear}${selYear === curYear && !showDelta ? soFar : ''}`;
 
   const lineAmount = (o: { total: number | string }) => {
     const n = parseFloat(String(o.total || '0'));
@@ -762,12 +957,28 @@ useFocusEffect(
             <Segmented labels={segmentLabels} index={period} onChange={setPeriod} reduce={reduce} />
           </Rise>
 
+          {monthsData !== null && (
+            <Drawer open={chartOpen} reduce={reduce}>
+              <MonthChart
+                title={t.statsByMonth}
+                hint={period === 3 ? t.statsHintYear : t.statsHintMonth}
+                years={chartYears.map(String)}
+                yearIndex={selYear === curYear ? 1 : 0}
+                onYear={pickYear}
+                cols={chartCols}
+                maxTotal={chartMax}
+                onPick={pickMonth}
+                reduce={reduce}
+              />
+            </Drawer>
+          )}
+
           <Rise delay={100} reduce={reduce}>
             <View style={styles.card}>
               <View style={styles.cardTopRow}>
-                <Text style={styles.eyebrow}>{t.totalRevenue} · {periodTitles[period]}</Text>
+                <Text style={styles.eyebrow} numberOfLines={1}>{t.totalRevenue} · {periodName}</Text>
                 {showDelta && (
-                  <Text style={[styles.delta, { color: deltaPct >= 0 ? GREEN : RED }]}>{deltaText} {t.statsVsLastYear}</Text>
+                  <Text style={[styles.delta, { color: deltaPct >= 0 ? GREEN : RED }]} numberOfLines={1}>{deltaText} {deltaLabel}</Text>
                 )}
               </View>
               <View style={styles.amountRow}>
@@ -858,6 +1069,19 @@ const styles = StyleSheet.create({
   seg: { flexDirection: 'row', height: 36, padding: 3, borderRadius: 10, backgroundColor: LINE, marginBottom: 14 },
   segThumb: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 8, backgroundColor: '#fff', shadowColor: '#17141F', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.16, shadowRadius: 3, elevation: 2 },
   segItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  segSmall: { height: 28, borderRadius: 9, marginBottom: 0 },
+  segThumbSmall: { borderRadius: 7 },
+  segTextSmall: { fontSize: 12 },
+  chartCard: { height: CHART_HEIGHT, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: LINE, padding: 20, shadowColor: '#17141F', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 },
+  chartTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  chartTitle: { fontSize: 12, fontWeight: '600', color: INK },
+  chartHint: { fontSize: 11, lineHeight: 14, height: 14, color: MUTED },
+  chartCols: { flexDirection: 'row', marginTop: 14 },
+  mCol: { flex: 1, minWidth: 0, height: 148, justifyContent: 'flex-end', alignItems: 'center', gap: 4 },
+  mValue: { fontSize: 10, fontWeight: '600', height: 14, lineHeight: 14, color: INK, fontVariant: ['tabular-nums'] },
+  mBarArea: { height: CHART_BAR_AREA, width: '100%', alignItems: 'center', justifyContent: 'flex-end' },
+  mBar: { width: '62%', borderTopLeftRadius: 4, borderTopRightRadius: 4, borderBottomLeftRadius: 2, borderBottomRightRadius: 2 },
+  mLetter: { fontSize: 11, height: 14, lineHeight: 14 },
   segText: { fontSize: 12.5, fontWeight: '500', color: MUTED },
   segTextActive: { fontWeight: '600', color: INK },
   card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: LINE, padding: 20, shadowColor: '#17141F', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 },
