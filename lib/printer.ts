@@ -5,6 +5,11 @@ import { Platform } from 'react-native';
 import { getOrderPrimaryLabel, getTableLabel, isDineInOrder } from './orderDisplay';
 import { stripHouseNumber, stripHouseNumberFromSingleLine } from './address';
 import { getEdition } from './edition';
+import { formatPhone } from './formatters';
+
+function escapeTicketText(value: string): string {
+  return value.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as Record<string, string>)[c]);
+}
 
 let isPrinting = false;
 
@@ -308,6 +313,15 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
         ? `${pizzaSize} ${itemName}`
         : itemName;
 
+      // Category in italics above the product (plugin 0.5.252+ sends it only
+      // where the restaurant's "Category on tickets" setting wants it).
+      const ticketCategory = String(item.ticket_category || '').trim();
+      if (ticketCategory) {
+        itemsHtml += `
+        <tr>
+          <td colspan="2" style="text-align:left; padding: 0 0 1px 0; font-size:14px; font-style:italic; font-weight:normal; line-height:1.2;">${escapeTicketText(ticketCategory)}</td>
+        </tr>`;
+      }
       itemsHtml += `
         <tr>
           <td style="text-align:left; padding: 0; font-size:18px; font-weight:bold;">${item.quantity}x ${displayName}</td>
@@ -550,6 +564,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
           </table>
           <div class="divider"></div>
           <p style="margin:4px 0; font-size:22px; font-weight:bold;">${order.customer_name || ''}</p>
+          ${printEditionIsFree && order.customer_phone ? `<p style="margin:4px 0; font-size:20px;">${lang === 'de' ? 'Telefon' : 'Phone'}: ${escapeTicketText(formatPhone(String(order.customer_phone)))}</p>` : ''}
           ${order.shipping_address ? `${(() => {
             const parts = order.shipping_address.split(',').map((s: string) => s.trim());
             // Pro: no house number on paper; the courier scans the QR code in
