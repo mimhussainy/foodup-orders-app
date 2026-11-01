@@ -1,12 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
+  Animated,
   AppState,
-  Image, Keyboard, Platform,
+  Easing,
+  Image, Keyboard, LayoutAnimation, Platform,
   RefreshControl, SafeAreaView, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View
+  StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, UIManager, View
 } from 'react-native';
 import { useLanguage } from '../../lib/useLanguage';
 import { useIsFree } from '../../lib/edition';
@@ -45,6 +48,7 @@ interface CompactStatsPeriod {
 interface CompactStatsOrder {
   order_id: number | string;
   total: number | string;
+  older?: boolean;
 }
 
 interface CompactStatsCourier {
@@ -52,6 +56,7 @@ interface CompactStatsCourier {
   currency: string;
   todayCashTotal: number;
   inProgressCashTotal: number;
+  olderOpenCashTotal?: number;
   totalOwed: number;
   legacySortTotal: number;
   openOrderCount: number;
@@ -205,6 +210,232 @@ function withStatsCurrency(period: CompactStatsPeriod, currency: string): StatsP
   return { ...period, currency };
 }
 
+// ---------------------------------------------------------------------------
+// Statistics screen UI
+// ---------------------------------------------------------------------------
+
+const BRAND = '#8B38CB';
+const INK = '#17141F';
+const MUTED = '#6C6678';
+const LINE = '#ECE9F1';
+const GREEN = '#1E7B45';
+const RED = '#B3261E';
+const AMBER = '#9A5B00';
+
+if (Platform.OS === 'android' && (UIManager as any).setLayoutAnimationEnabledExperimental) {
+  (UIManager as any).setLayoutAnimationEnabledExperimental(true);
+}
+
+function groupThousands(text: string) {
+  return text.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+}
+function fmtInt(n: number) {
+  return groupThousands(String(Math.round(n)));
+}
+function fmtMoney(n: number) {
+  return groupThousands(n.toFixed(2));
+}
+
+interface CourierLine {
+  id: string;
+  amount: number;
+  kind: 'open' | 'delivered';
+  older: boolean;
+}
+
+interface CourierView {
+  name: string;
+  currency: string;
+  owed: number;
+  olderTotal: number;
+  lines: CourierLine[];
+}
+
+function useReduceMotion() {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(v => { if (alive) setReduce(!!v); }).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
+    return () => { alive = false; sub.remove(); };
+  }, []);
+  return reduce;
+}
+
+// Counts a number up or down to its new value (used for every figure).
+function useTween(target: number, reduce: boolean, ms = 650) {
+  const [value, setValue] = useState(target);
+  const current = useRef(target);
+  useEffect(() => {
+    if (reduce) {
+      current.current = target;
+      setValue(target);
+      return;
+    }
+    const from = current.current;
+    if (from === target) return;
+    const start = Date.now();
+    let raf = 0;
+    const step = () => {
+      const t = Math.min(1, (Date.now() - start) / ms);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (target - from) * eased;
+      current.current = next;
+      setValue(next);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, reduce, ms]);
+  return value;
+}
+
+function Rise({ delay = 0, reduce, children }: { delay?: number; reduce: boolean; children: ReactNode }) {
+  const v = useRef(new Animated.Value(reduce ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduce) { v.setValue(1); return; }
+    Animated.timing(v, { toValue: 1, duration: 480, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [reduce, delay, v]);
+  return (
+    <Animated.View style={{ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function Segmented({ labels, index, onChange, reduce }: { labels: string[]; index: number; onChange: (i: number) => void; reduce: boolean }) {
+  const [width, setWidth] = useState(0);
+  const x = useRef(new Animated.Value(index)).current;
+  useEffect(() => {
+    if (reduce) { x.setValue(index); return; }
+    Animated.timing(x, { toValue: index, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [index, reduce, x]);
+  const thumbWidth = width > 0 ? (width - 6) / labels.length : 0;
+  return (
+    <View style={styles.seg} onLayout={e => setWidth(e.nativeEvent.layout.width)} accessibilityRole="tablist">
+      {width > 0 && (
+        <Animated.View
+          style={[
+            styles.segThumb,
+            {
+              width: thumbWidth,
+              transform: [{ translateX: x.interpolate({ inputRange: [0, labels.length - 1], outputRange: [0, thumbWidth * (labels.length - 1)] }) }],
+            },
+          ]}
+        />
+      )}
+      {labels.map((label, i) => (
+        <TouchableOpacity
+          key={label}
+          activeOpacity={0.7}
+          style={styles.segItem}
+          onPress={() => onChange(i)}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: i === index }}
+        >
+          <Text style={[styles.segText, i === index && styles.segTextActive]}>{label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function SplitBar({ a, b, colorA, colorB }: { a: number; b: number; colorA: string; colorB: string }) {
+  const hasData = a + b > 0;
+  return (
+    <View style={styles.splitBar}>
+      {hasData ? (
+        <>
+          <View style={{ flex: Math.max(a, 0.0001), backgroundColor: colorA, borderTopLeftRadius: 4, borderBottomLeftRadius: 4, borderTopRightRadius: 1, borderBottomRightRadius: 1 }} />
+          <View style={{ flex: Math.max(b, 0.0001), backgroundColor: colorB, borderTopRightRadius: 4, borderBottomRightRadius: 4, borderTopLeftRadius: 1, borderBottomLeftRadius: 1 }} />
+        </>
+      ) : (
+        <View style={{ flex: 1, backgroundColor: LINE, borderRadius: 4 }} />
+      )}
+    </View>
+  );
+}
+
+function Chevron({ open, reduce }: { open: boolean; reduce: boolean }) {
+  const v = useRef(new Animated.Value(open ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduce) { v.setValue(open ? 1 : 0); return; }
+    Animated.timing(v, { toValue: open ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [open, reduce, v]);
+  return (
+    <Animated.View style={{ transform: [{ rotate: v.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
+      <Ionicons name="chevron-down" size={16} color={MUTED} />
+    </Animated.View>
+  );
+}
+
+function LiveDot({ reduce }: { reduce: boolean }) {
+  const v = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (reduce) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(v, { toValue: 0.35, duration: 1100, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 1, duration: 1100, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [reduce, v]);
+  return <Animated.View style={[styles.liveDot, { opacity: v }]} />;
+}
+
+function CourierRow({ c, open, onToggle, reduce, t }: { c: CourierView; open: boolean; onToggle: () => void; reduce: boolean; t: any }) {
+  const owes = c.owed > 0;
+  const openCount = c.lines.filter(l => l.kind === 'open').length;
+  const deliveredCount = c.lines.filter(l => l.kind === 'delivered').length;
+  const sub = c.lines.length === 0
+    ? t.statsNothingOpen
+    : `${openCount} ${t.statsInProgress} · ${deliveredCount} ${t.statsDeliveredToday}`;
+  return (
+    <View style={styles.courierBlock}>
+      <TouchableOpacity
+        activeOpacity={0.6}
+        style={styles.courierHead}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{c.name.charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.courierName}>{c.name}</Text>
+          <Text style={styles.courierSub}>{sub}</Text>
+          {c.olderTotal > 0 && (
+            <Text style={styles.courierWarn}>{c.currency} {fmtMoney(c.olderTotal)} {t.statsOlder}</Text>
+          )}
+        </View>
+        <Text style={[styles.courierOwed, { color: owes ? RED : GREEN }]}>
+          {owes ? `${c.currency} ${fmtMoney(c.owed)}` : t.statsSettled}
+        </Text>
+        <Chevron open={open} reduce={reduce} />
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.lines}>
+          {c.lines.length === 0 ? (
+            <Text style={styles.lineMuted}>{t.statsNoCash}</Text>
+          ) : (
+            c.lines.map(l => (
+              <View key={`${l.kind}-${l.id}`} style={styles.lineRow}>
+                <View style={[styles.lineDot, { backgroundColor: l.kind === 'delivered' ? GREEN : '#B7791F' }]} />
+                <Text style={styles.lineId}>#{l.id}</Text>
+                <Text style={[styles.lineMuted, l.older && { color: AMBER }]}>
+                  {l.older ? t.statsOlder : l.kind === 'delivered' ? t.statsDeliveredToday : t.statsInProgress}
+                </Text>
+                <Text style={styles.lineAmount}>{c.currency} {fmtMoney(l.amount)}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // FoodUp Free: statistics are a Pro feature. The locked view makes no requests.
 export default function StatsScreen() {
   const isFree = useIsFree();
@@ -217,7 +448,6 @@ export default function StatsScreen() {
 
 function ProStatsScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pinUnlocked, setPinUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -304,13 +534,9 @@ function ProStatsScreen() {
       await fetchLegacyStats(code);
     }
   }, [fetchCompactStats, fetchLegacyStats]);
-  const [courierStats, setCourierStats] = useState<{ [key: string]: { today: number; week: number; total: number } }>({});
   const [courierDelivered, setCourierDelivered] = useState<{ [key: string]: any[] }>({});
   const [courierClaims, setCourierClaims] = useState<{ [key: string]: any[] }>({});
   const [allOrders, setAllOrders] = useState<any[]>([]);
-  const [expandedCourier, setExpandedCourier] = useState<string | null>(null);
-  const [expandedCourierDay, setExpandedCourierDay] = useState<string | null>(null);
-  const [expandedOpenOrders, setExpandedOpenOrders] = useState<string | null>(null);
   const { t } = useLanguage();
   const scrollRef = useRef<any>(null);
   const pinInputRef = useRef<TextInput>(null);
@@ -373,9 +599,6 @@ useFocusEffect(
       setPinInput('');
     }
   };
-  const toggleExpand = (key: string) => {
-    setExpanded(prev => prev === key ? null : key);
-  };
 
   const todayStats = statsPeriods?.today || getStats(orders, getStartOfDay());
   const weekStats = statsPeriods?.week || getStats(orders, getStartOfWeek());
@@ -383,81 +606,82 @@ useFocusEffect(
   const yearStats = statsPeriods?.year || getStats(orders, getStartOfYear());
   const pastYearStats = statsPeriods?.previousYear || getStats(orders, getStartOfPastYear(), getEndOfPastYear());
 
-  const StatRows = ({ stats }: { stats: any }) => (
-    <>
-      <View style={styles.row}>
-        <Ionicons name="receipt-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.total} {t.orders}</Text>
-        <Text style={styles.rowValue}>{stats.totalOrders}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.row}>
-        <Ionicons name="bicycle-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.deliveryLabel}</Text>
-        <Text style={styles.rowValue}>{stats.deliveries}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.row}>
-        <Ionicons name="bag-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.pickupLabel}</Text>
-        <Text style={styles.rowValue}>{stats.pickups}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.row}>
-        <Ionicons name="cash-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.cashPayment}</Text>
-        <Text style={styles.rowValue}>{stats.currency} {stats.cash.toFixed(2)}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.row}>
-        <Ionicons name="card-outline" size={16} color="#999" />
-        <Text style={styles.rowLabel}>{t.onlinePayment}</Text>
-        <Text style={styles.rowValue}>{stats.currency} {stats.online.toFixed(2)}</Text>
-      </View>
-      <View style={styles.divider} />
-      <View style={styles.row}>
-        <Ionicons name="trending-up-outline" size={16} color="#999" />
-        <Text style={[styles.rowLabel, { fontWeight: '700', color: '#111' }]}>{t.totalRevenue}</Text>
-        <Text style={[styles.rowValue, { fontWeight: '700', color: '#111' }]}>{stats.currency} {stats.total.toFixed(2)}</Text>
-      </View>
-    </>
-  );
+  const reduce = useReduceMotion();
+  const [period, setPeriod] = useState(0);
+  const [openCourier, setOpenCourier] = useState<string | null>(null);
+  const periodStats: StatsPeriod[] = [todayStats, weekStats, monthStats, yearStats];
+  const current = periodStats[period];
+  const periodTitles = [t.today, t.thisWeek, t.thisMonth, t.thisYear];
+  const segmentLabels = [t.today, t.statsWeek, t.statsMonth, t.statsYear];
 
-  const CollapsibleCard = ({ title, statsKey, stats }: { title: string; statsKey: string; stats: any }) => {
-    const isOpen = expanded === statsKey;
-    return (
-      <>
-        <Text style={styles.groupLabel}>{title}</Text>
-        <View style={styles.section}>
-          {!isOpen && (
-            <TouchableOpacity
-              style={[styles.row, { borderBottomWidth: 0 }]}
-              onPress={() => toggleExpand(statsKey)}
-            >
-              <Ionicons name="bar-chart-outline" size={16} color="#999" />
-              <Text style={[styles.rowLabel, { flex: 1 }]}>
-                {stats.totalOrders === 0
-                  ? t.noOrders
-                  : `${stats.totalOrders} ${t.orders} · ${stats.currency} ${stats.total.toFixed(2)}`}
-              </Text>
-              <Text style={styles.chevron}>▼</Text>
-            </TouchableOpacity>
-          )}
-          {isOpen && (
-            <>
-              <TouchableOpacity
-                style={[styles.row, { borderBottomWidth: 1 }]}
-                onPress={() => toggleExpand(statsKey)}
-              >
-                <Text style={[styles.rowLabel, { flex: 1, fontWeight: '600', color: '#111' }]}>{title}</Text>
-                <Text style={styles.chevron}>▲</Text>
-              </TouchableOpacity>
-              <StatRows stats={stats} />
-            </>
-          )}
-        </View>
-      </>
-    );
+  const shownOrders = useTween(current.totalOrders, reduce);
+  const shownDeliveries = useTween(current.deliveries, reduce);
+  const shownPickups = useTween(current.pickups, reduce);
+  const shownCash = useTween(current.cash, reduce);
+  const shownOnline = useTween(current.online, reduce);
+  const shownTotal = shownCash + shownOnline;
+  const shownAvg = shownTotal / Math.max(1, shownOrders);
+  const cashPct = shownTotal > 0 ? Math.round((shownCash / shownTotal) * 100) : 0;
+  const onlinePct = shownTotal > 0 ? 100 - cashPct : 0;
+
+  const previousYearTotal = pastYearStats.total;
+  const showDelta = period === 3 && previousYearTotal > 0;
+  const deltaPct = showDelta ? ((yearStats.total - previousYearTotal) / previousYearTotal) * 100 : 0;
+  const deltaText = `${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%`;
+
+  const lineAmount = (o: { total: number | string }) => {
+    const n = parseFloat(String(o.total || '0'));
+    return Number.isFinite(n) ? n : 0;
+  };
+  const isCashMethod = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
+
+  let couriersView: CourierView[] = [];
+  if (compactCouriers !== null) {
+    couriersView = compactCouriers.map(c => {
+      const open: CourierLine[] = (c.openCashOrders || []).map(o => ({ id: String(o.order_id), amount: lineAmount(o), kind: 'open', older: !!o.older }));
+      const delivered: CourierLine[] = (c.todayDeliveredCashOrders || []).map(o => ({ id: String(o.order_id), amount: lineAmount(o), kind: 'delivered', older: false }));
+      return {
+        name: c.name,
+        currency: c.currency || 'CHF',
+        owed: c.totalOwed,
+        olderTotal: c.olderOpenCashTotal || 0,
+        lines: [...open, ...delivered],
+      };
+    });
+  } else {
+    // Older backend without /stats: same figures as before, built from the raw lists.
+    const names = Array.from(new Set([...Object.keys(courierDelivered), ...Object.keys(courierClaims)]));
+    const todayStart = getStartOfDay().getTime();
+    couriersView = names.map(name => {
+      const delivered = (courierDelivered[name] || []).filter((o: any) => {
+        if (!isCashMethod(o.payment_method)) return false;
+        let d = new Date(o.delivered_at);
+        if (isNaN(d.getTime())) {
+          const parts = (o.delivered_at || '').match(/(\d+)\/(\d+)\/(\d+)/);
+          if (parts) d = new Date(`${parts[3]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`);
+        }
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() === todayStart;
+      });
+      const open = (courierClaims[name] || []).filter((o: any) => isCashMethod(o.payment_method));
+      const lines: CourierLine[] = [
+        ...open.map((o: any) => ({ id: String(o.order_id), amount: lineAmount(o), kind: 'open' as const, older: false })),
+        ...delivered.map((o: any) => ({ id: String(o.order_id), amount: lineAmount(o), kind: 'delivered' as const, older: false })),
+      ];
+      return {
+        name,
+        currency: delivered[0]?.currency || open[0]?.currency || 'CHF',
+        owed: lines.reduce((sum, l) => sum + l.amount, 0),
+        olderTotal: 0,
+        lines,
+      };
+    }).sort((a, b) => b.owed - a.owed);
+  }
+  const owedTotal = couriersView.reduce((sum, c) => sum + c.owed, 0);
+  const owedCurrency = couriersView[0]?.currency || current.currency || 'CHF';
+  const toggleCourier = (name: string) => {
+    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    setOpenCourier(prev => (prev === name ? null : name));
   };
 
   if (!pinUnlocked) {
@@ -524,220 +748,97 @@ useFocusEffect(
             />
           }
         >
+          <Rise reduce={reduce}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{t.tabStatistics}</Text>
+              <View style={styles.liveWrap}>
+                <LiveDot reduce={reduce} />
+                <Text style={styles.liveText}>{t.statsLive}</Text>
+              </View>
+            </View>
+          </Rise>
 
-          <Text style={styles.groupLabel}>{t.today}</Text>
-          <View style={styles.section}>
-            <StatRows stats={todayStats} />
-          </View>
+          <Rise delay={50} reduce={reduce}>
+            <Segmented labels={segmentLabels} index={period} onChange={setPeriod} reduce={reduce} />
+          </Rise>
 
-            <CollapsibleCard title={t.thisWeek} statsKey="week" stats={weekStats} />
-            <CollapsibleCard title={t.thisMonth} statsKey="month" stats={monthStats} />
-            <CollapsibleCard title={t.thisYear} statsKey="year" stats={yearStats} />
-            {((compactCouriers !== null && compactCouriers.length > 0) || (compactCouriers === null && (Object.keys(courierDelivered).length > 0 || Object.keys(courierClaims).length > 0))) && (
-            <>
-              <Text style={styles.groupLabel}>{t.courierPerformance}</Text>
-              {compactCouriers !== null ? (
-                compactCouriers.map(courier => {
-                const name = courier.name;
-                const isOpen = expandedCourier === name;
-                const currency = courier.currency || 'CHF';
-                const openCashOrders = courier.openCashOrders || [];
-                const todayCashOrders = courier.todayDeliveredCashOrders || [];
-                const todayCashTotal = courier.todayCashTotal;
-                const inProgressCashTotal = courier.inProgressCashTotal;
-                const totalOwed = courier.totalOwed;
+          <Rise delay={100} reduce={reduce}>
+            <View style={styles.card}>
+              <View style={styles.cardTopRow}>
+                <Text style={styles.eyebrow}>{t.totalRevenue} · {periodTitles[period]}</Text>
+                {showDelta && (
+                  <Text style={[styles.delta, { color: deltaPct >= 0 ? GREEN : RED }]}>{deltaText} {t.statsVsLastYear}</Text>
+                )}
+              </View>
+              <View style={styles.amountRow}>
+                <Text style={styles.currency}>{current.currency}</Text>
+                <Text style={styles.amount}>{fmtMoney(shownTotal)}</Text>
+              </View>
 
-                return (
-                  <View key={name} style={[styles.section, { marginBottom: 10 }]}>
-                    <TouchableOpacity
-                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
-                      onPress={() => setExpandedCourier(isOpen ? null : name)}
-                    >
-                      <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
-                      <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: totalOwed > 0 ? '#e74c3c' : '#2ecc71' }}>
-                          {t.total || 'Total'}: {currency} {totalOwed.toFixed(2)}
-                        </Text>
-                      </View>
-                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
-                    </TouchableOpacity>
+              <View style={styles.hr} />
 
-                    {isOpen && (
-                      <>
-                        {/* In Progress / Open Orders */}
-                        {courier.openOrderCount > 0 && (
-                          <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f39c12', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                              {t.openOrders || 'Open Orders'}
-                            </Text>
-                            {openCashOrders.map((o: CompactStatsOrder, oi: number) => (
-                              <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === openCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
-                                <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
-                                <Text style={{ fontSize: 13, color: '#f39c12', fontWeight: '600' }}>{currency} {parseFloat(String(o.total)).toFixed(2)}</Text>
-                              </View>
-                            ))}
-                            {openCashOrders.length === 0 && (
-                              <Text style={{ fontSize: 13, color: '#999' }}>{t.noCashInProgress || 'No cash orders in progress'}</Text>
-                            )}
-                            {openCashOrders.length > 0 && (
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: '#f39c12' }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{currency} {inProgressCashTotal.toFixed(2)}</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
+              <View style={styles.strip}>
+                <View style={styles.stripCol}>
+                  <Text style={styles.stripLabel}>{t.orders}</Text>
+                  <Text style={styles.stripValue}>{fmtInt(shownOrders)}</Text>
+                </View>
+                <View style={[styles.stripCol, styles.stripColDivider]}>
+                  <Text style={styles.stripLabel}>{t.statsAvgOrder}</Text>
+                  <Text style={styles.stripValue}>{fmtMoney(shownAvg)}</Text>
+                </View>
+                <View style={[styles.stripCol, styles.stripColDivider]}>
+                  <Text style={styles.stripLabel}>{t.deliveryLabel}</Text>
+                  <Text style={styles.stripValue}>{fmtInt(shownDeliveries)}</Text>
+                </View>
+                <View style={[styles.stripCol, styles.stripColDivider]}>
+                  <Text style={styles.stripLabel}>{t.pickupLabel}</Text>
+                  <Text style={styles.stripValue}>{fmtInt(shownPickups)}</Text>
+                </View>
+              </View>
+              {current.totalOrders === 0 && <Text style={styles.emptyNote}>{t.noOrders}</Text>}
 
-                        {/* Today Delivered Cash */}
-                        <View style={{ paddingVertical: 10 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B38CB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                            {t.today} — {t.delivered || 'Delivered'}
-                          </Text>
-                          {todayCashOrders.length === 0 ? (
-                            <Text style={{ fontSize: 13, color: '#999' }}>{t.noDeliveriesToday || 'No cash deliveries today'}</Text>
-                          ) : (
-                            <>
-                              {todayCashOrders.map((o: CompactStatsOrder, oi: number) => (
-                                <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === todayCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
-                                  <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
-                                  <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{currency} {parseFloat(String(o.total)).toFixed(2)}</Text>
-                                </View>
-                              ))}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#111' }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{t.cashCollected || 'Cash Collected'}</Text>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{currency} {todayCashTotal.toFixed(2)}</Text>
-                              </View>
-                            </>
-                          )}
-                        </View>
+              <View style={styles.hr} />
 
-                        {/* Grand Total Owed */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1.5, borderTopColor: '#8B38CB' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{t.totalToSubmit || 'Total to Submit'}</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{currency} {totalOwed.toFixed(2)}</Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                );
-              })
-              ) : (() => {
-                const isCashFn = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
-                const allCourierNames = Array.from(new Set([
-                  ...Object.keys(courierDelivered),
-                  ...Object.keys(courierClaims),
-                ])).sort((a, b) => {
-                  const aCash = (courierDelivered[a] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0)
-                    + (courierClaims[a] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0);
-                  const bCash = (courierDelivered[b] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0)
-                    + (courierClaims[b] || []).filter((o: any) => isCashFn(o.payment_method)).reduce((s: number, o: any) => s + parseFloat(o.total || '0'), 0);
-                  return bCash - aCash;
-                });
-                return allCourierNames.map(name => {
-                const orders = courierDelivered[name] || [];
-                const isOpen = expandedCourier === name;
-                const today = new Date(); today.setHours(0, 0, 0, 0);
+              <View style={styles.sectionTop}>
+                <Text style={styles.sectionTitle}>{t.statsPayment}</Text>
+                <Text style={styles.sectionMeta}>{t.cashPayment} {cashPct}% · {t.onlinePayment} {onlinePct}%</Text>
+              </View>
+              <SplitBar a={shownCash} b={shownOnline} colorA={INK} colorB={BRAND} />
+              <View style={styles.legendRow}>
+                <View style={styles.legendCol}>
+                  <View style={[styles.swatch, { backgroundColor: INK }]} />
+                  <Text style={styles.legendLabel}>{t.cashPayment}</Text>
+                  <Text style={styles.legendValue}>{fmtMoney(shownCash)}</Text>
+                </View>
+                <View style={[styles.legendCol, styles.legendColDivider]}>
+                  <View style={[styles.swatch, { backgroundColor: BRAND }]} />
+                  <Text style={styles.legendLabel}>{t.onlinePayment}</Text>
+                  <Text style={styles.legendValue}>{fmtMoney(shownOnline)}</Text>
+                </View>
+              </View>
+            </View>
+          </Rise>
 
-                const isCash = (pm: string) => pm?.toLowerCase().includes('bar') || pm?.toLowerCase().includes('cash');
-                const formatDate = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-
-                const todayCashOrders = orders.filter((o: any) => {
-                  if (!isCash(o.payment_method)) return false;
-                  let d = new Date(o.delivered_at);
-                  if (isNaN(d.getTime())) {
-                    const parts = (o.delivered_at || '').match(/(\d+)\/(\d+)\/(\d+)/);
-                    if (parts) d = new Date(`${parts[3]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`);
-                  }
-                  d.setHours(0,0,0,0);
-                  return d.getTime() === today.getTime();
-                });
-                const todayCashTotal = todayCashOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                const inProgress = courierClaims[name] || [];
-                const inProgressCash = inProgress.filter((o: any) => isCash(o.payment_method));
-                const inProgressCashTotal = inProgressCash.reduce((sum: number, o: any) => sum + parseFloat(o.total || '0'), 0);
-                const totalOwed = todayCashTotal + inProgressCashTotal;
-                const currency = orders[0]?.currency || inProgressCash[0]?.currency || 'CHF';
-
-                return (
-                  <View key={name} style={[styles.section, { marginBottom: 10 }]}>
-                    <TouchableOpacity
-                      style={[styles.row, { borderBottomWidth: isOpen ? 1 : 0 }]}
-                      onPress={() => setExpandedCourier(isOpen ? null : name)}
-                    >
-                      <Ionicons name="bicycle-outline" size={16} color={isOpen ? '#8B38CB' : '#999'} />
-                      <Text style={[styles.rowLabel, { fontWeight: '700', color: isOpen ? '#8B38CB' : '#111' }]}>{name}</Text>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: totalOwed > 0 ? '#e74c3c' : '#2ecc71' }}>
-                          {t.total || 'Total'}: {currency} {totalOwed.toFixed(2)}
-                        </Text>
-                      </View>
-                      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={isOpen ? '#8B38CB' : '#999'} />
-                    </TouchableOpacity>
-
-                    {isOpen && (
-                      <>
-                        {/* In Progress / Open Orders */}
-                        {inProgress.length > 0 && (
-                          <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f39c12', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                              {t.openOrders || 'Open Orders'}
-                            </Text>
-                            {inProgressCash.map((o: any, oi: number) => (
-                              <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === inProgressCash.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
-                                <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
-                                <Text style={{ fontSize: 13, color: '#f39c12', fontWeight: '600' }}>{currency} {parseFloat(o.total).toFixed(2)}</Text>
-                              </View>
-                            ))}
-                            {inProgressCash.length === 0 && (
-                              <Text style={{ fontSize: 13, color: '#999' }}>{t.noCashInProgress || 'No cash orders in progress'}</Text>
-                            )}
-                            {inProgressCash.length > 0 && (
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: '#f39c12' }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{t.unconfirmedCash || 'Unconfirmed Cash'}</Text>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#f39c12' }}>{currency} {inProgressCashTotal.toFixed(2)}</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-
-                        {/* Today Delivered Cash */}
-                        <View style={{ paddingVertical: 10 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B38CB', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                            {t.today} — {t.delivered || 'Delivered'}
-                          </Text>
-                          {todayCashOrders.length === 0 ? (
-                            <Text style={{ fontSize: 13, color: '#999' }}>{t.noDeliveriesToday || 'No cash deliveries today'}</Text>
-                          ) : (
-                            <>
-                              {todayCashOrders.map((o: any, oi: number) => (
-                                <View key={o.order_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: oi === todayCashOrders.length - 1 ? 0 : 1, borderBottomColor: '#F5F5F5' }}>
-                                  <Text style={{ fontSize: 13, color: '#666' }}>#{o.order_id}</Text>
-                                  <Text style={{ fontSize: 13, color: '#111', fontWeight: '600' }}>{currency} {parseFloat(o.total).toFixed(2)}</Text>
-                                </View>
-                              ))}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTopWidth: 1.5, borderTopColor: '#111' }}>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111' }}>{t.cashCollected || 'Cash Collected'}</Text>
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B38CB' }}>{currency} {todayCashTotal.toFixed(2)}</Text>
-                              </View>
-                            </>
-                          )}
-                        </View>
-
-                        {/* Grand Total Owed */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1.5, borderTopColor: '#8B38CB' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{t.totalToSubmit || 'Total to Submit'}</Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B38CB' }}>{currency} {totalOwed.toFixed(2)}</Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                );
-              });
-              })()}
-            </>
+          {couriersView.length > 0 && (
+            <Rise delay={160} reduce={reduce}>
+              <View style={styles.card}>
+                <View style={styles.courierTop}>
+                  <Text style={styles.sectionTitle}>{t.statsCourierCash}</Text>
+                  <Text style={styles.sectionMeta}>{owedCurrency} {fmtMoney(owedTotal)} {t.statsToSubmit}</Text>
+                </View>
+                {couriersView.map(c => (
+                  <CourierRow
+                    key={c.name}
+                    c={c}
+                    open={openCourier === c.name}
+                    onToggle={() => toggleCourier(c.name)}
+                    reduce={reduce}
+                    t={t}
+                  />
+                ))}
+              </View>
+            </Rise>
           )}
-
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -745,15 +846,57 @@ useFocusEffect(
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F7F7' },
-  header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? 40 : 65, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#F6F5F8' },
+  header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? 40 : 65, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: LINE, alignItems: 'center' },
   logo: { width: 100, height: 30 },
-  scrollContent: { paddingBottom: 40, paddingTop: 8 },
-  groupLabel: { fontSize: 13, fontWeight: '500', color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 24, marginBottom: 8, marginHorizontal: 20 },
-  section: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 0 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  rowLabel: { fontSize: 14, color: '#666', flex: 1 },
-  rowValue: { fontSize: 14, color: '#111', fontWeight: '500' },
-  chevron: { fontSize: 12, color: '#999' },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 40, gap: 14 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 },
+  title: { fontSize: 18, fontWeight: '600', color: INK, letterSpacing: -0.2 },
+  liveWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: GREEN },
+  liveText: { fontSize: 11, color: MUTED },
+  seg: { flexDirection: 'row', height: 36, padding: 3, borderRadius: 10, backgroundColor: LINE, marginBottom: 14 },
+  segThumb: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 8, backgroundColor: '#fff', shadowColor: '#17141F', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.16, shadowRadius: 3, elevation: 2 },
+  segItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  segText: { fontSize: 12.5, fontWeight: '500', color: MUTED },
+  segTextActive: { fontWeight: '600', color: INK },
+  card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: LINE, padding: 20, shadowColor: '#17141F', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2, elevation: 1 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  eyebrow: { fontSize: 11, fontWeight: '500', letterSpacing: 0.6, textTransform: 'uppercase', color: MUTED, flexShrink: 1 },
+  delta: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 8 },
+  currency: { fontSize: 13, fontWeight: '600', color: MUTED },
+  amount: { fontSize: 28, fontWeight: '700', letterSpacing: -0.6, color: INK, fontVariant: ['tabular-nums'] },
+  hr: { height: 1, backgroundColor: LINE, marginVertical: 18 },
+  strip: { flexDirection: 'row' },
+  stripCol: { flex: 1, gap: 4 },
+  stripColDivider: { paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: LINE },
+  stripLabel: { fontSize: 11, color: MUTED },
+  stripValue: { fontSize: 15, fontWeight: '600', color: INK, fontVariant: ['tabular-nums'] },
+  emptyNote: { fontSize: 12, color: MUTED, marginTop: 10 },
+  sectionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: '600', color: INK },
+  sectionMeta: { fontSize: 11, color: MUTED, fontVariant: ['tabular-nums'] },
+  splitBar: { flexDirection: 'row', gap: 2, height: 8 },
+  legendRow: { flexDirection: 'row', marginTop: 12 },
+  legendCol: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legendColDivider: { paddingLeft: 14, borderLeftWidth: 1, borderLeftColor: LINE },
+  swatch: { width: 8, height: 8, borderRadius: 2 },
+  legendLabel: { fontSize: 12, color: MUTED, flexShrink: 1 },
+  legendValue: { fontSize: 12, fontWeight: '600', color: INK, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
+  courierTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12 },
+  courierBlock: { borderTopWidth: 1, borderTopColor: LINE },
+  courierHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3EAFB', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 12, fontWeight: '700', color: BRAND },
+  courierName: { fontSize: 13, fontWeight: '600', color: INK },
+  courierSub: { fontSize: 11, color: MUTED, marginTop: 2 },
+  courierWarn: { fontSize: 11, color: AMBER, marginTop: 2 },
+  courierOwed: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  lines: { paddingBottom: 12, paddingLeft: 44, gap: 8 },
+  lineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  lineDot: { width: 6, height: 6, borderRadius: 3 },
+  lineId: { fontSize: 12, fontWeight: '500', color: INK, fontVariant: ['tabular-nums'] },
+  lineMuted: { fontSize: 12, color: MUTED },
+  lineAmount: { fontSize: 12, fontWeight: '600', color: INK, marginLeft: 'auto', fontVariant: ['tabular-nums'] },
 });
