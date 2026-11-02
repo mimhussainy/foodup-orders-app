@@ -11,6 +11,7 @@ import {
 import { useLanguage } from '../../lib/useLanguage';
 import { clearStoredEdition, getEdition, useIsFree } from '../../lib/edition';
 import { ProBadge } from '../../components/ProLocked';
+import { RestaurantLogoAvatar } from '../../components/RestaurantHeader';
 
 const BACKEND_URL = 'https://foodup-order-alerts-backend.onrender.com';
 
@@ -1159,7 +1160,7 @@ const stopPreviewSound = async () => {
           {role === 'owner' && (
             <View style={{ marginHorizontal: 16, marginTop: 10, gap: 18 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4 }}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+                <RestaurantLogoAvatar fallback={<View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 15, fontWeight: '700', color: INK }} numberOfLines={1}>{restaurantName || t.setUpProfile}</Text>
                   <Text style={{ fontSize: 11, color: MUTED, marginTop: 2 }} numberOfLines={1}>{restaurantCode}</Text>

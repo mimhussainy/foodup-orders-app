@@ -96,6 +96,22 @@ export default function RestaurantHeader({ storeIsOpen, right }: { storeIsOpen: 
   );
 }
 
+// The same restaurant logo as in the Orders header, as a plain circle without
+// the open/closed ring (used in Settings). Shows `fallback` when there is no logo.
+export function RestaurantLogoAvatar({ size = 42, fallback }: { size?: number; fallback: ReactNode }) {
+  const { logoUrl } = useRestaurantBranding();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => { setFailed(false); }, [logoUrl]);
+
+  if (!logoUrl || failed) return <>{fallback}</>;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#FFFFFF', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+      <Image source={{ uri: logoUrl }} style={{ width: '82%', height: '82%' }} resizeMode="contain" onError={() => setFailed(true)} />
+    </View>
+  );
+}
+
 export const STORE_OPEN_COLOR = OPEN_COLOR;
 export const STORE_CLOSED_COLOR = CLOSED_COLOR;
 
