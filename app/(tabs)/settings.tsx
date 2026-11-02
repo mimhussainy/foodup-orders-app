@@ -1254,10 +1254,11 @@ const stopPreviewSound = async () => {
           {/* Hidden: press and hold the version line for 3 seconds to clear orders (owner only). */}
           <TouchableOpacity
             activeOpacity={1}
+            style={{ paddingVertical: 12, marginTop: Platform.OS === 'android' && deviceId ? 0 : 24 }}
             onLongPress={role === 'owner' ? confirmClearOrders : undefined}
             delayLongPress={3000}
           >
-            <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 4 }}>v1.0.0 — build bc20cba</Text>
+            <Text style={{ textAlign: 'center', color: '#999', fontSize: 11 }}>v1.0.0 — build bc20cba</Text>
           </TouchableOpacity>
         </ScrollView>
         </KeyboardAvoidingView>
