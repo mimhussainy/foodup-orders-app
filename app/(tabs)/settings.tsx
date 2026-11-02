@@ -1254,7 +1254,7 @@ const stopPreviewSound = async () => {
           {/* Hidden: press and hold the version line for 3 seconds to clear orders (owner only). */}
           <TouchableOpacity
             activeOpacity={1}
-            style={{ paddingVertical: 12, marginTop: Platform.OS === 'android' && deviceId ? 0 : 24 }}
+            style={{ paddingVertical: 8, marginTop: Platform.OS === 'android' && deviceId ? 0 : 8 }}
             onLongPress={role === 'owner' ? confirmClearOrders : undefined}
             delayLongPress={3000}
           >
