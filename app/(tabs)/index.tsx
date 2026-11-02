@@ -2045,7 +2045,7 @@ const flatData: FlatItem[] = [
             const order = item.item;
             return (
               <TouchableOpacity
-                style={[styles.section, { paddingTop: 14, paddingBottom: 14 }]}
+                style={[styles.section, { paddingTop: 14, paddingBottom: 14, paddingLeft: 12, borderLeftWidth: 4, borderLeftColor: getOrderStatusPresentation(order).color }]}
                 onPress={() => setSelectedOrder(order)}
                 activeOpacity={0.7}
               >
