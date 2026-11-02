@@ -1446,7 +1446,7 @@ const sortedOrders = [...filteredOrders].sort((a, b) => {
 });
 const sections = groupOrdersByDate(sortedOrders, t);
 
-type FlatItem = { type: 'storeStatus' } | { type: 'tableServiceEvents' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string } | { type: 'order'; item: Order };
+type FlatItem = { type: 'storeStatus' } | { type: 'tableServiceEvents' } | { type: 'searchBar' } | { type: 'filterTabs' } | { type: 'header'; title: string; count: number } | { type: 'order'; item: Order };
 
 const flatData: FlatItem[] = [
   { type: 'storeStatus' },
@@ -1454,7 +1454,7 @@ const flatData: FlatItem[] = [
   ...(filter === 'all' ? [{ type: 'searchBar' as const }] : []),
   ...(isFree ? [] : [{ type: 'filterTabs' as const }]),
   ...sections.flatMap(section => [
-    { type: 'header' as const, title: section.title },
+    { type: 'header' as const, title: section.title, count: section.data.length },
     ...section.data.map(item => ({ type: 'order' as const, item })),
   ]),
 ];
@@ -2033,7 +2033,14 @@ const flatData: FlatItem[] = [
               );
             }
             if (item.type === 'header') {
-              return <Text style={styles.groupLabel}>{item.title}</Text>;
+              return (
+                <Text style={styles.groupLabel}>
+                  {item.title}
+                  <Text style={{ textTransform: 'none', color: '#999', letterSpacing: 0 }}>
+                    {`  (${item.count} ${item.count === 1 ? t.orderOne : t.orderMany})`}
+                  </Text>
+                </Text>
+              );
             }
             const order = item.item;
             return (

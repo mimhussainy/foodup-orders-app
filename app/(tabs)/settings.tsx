@@ -1240,12 +1240,6 @@ const stopPreviewSound = async () => {
           </View>
 
           <View style={{ marginHorizontal: 16, marginTop: 18, flexDirection: 'row', gap: 12 }}>
-            {role === 'owner' && (
-              <TouchableOpacity style={[styles.dangerBtn, { backgroundColor: '#FBE9E7' }]} onPress={confirmClearOrders} activeOpacity={0.8}>
-                <Ionicons name="trash-outline" size={16} color="#B3261E" />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#B3261E' }}>{t.clearOrders}</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity style={[styles.dangerBtn, { backgroundColor: INK }]} onPress={confirmLogout} activeOpacity={0.8}>
               <Ionicons name="log-out-outline" size={16} color="#fff" />
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{t.logOut}</Text>
@@ -1257,7 +1251,14 @@ const stopPreviewSound = async () => {
               {t.deviceId}: {deviceId}
             </Text>
           ) : null}
-          <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 4 }}>v1.0.0 — build bc20cba</Text>
+          {/* Hidden: press and hold the version line for 3 seconds to clear orders (owner only). */}
+          <TouchableOpacity
+            activeOpacity={1}
+            onLongPress={role === 'owner' ? confirmClearOrders : undefined}
+            delayLongPress={3000}
+          >
+            <Text style={{ textAlign: 'center', color: '#999', fontSize: 11, marginTop: 4 }}>v1.0.0 — build bc20cba</Text>
+          </TouchableOpacity>
         </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
