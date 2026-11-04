@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
 import * as Print from 'expo-print';
 import { Platform } from 'react-native';
-import { getOrderPrimaryLabel, getTableLabel, isDineInOrder } from './orderDisplay';
+import { getExplicitPaidState, getKioskServiceLabel, getOrderPrimaryLabel, getQrOrderNumber, getTableLabel, isDineInOrder, isKioskOrder } from './orderDisplay';
 import { stripHouseNumber, stripHouseNumberFromSingleLine } from './address';
 import { getEdition } from './edition';
 import { formatPhone } from './formatters';
@@ -250,6 +250,34 @@ async function resolvePrintBranding(code: string): Promise<{ logoUrl: string; sc
   return refreshPrintBranding(code);
 }
 
+// Restaurant name for the kiosk ticket header. The cached name is used at once;
+// only the very first kiosk print waits (max 2.5 s) for the profile.
+async function resolveRestaurantName(code: string): Promise<string> {
+  if (!code) return '';
+  const cacheKey = `foodup_print_restaurant_name_${code}`;
+  const cached = ((await AsyncStorage.getItem(cacheKey).catch(() => null)) || '').trim();
+
+  const refresh = (async () => {
+    try {
+      const data = await fetchJsonWithTimeout(
+        `${PRINTER_BACKEND_URL}/restaurant-profile/${encodeURIComponent(code)}`,
+        2500
+      );
+      const name = String(data?.profile?.name || data?.profile?.restaurant_name || '').trim();
+      if (name) await AsyncStorage.setItem(cacheKey, name).catch(() => {});
+      return name;
+    } catch (e) {
+      return '';
+    }
+  })();
+
+  if (cached) {
+    void refresh;
+    return cached;
+  }
+  return refresh;
+}
+
 export async function warmPrintResources(): Promise<void> {
   try {
     const code = (await AsyncStorage.getItem('restaurant_code') || '').toLowerCase().trim();
@@ -393,7 +421,8 @@ export async function printOrder(order: any, acceptedMinutes?: number, rejected?
     const dineInOrder = isDineInOrder(order);
 
     const tablePaymentMethod = String(order.payment_method || '').trim().toLowerCase();
-    const tablePaymentPending =
+    const explicitKioskPaid = isKioskOrder(order) ? getExplicitPaidState(order) : null;
+    const tablePaymentPending = explicitKioskPaid !== null ? !explicitKioskPaid :
       tablePaymentMethod === 'fuo_table_counter' ||
       tablePaymentMethod === 'fuo_table_waiter' ||
       tablePaymentMethod.includes('cashier') ||
@@ -517,6 +546,93 @@ const acceptanceHtml = resolvedScheduledStr ? `
       </html>
     `;
 
+    // ── Kiosk ticket (design: Ticket.dc.html) ─────────────────────────────────
+    const kioskOrder = isKioskOrder(order);
+    let kioskTicketHtml = '';
+    if (kioskOrder) {
+      const kioskCode = await AsyncStorage.getItem('restaurant_code').catch(() => '') || '';
+      const kioskRestaurantName = await resolveRestaurantName(kioskCode);
+      const kioskNumber = getQrOrderNumber(order);
+      const kioskServiceLabel = getKioskServiceLabel(order, lang).toUpperCase();
+      const kioskKicker = [
+        lang === 'de' ? 'Kiosk-Bestellung' : 'Kiosk order',
+        String(order.kiosk_name || '').trim(),
+      ].filter(Boolean).join(' · ');
+      const kioskPaid = getExplicitPaidState(order) ?? !tablePaymentPending;
+      const kioskLabels = {
+        ordered: lang === 'de' ? 'Bestellt' : 'Ordered',
+        total: lang === 'de' ? 'Total' : 'Total',
+        paymentMode: lang === 'de' ? 'Zahlungsart' : 'Payment',
+        paidOnline: lang === 'de' ? 'Online bezahlt' : 'Paid online',
+        atCounter: lang === 'de' ? 'An der Kasse' : 'At the counter',
+        paid: lang === 'de' ? '✓ Bezahlt' : '✓ Paid',
+        notPaidYet: lang === 'de' ? 'NOCH NICHT BEZAHLT' : 'NOT PAID YET',
+        note: lang === 'de' ? 'Hinweis' : 'Note',
+      };
+
+      let kioskItemsHtml = '';
+      (order.items || []).forEach((item: any) => {
+        const category = String(item.ticket_category || '').trim();
+        if (category) {
+          kioskItemsHtml += `<tr><td colspan="2" style="padding:0 0 1px 0; font-size:12px; font-style:italic;">${escapeTicketText(category)}</td></tr>`;
+        }
+        const variation = String(item.variation || '').trim();
+        const itemName = escapeTicketText(String(item.name || '').trim());
+        kioskItemsHtml += `
+          <tr>
+            <td style="padding:0; font-size:15px; font-weight:800;">${item.quantity}× ${itemName}${variation && !String(item.name || '').includes(variation) ? ` <span style="font-weight:600;">(${escapeTicketText(variation)})</span>` : ''}</td>
+            <td style="padding:0; font-size:15px; font-weight:800; text-align:right; white-space:nowrap;">${order.currency} ${parseFloat(String(item.total || '0')).toFixed(2)}</td>
+          </tr>`;
+        (item.addons || []).forEach((addon: any) => {
+          const addonText = escapeTicketText(String(addon.value || addon.label || '').trim());
+          if (!addonText) return;
+          kioskItemsHtml += `<tr><td colspan="2" style="padding:0 0 0 12px; font-size:13px; font-weight:600;">+ ${addonText}</td></tr>`;
+        });
+        kioskItemsHtml += `<tr><td colspan="2" style="padding-bottom:7px;"></td></tr>`;
+      });
+
+      kioskTicketHtml = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px; width: 280px; color:#000; }
+            * { -webkit-print-color-adjust: exact; }
+            @page { margin: 0; size: 80mm auto; }
+            .divider { border-top: 1px solid #000; margin: 9px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            td { vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          ${logoHtml}
+          ${kioskRestaurantName ? `<div style="text-align:center; font-size:15px; font-weight:900; letter-spacing:1px; text-transform:uppercase; margin:2px 0 6px;">${escapeTicketText(kioskRestaurantName)}</div>` : ''}
+          <div style="text-align:center; font-size:11px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; margin:2px 0 2px;">${escapeTicketText(kioskKicker)}</div>
+          <div style="text-align:center; font-size:44px; line-height:1.05; font-weight:900; margin:2px 0 6px;">${kioskNumber !== null ? `#${kioskNumber}` : `#${order.order_id}`}</div>
+          <div style="background:#000; color:#fff; text-align:center; font-size:22px; font-weight:900; letter-spacing:1px; padding:6px 0; margin:0 0 4px;">${kioskServiceLabel}</div>
+          <div class="divider"></div>
+          <p style="margin:3px 0; font-size:14px;">${kioskLabels.ordered}: <span style="float:right; font-weight:700;">${createdTimeStr}&nbsp;&nbsp;${createdDateStr}</span></p>
+          <div class="divider"></div>
+          <table>${kioskItemsHtml}</table>
+          <div class="divider"></div>
+          <table>
+            <tr><td colspan="2" style="text-align:right; font-size:21px; font-weight:900;">${kioskLabels.total}:&nbsp;&nbsp;${order.currency} ${parseFloat(String(order.total || '0')).toFixed(2)}</td></tr>
+          </table>
+          <div style="border:2px solid #000; padding:8px 9px; margin:10px 0; text-align:center;">
+            <div style="font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-bottom:3px;">${kioskLabels.paymentMode}</div>
+            <div style="font-size:19px; font-weight:900; line-height:1.15;">${kioskPaid ? kioskLabels.paidOnline : kioskLabels.atCounter}</div>
+            ${kioskPaid
+              ? `<div style="font-size:15px; font-weight:800; margin-top:4px;">${kioskLabels.paid}</div>`
+              : `<div style="background:#000; color:#fff; font-size:15px; font-weight:900; letter-spacing:.5px; padding:5px 0; margin-top:6px;">${kioskLabels.notPaidYet}</div>`}
+          </div>
+          ${order.note ? `<p style="font-size:16px; margin:6px 0;"><strong>${kioskLabels.note}:</strong> ${escapeTicketText(String(order.note))}</p>` : ''}
+          <div style="border-top:1px dashed #000; margin:12px 0;"></div>
+          <p style="text-align:center; font-size:12px; margin:4px 0;">Powered by: foodup.ch</p>
+        </body>
+      </html>
+    `;
+    }
+
     const printEditionIsFree = getEdition() === 'free';
     const normalOrderHtml = `
       <html>
@@ -627,7 +743,7 @@ const acceptanceHtml = resolvedScheduledStr ? `
       </html>
     `;
 
-    const html = dineInOrder ? tableOrderHtml : normalOrderHtml;
+    const html = kioskOrder ? kioskTicketHtml : dineInOrder ? tableOrderHtml : normalOrderHtml;
 
     const printTimeout = new Promise<void>((_, reject) =>
       setTimeout(() => reject(new Error('Print timeout after 60s')), 60000)

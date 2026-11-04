@@ -230,6 +230,8 @@ export default function SettingsScreen() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState('');
   const [checkingPrinter, setCheckingPrinter] = useState(false);
+  const [kioskDevices, setKioskDevices] = useState<{ id: string; name: string; enabled: boolean; status: string }[]>([]);
+  const [togglingKiosk, setTogglingKiosk] = useState<string | null>(null);
 
   const getPin = async () => {
     const iosPin = await AsyncStorage.getItem('ios_pin') || '';
@@ -313,6 +315,50 @@ export default function SettingsScreen() {
     } catch (e) {}
     setProductsLoading(false);
   };
+
+  // FoodUp Kiosk switches (owner only). The list is empty, and the section hidden,
+  // until at least one kiosk is paired on the restaurant's website.
+  const kioskWebsiteUrl = () =>
+    restaurantWebsite.startsWith('http') ? restaurantWebsite : `https://${restaurantWebsite}`;
+
+  const loadKioskDevices = async () => {
+    if (!restaurantWebsite) return;
+    try {
+      const res = await fetch(`${kioskWebsiteUrl()}/wp-json/foodup/v1/kiosk-devices?secret=foodup2026`);
+      const result = await res.json();
+      if (result?.success && Array.isArray(result.devices)) {
+        setKioskDevices(result.devices.map((d: any) => ({
+          id: String(d.id || ''),
+          name: String(d.name || 'Kiosk'),
+          enabled: d.enabled !== false,
+          status: String(d.status || 'offline'),
+        })).filter((d: any) => d.id));
+      }
+    } catch (e) {}
+  };
+
+  const toggleKiosk = async (deviceId: string, enabled: boolean) => {
+    setTogglingKiosk(deviceId);
+    try {
+      const res = await fetch(`${kioskWebsiteUrl()}/wp-json/foodup/v1/kiosk-toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: 'foodup2026', device_id: deviceId, enabled }),
+      });
+      const result = await res.json();
+      if (result?.success) {
+        setKioskDevices(prev => prev.map(d => d.id === deviceId
+          ? { ...d, enabled, status: enabled ? (d.status === 'paused' ? 'online' : d.status) : 'paused' }
+          : d));
+      }
+    } catch (e) {}
+    setTogglingKiosk(null);
+    void loadKioskDevices();
+  };
+
+  useEffect(() => {
+    if (role === 'owner' && restaurantWebsite) void loadKioskDevices();
+  }, [role, restaurantWebsite]);
 
   const toggleProduct = async (productId: number, enabled: boolean) => {
     setTogglingProduct(productId);
@@ -1188,6 +1234,42 @@ const stopPreviewSound = async () => {
                   </View>
                   <Toggle passive on={!!storeIsOpen} onColor="rgba(255,255,255,0.35)" />
                 </TouchableOpacity>
+              )}
+
+              {kioskDevices.length > 0 && (
+                <View style={[styles.section, { marginHorizontal: 0, paddingVertical: 4 }]}>
+                  {kioskDevices.map((device, index) => {
+                    const statusLabel =
+                      device.status === 'paused' ? t.kioskPaused
+                      : device.status === 'closed' ? t.kioskClosed
+                      : device.status === 'online' ? t.kioskOnline
+                      : t.kioskOffline;
+                    const statusColor =
+                      device.status === 'online' ? '#16A34A'
+                      : device.status === 'paused' ? '#f39c12'
+                      : device.status === 'closed' ? '#e74c3c'
+                      : '#999';
+                    return (
+                      <View
+                        key={device.id}
+                        style={[styles.row, { borderBottomWidth: index === kioskDevices.length - 1 ? 0 : 1, paddingVertical: 12 }]}
+                      >
+                        <Ionicons name="tablet-portrait-outline" size={18} color={PURPLE} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: INK }} numberOfLines={1}>{device.name}</Text>
+                          <Text style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                            {t.kioskTakingOrders} · <Text style={{ color: statusColor, fontWeight: '700' }}>{statusLabel}</Text>
+                          </Text>
+                        </View>
+                        <Toggle
+                          on={device.enabled}
+                          onPress={() => toggleKiosk(device.id, !device.enabled)}
+                          disabled={togglingKiosk === device.id}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
               )}
 
               <View style={{ flexDirection: 'row', gap: 10 }}>

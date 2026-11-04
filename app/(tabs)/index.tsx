@@ -28,7 +28,7 @@ import OrderCountdown from '../../components/OrderCountdown';
 import ScheduledCountdown from '../../components/ScheduledCountdown';
 import { formatDate, formatISODate, wcDateToMs } from '../../lib/dateUtils';
 import { formatAddress, formatPhone } from '../../lib/formatters';
-import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, isDineInOrder } from '../../lib/orderDisplay';
+import { getOrderPrimaryLabel, getQrOrderContextLabel, getTableLabel, getExplicitPaidState, isDineInOrder, isKioskOrder, kioskFieldsFrom } from '../../lib/orderDisplay';
 import { orderRingtoneKey, releaseOrderRingtoneSuppression, resolveOrderRingtone, suppressOrderRingtone } from '../../lib/orderRingtone';
 import { groupOrdersByDate, isOlderThanToday, isPickupMethod, isScheduledOrder, isTodayBeforeThreeAM } from '../../lib/orderUtils';
 import { printOrder, warmPrintResources } from '../../lib/printer';
@@ -79,6 +79,11 @@ interface Order {
   table_round_id?: string;
   table_integration?: string;
   source?: string;
+  paid?: boolean;
+  payment_status?: string;
+  payment_method_id?: string;
+  kiosk_device?: string;
+  kiosk_name?: string;
 }
 
 interface TableServiceEvent {
@@ -117,6 +122,13 @@ function getStatusLabel(status: string, t: any) {
 }
 
 function isUnpaidOrder(order: any): boolean {
+  // Kiosk orders carry an explicit paid flag from the website (online payment
+  // confirmed, or "pay at counter"), so the payment text is not guessed.
+  if (isKioskOrder(order)) {
+    const explicit = getExplicitPaidState(order);
+    if (explicit !== null) return !explicit;
+  }
+
   const method = String(order?.payment_method || '').trim().toLowerCase();
   const normalOfflinePayment =
     method.includes('bar') ||
@@ -741,6 +753,7 @@ useEffect(() => {
           table_round_id: o.table_round_id || '',
           table_integration: o.table_integration || '',
           source: o.source || '',
+          ...kioskFieldsFrom(o),
         }));
         setOrders(prev => {
           const merged = [...prev];
@@ -821,6 +834,7 @@ useEffect(() => {
             table_round_id: data.table_round_id || '',
             table_integration: data.table_integration || '',
             source: data.source || '',
+            ...kioskFieldsFrom(data),
             items: data.items || '[]',
           };
           AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(printData)).catch(() => {});
@@ -926,6 +940,7 @@ useEffect(() => {
         table_round_id: data.table_round_id || '',
         table_integration: data.table_integration || '',
         source: data.source || '',
+        ...kioskFieldsFrom(data),
         };
 
         if (data.event_type === 'status_update') {
@@ -1056,6 +1071,7 @@ useEffect(() => {
           table_round_id: order.table_round_id || '',
           table_integration: order.table_integration || '',
           source: order.source || '',
+          ...kioskFieldsFrom(order),
           sound: false,
         }),
       });
@@ -1165,6 +1181,7 @@ useEffect(() => {
           table_round_id: order.table_round_id || '',
           table_integration: order.table_integration || '',
           source: order.source || '',
+          ...kioskFieldsFrom(order),
           sound: false,
         }),
       });
@@ -1252,6 +1269,7 @@ useEffect(() => {
             table_round_id: target.table_round_id || '',
             table_integration: target.table_integration || '',
             source: target.source || '',
+            ...kioskFieldsFrom(target),
             sound: false,
           }),
         });
@@ -1362,6 +1380,16 @@ useEffect(() => {
     return { label: t.newOrder || 'Received', color: '#f39c12', key: 'received' };
   };
 
+  // A kiosk order is accepted by the Orders backend within seconds. If it is still
+  // not accepted after 3 minutes, tell the owner instead of hiding the order.
+  const isKioskUnconfirmed = (order: Order) => {
+    if (!isKioskOrder(order)) return false;
+    if (acceptedTimes[String(order.order_id)] || autoPrintOrders[String(order.order_id)]) return false;
+    if (['cancelled', 'refunded', 'completed', 'failed'].includes(String(order.status || '').toLowerCase())) return false;
+    const age = Date.now() - Number(order.timestamp || 0);
+    return age > 3 * 60 * 1000 && age < 12 * 60 * 60 * 1000;
+  };
+
   const getOrderStatusPresentation = (order: Order) => {
     if (isDineInOrder(order)) return getTableStatusPresentation(order);
     return {
@@ -1434,6 +1462,7 @@ useEffect(() => {
         String(o.table_number || '').toLowerCase().includes(s) ||
         String(o.table_name || '').toLowerCase().includes(s) ||
         o.customer_name.toLowerCase().includes(s) ||
+        String(o.kiosk_name || '').toLowerCase().includes(s) ||
         o.customer_phone.toLowerCase().includes(s)
       );
     });
@@ -1530,8 +1559,8 @@ const flatData: FlatItem[] = [
               <View style={styles.divider} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name={isDineInOrder(selectedOrder) ? "restaurant-outline" : "person-outline"} size={Platform.OS === 'android' ? 13 : 14} color="#999" />
-                  <Text style={styles.orderCustomer}>{isDineInOrder(selectedOrder) ? (getTableLabel(selectedOrder, t.table || 'Tisch') || 'Am Tisch') : selectedOrder.customer_name}</Text>
+                  <Ionicons name={isKioskOrder(selectedOrder) ? "tablet-portrait-outline" : isDineInOrder(selectedOrder) ? "restaurant-outline" : "person-outline"} size={Platform.OS === 'android' ? 13 : 14} color="#999" />
+                  <Text style={styles.orderCustomer}>{isKioskOrder(selectedOrder) ? (selectedOrder.kiosk_name || 'Kiosk') : isDineInOrder(selectedOrder) ? (getTableLabel(selectedOrder, t.table || 'Tisch') || 'Am Tisch') : selectedOrder.customer_name}</Text>
                 </View>
                 {selectedOrder.orderable_order_time ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -2057,6 +2086,11 @@ const flatData: FlatItem[] = [
                         <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#795548' }}>{t.autoAccepted}</Text>
                       </View>
                     )}
+                    {isKioskUnconfirmed(order) && (
+                      <View style={{ backgroundColor: '#e74c3c20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: Platform.OS === 'android' ? 10 : 11, fontWeight: '600', color: '#e74c3c' }}>{t.kioskNotConfirmed || 'Nicht bestätigt'}</Text>
+                      </View>
+                    )}
                     {pendingDecisionOrders.includes(order.order_id) && (
                       <TouchableOpacity
                         onPress={async (e) => {
@@ -2088,8 +2122,8 @@ const flatData: FlatItem[] = [
                 <View style={styles.divider} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name={isDineInOrder(order) ? "restaurant-outline" : "person-outline"} size={14} color="#999" />
-                    <Text style={styles.orderCustomer}>{isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name}</Text>
+                    <Ionicons name={isKioskOrder(order) ? "tablet-portrait-outline" : isDineInOrder(order) ? "restaurant-outline" : "person-outline"} size={14} color="#999" />
+                    <Text style={styles.orderCustomer}>{isKioskOrder(order) ? (order.kiosk_name || 'Kiosk') : isDineInOrder(order) ? (getTableLabel(order, t.table || 'Tisch') || 'Am Tisch') : order.customer_name}</Text>
                   </View>
                   {order.orderable_order_time ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

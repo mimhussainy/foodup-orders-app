@@ -11,6 +11,7 @@ import AcceptRejectModal from '../components/AcceptRejectModal';
 import { LanguageProvider } from '../lib/LanguageContext';
 import { formatDate, wcDateToMs } from '../lib/dateUtils';
 import { printOrder } from '../lib/printer';
+import { isKioskOrder, kioskFieldsFrom } from '../lib/orderDisplay';
 import { applyEditionFromResponse, loadStoredEdition } from '../lib/edition';
 import {
   isOrderRingtoneSuppressed, isOrderRingtoneResolved, resolveOrderRingtone, startOrderRingtone,
@@ -651,6 +652,7 @@ export default function RootLayout() {
             table_round_id: data.table_round_id || '',
             table_integration: data.table_integration || '',
             source: data.source || '',
+            ...kioskFieldsFrom(data),
             items: data.items || '[]',
           };
           await AsyncStorage.setItem(`auto_print_${data.order_id}`, JSON.stringify(autoPrintPayload));
@@ -715,10 +717,19 @@ export default function RootLayout() {
           table_round_id: data.table_round_id || '',
           table_integration: data.table_integration || '',
           source: data.source || '',
+          ...kioskFieldsFrom(data),
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
           date_created: data.date_created || '',
         };
+
+        // Kiosk orders are accepted by the backend at once and printed from the
+        // "auto_accepted" push, so nobody has to accept or reject them.
+        if (isKioskOrder(newOrder)) {
+          debugLog(`KIOSK order:${newOrder.order_id} - no accept/reject modal, backend accepts it`);
+          await AsyncStorage.setItem('orders_live_refresh', String(Date.now())).catch(() => {});
+          return;
+        }
 
         await addPendingDecision(newOrder.order_id, String(newOrder.restaurant_code || currentCode).toLowerCase().trim());
         debugLog(`SRC:notification order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
@@ -779,9 +790,11 @@ export default function RootLayout() {
           table_round_id: data.table_round_id || '',
           table_integration: data.table_integration || '',
           source: data.source || '',
+          ...kioskFieldsFrom(data),
           orderable_order_time: data.orderable_order_time || '',
           orderable_order_date: data.orderable_order_date || '',
         };
+        if (isKioskOrder(newOrder)) return;
         debugLog(`SRC:tap order:${newOrder.order_id} age_min:${Math.floor((Date.now() - newOrder.timestamp) / 60000)}`);
         await addPendingDecision(newOrder.order_id, String(newOrder.restaurant_code || currentCode).toLowerCase().trim());
         const enqueued = await enqueueOrder(newOrder, true, true);
@@ -839,6 +852,7 @@ export default function RootLayout() {
         table_round_id: String(raw?.table_round_id || ''),
         table_integration: String(raw?.table_integration || ''),
         source: String(raw?.source || ''),
+        ...kioskFieldsFrom(raw),
         orderable_order_time: String(raw?.orderable_order_time || ''),
         orderable_order_date: String(raw?.orderable_order_date || ''),
         date_created: dateCreated,
@@ -899,6 +913,7 @@ export default function RootLayout() {
       table_round_id: String(order?.table_round_id || ''),
       table_integration: String(order?.table_integration || ''),
       source: String(order?.source || ''),
+      ...kioskFieldsFrom(order),
       items: Array.isArray(order?.items) ? order.items : safeParseItems(order?.items),
     });
 
@@ -996,6 +1011,7 @@ export default function RootLayout() {
           const state = result.states?.[String(order.order_id)] || {};
           if (state.accepted || state.rejected) continue;
           order.auto_actioned = Boolean(state.auto_actioned);
+          if (isKioskOrder(order)) continue; // accepted by the backend, never reviewed in the app
           if (!shouldRecoverForDecision(order)) continue;
           if (!authorizedOrderDevice) continue;
 
